@@ -24,7 +24,7 @@ import {
   buildProvenance,
   unavailableProvenance,
 } from './provenance.js';
-import { densityFor, NO_DENSITY_MESSAGE } from './density.js';
+import { densityFor, densityUnavailableReason } from './density.js';
 import { formatForUnit } from './format.js';
 import { num } from './text.js';
 import {
@@ -132,7 +132,7 @@ export function toGrams(
     if (!d) {
       return {
         grams: null,
-        provenance: unavailableProvenance(NO_DENSITY_MESSAGE(ing.name)),
+        provenance: unavailableProvenance(densityUnavailableReason(ing)),
       };
     }
     const grams = (qty * ml * d.gPer100) / 100;
@@ -273,7 +273,7 @@ export function convert(
     const ml = mlPerUnit(to.id, prefs);
     if (ml == null) return fail('אין גודל כלי מוגדר');
     const d = densityFor(ing, prefs, to.id);
-    if (!d) return fail(NO_DENSITY_MESSAGE(ing.name));
+    if (!d) return fail(densityUnavailableReason(ing));
     needsReview = needsReview || d.needsReview;
     const value = ((g.grams / d.gPer100) * 100) / ml;
     const step: ProvenanceStep = {

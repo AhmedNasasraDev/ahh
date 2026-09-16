@@ -1,6 +1,9 @@
 // Conflict report, DERIVED from density-table.ts rather than hand-written, so it
-// can never drift from the data it describes. Requirement §8: where legacy values
-// disagree, report the disagreement instead of guessing which one is right.
+// can never drift from the data it describes.
+//
+// Approved policy: a disagreement is reported, never averaged and never settled
+// by keeping "whatever was there before". A row only carries a value when one
+// uncontradicted source covers it; otherwise it stays unvalued and appears here.
 
 import {
   CONFLICT_TOLERANCE_PCT,
@@ -9,77 +12,75 @@ import {
   LEGACY_CUP_ML,
   type DensityEntry,
   type LegacySource,
+  type Resolution,
 } from './density-table.js';
 
 export interface DensityConflict {
   key: string;
   ingredient: string;
-  /** the value this engine currently uses */
-  resolved: number;
-  /** which legacy table the resolved value came from */
-  authority: LegacySource;
-  /** the legacy values that disagree, and by how much */
-  disagreements: Array<{
-    source: LegacySource;
-    gPer100: number;
-    deltaPct: number;
-  }>;
+  resolution: Resolution;
+  /** the value in use, or null when none was adopted */
+  resolved: number | null;
+  /** every legacy value on record for this row, awaiting a ruling */
+  candidates: Array<{ source: LegacySource; gPer100: number }>;
+  /** widest relative gap between candidates, 0 when there is one or none */
   maxDeltaPct: number;
+  /** sibling forms, for rows split by physical form */
+  forms?: string[];
   reviewNote: string;
 }
 
-function authorityOf(entry: DensityEntry): LegacySource {
-  if (entry.sources['measure.TABLE'] != null) return 'measure.TABLE';
-  const keys = Object.keys(entry.sources) as LegacySource[];
-  return keys[0] ?? 'measure.TABLE';
+function spread(values: number[]): number {
+  if (values.length < 2) return 0;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (min === 0) return 0;
+  return Math.round(((max - min) / min) * 1000) / 10;
 }
 
-function buildConflicts(): DensityConflict[] {
-  const out: DensityConflict[] = [];
-  for (const entry of DENSITY_TABLE) {
-    const authority = authorityOf(entry);
-    const base = entry.sources[authority];
-    if (base == null) continue;
-    const disagreements: DensityConflict['disagreements'] = [];
-    for (const [src, val] of Object.entries(entry.sources) as Array<
-      [LegacySource, number]
-    >) {
-      if (src === authority) continue;
-      const deltaPct = ((val - base) / base) * 100;
-      if (Math.abs(deltaPct) > CONFLICT_TOLERANCE_PCT) {
-        disagreements.push({
-          source: src,
-          gPer100: val,
-          deltaPct: Math.round(deltaPct * 10) / 10,
-        });
-      }
-    }
-    const singleSourced = Object.keys(entry.sources).length === 1;
-    if (disagreements.length === 0 && !(singleSourced && entry.needsReview)) {
-      continue;
-    }
-    out.push({
-      key: entry.key,
-      ingredient: entry.match[0] ?? entry.key,
-      resolved: entry.gPer100,
-      authority,
-      disagreements,
-      maxDeltaPct: disagreements.reduce(
-        (m, d) => Math.max(m, Math.abs(d.deltaPct)),
-        0,
-      ),
-      reviewNote: entry.reviewNote ?? '',
-    });
-  }
-  return out.sort((a, b) => b.maxDeltaPct - a.maxDeltaPct);
+function toConflict(entry: DensityEntry): DensityConflict {
+  const candidates = (
+    Object.entries(entry.sources) as Array<[LegacySource, number]>
+  ).map(([source, gPer100]) => ({ source, gPer100 }));
+  return {
+    key: entry.key,
+    ingredient: entry.match[0] ?? entry.key,
+    resolution: entry.resolution,
+    resolved: entry.gPer100,
+    candidates,
+    maxDeltaPct: spread(candidates.map((c) => c.gPer100)),
+    ...(entry.forms ? { forms: entry.forms } : {}),
+    reviewNote: entry.reviewNote ?? '',
+  };
 }
 
-export const DENSITY_CONFLICTS: readonly DensityConflict[] = buildConflicts();
+/** Everything a human still has to look at. */
+export const DENSITY_CONFLICTS: readonly DensityConflict[] = DENSITY_TABLE
+  .filter((e) => e.needsReview === true)
+  .map(toConflict)
+  .sort((a, b) => b.maxDeltaPct - a.maxDeltaPct);
+
+/** Sources disagree; no value adopted. The engine answers `unavailable`. */
+export const PENDING_VERIFICATION: readonly DensityConflict[] =
+  DENSITY_CONFLICTS.filter((c) => c.resolution === 'pending-verification');
+
+/** The name covers several physical forms; no value until each form is measured. */
+export const PENDING_FORM: readonly DensityConflict[] =
+  DENSITY_CONFLICTS.filter((c) => c.resolution === 'pending-form');
+
+/** One uncontradicted source; the value is in use but wants a second opinion. */
+export const ACCEPTED_SINGLE_SOURCE: readonly DensityConflict[] =
+  DENSITY_CONFLICTS.filter((c) => c.resolution === 'accepted-single-source');
+
+/** Rows whose sources agree and which need no further attention. */
+export const ACCEPTED: readonly string[] = DENSITY_TABLE.filter(
+  (e) => e.resolution === 'accepted',
+).map((e) => e.key);
 
 /**
  * Cases where a legacy table had NO row and silently used its invented fallback,
- * while the authority table does have a real value. Not a disagreement between
- * two claims — a disagreement between a claim and a guess.
+ * while another table does hold a real value. Not a disagreement between two
+ * claims — a disagreement between a claim and a guess.
  */
 export interface FallbackDivergence {
   key: string;
@@ -107,9 +108,7 @@ export const FALLBACK_DIVERGENCES: readonly FallbackDivergence[] = (
   tableValue,
   legacyFallback: FALLBACK_DRY_G_PER_100,
   deltaPct:
-    Math.round(
-      ((FALLBACK_DRY_G_PER_100 - tableValue) / tableValue) * 1000,
-    ) / 10,
+    Math.round(((FALLBACK_DRY_G_PER_100 - tableValue) / tableValue) * 1000) / 10,
   legacySource: 'engine.CUP_DRY' as LegacySource,
 }));
 
@@ -129,20 +128,19 @@ export const SUSPECT_TERMS: readonly {
   },
   {
     term: 'חלבון',
-    filedUnder: 'egg (103 g/100ml)',
+    filedUnder: 'egg.white',
     looksLike: 'גם חלק מהשם "קמח לחם 13% חלבון"',
     effect:
-      'שורת הקמח מופיעה לפניה בסדר החיפוש, ובנוסף הוספה החרגה מפורשת של "קמח" בשורת הביצה.',
+      'שורת הקמח מופיעה לפניה בסדר החיפוש, ובנוסף יש החרגה מפורשת של "קמח" בשורות הביצה.',
   },
 ];
 
 /**
  * The legacy "we do not know, so here is a number anyway" fallbacks.
- * Deliberately NOT part of the lookup path. Exported so nothing is lost and so a
- * migration can compare old and new behaviour.
+ * REMOVED from the lookup path by approved decision §7. Kept here so nothing is
+ * lost and so a migration can compare old and new behaviour.
  *
- * Spec §5.1 rule 5 and §18.1: no reliable data → no number. These fallbacks are
- * the direct opposite of that rule, which is why they are quarantined here.
+ * Spec §5.1 rule 5 and §18.1: no reliable data → no number.
  */
 export const LEGACY_INVENTED_FALLBACKS = {
   /** engine.js:40 and parser.js:26 — any unrecognised dry ingredient */
@@ -156,33 +154,31 @@ export const LEGACY_INVENTED_FALLBACKS = {
 } as const;
 
 /**
- * Ingredients the merged table deliberately refuses to answer for, and what the
- * prototype used to say instead. Filling these in is a data task for a
- * professional, not a code change.
+ * Ingredients the table refuses to answer for, and what the prototype used to
+ * say instead. Approved decision §6: leave them unresolved, do not guess.
  */
 export const KNOWN_GAPS: readonly {
   name: string;
-  legacyAnswerGramsPerCup: number | null;
+  legacyAnswerGramsPerCup: number;
   legacyVia: string;
-}[] = KNOWN_DATA_GAPS.map((name) => {
-  if (name.startsWith('קמח')) {
-    return {
-      name,
-      legacyAnswerGramsPerCup: 120,
-      legacyVia: "engine.CUP_DRY matched the substring 'קמח'",
-    };
-  }
-  return {
-    name,
-    legacyAnswerGramsPerCup: LEGACY_INVENTED_FALLBACKS.dryGramsPerCup,
-    legacyVia: 'engine.CUP_DRY fell through to its 150 g/cup default',
-  };
-});
+}[] = KNOWN_DATA_GAPS.map((name) =>
+  name.startsWith('קמח')
+    ? {
+        name,
+        legacyAnswerGramsPerCup: 120,
+        legacyVia: "engine.CUP_DRY matched the substring 'קמח'",
+      }
+    : {
+        name,
+        legacyAnswerGramsPerCup: LEGACY_INVENTED_FALLBACKS.dryGramsPerCup,
+        legacyVia: 'engine.CUP_DRY fell through to its 150 g/cup default',
+      },
+);
 
 /**
- * Ingredients where the prototype's SPLIT tables made it use its invented
- * fallback even though one of the other tables held a real value. Found by the
- * merge itself — see README.md → "what the merge uncovered".
+ * Defects the merge itself uncovered: engine.cupGrams only consulted engine.DENS
+ * when the name matched an internal liquid regex, so an ingredient that WAS in
+ * one of its own tables still fell through to the 150 g/cup guess.
  */
 export const SPLIT_TABLE_ERRORS: readonly {
   name: string;
@@ -197,7 +193,7 @@ export const SPLIT_TABLE_ERRORS: readonly {
     mergedGramsPerCup: 142 * 2.4,
     factor: (142 * 2.4) / 150,
     cause:
-      "engine.DENS knew honey was 1.42 g/ml, but engine.cupGrams only consulted it when the name matched its liquid regex /מים|חלב|שמנת|שמן|מיץ|יין|ביצ/ — honey does not. Any cup or spoon of honey was costed and weighed at 150 g/cup instead of 340.8.",
+      "engine.DENS knew honey was 1.42 g/ml, but engine.cupGrams only consulted it when the name matched its liquid regex /מים|חלב|שמנת|שמן|מיץ|יין|ביצ/ — honey does not. Any cup or spoon of honey was weighed and costed at 150 g/cup instead of 340.8.",
   },
   {
     name: 'סירופ / מולסה',
@@ -215,3 +211,24 @@ export const SPLIT_TABLE_ERRORS: readonly {
       'Present in measure.TABLE (104) but absent from both engine tables and from the liquid regex.',
   },
 ];
+
+/** One-line summary, handy for a status screen or a CI log. */
+export function conflictSummary(): {
+  rows: number;
+  accepted: number;
+  acceptedSingleSource: number;
+  pendingVerification: number;
+  pendingForm: number;
+  knownGaps: number;
+  tolerancePct: number;
+} {
+  return {
+    rows: DENSITY_TABLE.length,
+    accepted: ACCEPTED.length,
+    acceptedSingleSource: ACCEPTED_SINGLE_SOURCE.length,
+    pendingVerification: PENDING_VERIFICATION.length,
+    pendingForm: PENDING_FORM.length,
+    knownGaps: KNOWN_DATA_GAPS.length,
+    tolerancePct: CONFLICT_TOLERANCE_PCT,
+  };
+}

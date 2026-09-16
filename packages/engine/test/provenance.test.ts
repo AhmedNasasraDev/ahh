@@ -113,10 +113,20 @@ describe('B3 — an estimate can never surface as exact', () => {
   });
 
   it('a reviewed table row propagates needsReview to the caller', () => {
-    const r = convert({ name: 'שקדים', qty: 1, unit: 'cup' }, 'g', P240);
+    // ground coffee: one uncontradicted source, value in use, flagged
+    const r = convert({ name: 'קפה טחון', qty: 1, unit: 'cup' }, 'g', P240);
     expect(r.ok).toBe(true);
     expect(r.provenance.needsReview).toBe(true);
     expect(r.provenance.source).toBe('estimate');
+  });
+
+  it('a row with no value at all is refused, with its own explanation', () => {
+    const r = convert({ name: 'שקדים', qty: 1, unit: 'cup' }, 'g', P240);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.why).toContain('נמדד אחרת בכל צורה');
+    expect(r.provenance.source).toBe('unavailable');
+    expect(r.provenance.exact).toBe(false);
   });
 });
 

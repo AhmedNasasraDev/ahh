@@ -16,16 +16,24 @@ export {
   gramsPerCup,
   isKnownDataGap,
   lookupDensity,
+  unvaluedEntries,
+  valuedEntries,
   type DensityEntry,
   type LegacySource,
+  type Resolution,
 } from './data/density-table.js';
 export {
+  ACCEPTED,
+  ACCEPTED_SINGLE_SOURCE,
   DENSITY_CONFLICTS,
   FALLBACK_DIVERGENCES,
   KNOWN_GAPS,
   LEGACY_INVENTED_FALLBACKS,
+  PENDING_FORM,
+  PENDING_VERIFICATION,
   SPLIT_TABLE_ERRORS,
   SUSPECT_TERMS,
+  conflictSummary,
   type DensityConflict,
   type FallbackDivergence,
 } from './data/density-conflicts.js';
@@ -71,7 +79,11 @@ export {
   upsertCalibration,
   type CalibrationInput,
 } from './calibration.js';
-export { NO_DENSITY_MESSAGE, densityFor } from './density.js';
+export {
+  NO_DENSITY_MESSAGE,
+  densityFor,
+  densityUnavailableReason,
+} from './density.js';
 
 // provenance
 export {

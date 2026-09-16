@@ -76,8 +76,9 @@ describe('flour, cornstarch and powdered sugar', () => {
     const powdered = lookupDensity('אבקת סוכר');
     const cocoa = lookupDensity('קקאו');
     expect(powdered?.gPer100).toBe(46);
-    expect(cocoa?.gPer100).toBe(42);
     expect(powdered?.key).not.toBe(cocoa?.key);
+    // cocoa itself is unvalued pending verification — see the cocoa block below
+    expect(cocoa?.gPer100).toBeNull();
   });
 
   it('vanilla icing sugar still resolves as powdered sugar (order-based lookup)', () => {
@@ -85,36 +86,41 @@ describe('flour, cornstarch and powdered sugar', () => {
   });
 
   it('whole-wheat flour is its own row, granulated sugar is its own row', () => {
-    expect(lookupDensity('קמח מלא')?.gPer100).toBe(54);
+    expect(lookupDensity('קמח מלא')?.key).toBe('flour.wholemeal');
+    expect(lookupDensity('קמח מלא')?.gPer100).toBeNull(); // pending verification
     expect(lookupDensity('קמח לבן')?.gPer100).toBe(50);
     expect(lookupDensity('סוכר')?.gPer100).toBe(83);
     expect(lookupDensity('סוכר חום')?.gPer100).toBe(79);
   });
 });
 
-describe('cocoa — the documented conflict', () => {
+describe('cocoa — conflicting values, so no value at all', () => {
   const cocoa = DENSITY_TABLE.find((r) => r.key === 'cocoa')!;
 
-  it('resolves to the authority value and keeps both legacy values on record', () => {
-    expect(cocoa.gPer100).toBe(42);
+  it('carries no value, and keeps every legacy candidate on record', () => {
+    expect(cocoa.gPer100).toBeNull();
+    expect(cocoa.resolution).toBe('pending-verification');
     expect(cocoa.sources['measure.TABLE']).toBe(42);
     expect(cocoa.sources['engine.CUP_DRY']).toBeCloseTo(45.83, 2);
     expect(cocoa.sources['parser.DRY']).toBeCloseTo(45.83, 2);
   });
 
-  it('is flagged for professional review rather than silently resolved', () => {
+  it('is flagged for professional review, not silently resolved', () => {
     expect(cocoa.needsReview).toBe(true);
-    expect(cocoa.reviewNote).toContain('9%');
+    expect(cocoa.reviewNote).toContain('9.1%');
+    expect(cocoa.reviewNote).toContain('אין ערך בשימוש עד אימות');
   });
 
-  it('the conflict surfaces in the conversion provenance', () => {
+  it('converting a cup of cocoa is refused, with the conflict spelled out', () => {
     const r = convert({ name: 'קקאו', qty: 1, unit: 'cup' }, 'g', P240);
-    expect(r.ok).toBe(true);
-    expect(r.provenance.needsReview).toBe(true);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.why).toContain('נתונים סותרים');
+    expect(r.provenance.source).toBe('unavailable');
   });
 
-  it('1 cup of cocoa = 100.8 g here, where the legacy engine said 110 g', () => {
-    expect(gramsPerCup(cocoa, 240)).toBeCloseTo(100.8, 6);
+  it('gramsPerCup returns null rather than a number', () => {
+    expect(gramsPerCup(cocoa, 240)).toBeNull();
   });
 });
 

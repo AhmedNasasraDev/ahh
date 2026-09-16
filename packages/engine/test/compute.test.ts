@@ -30,7 +30,8 @@ describe('cost and yield come from the same source of truth', () => {
     const c = compute(CUP_CAKE, [CUP_CAKE], { prefs: P240 });
     const flourRow = c.rows.find((r) => r.ing.id === 'i1')!;
     const entry = lookupDensity('קמח לבן')!;
-    expect(flourRow.g).toBeCloseTo((2 * 240 * entry.gPer100) / 100, 6);
+    expect(entry.gPer100).not.toBeNull();
+    expect(flourRow.g).toBeCloseTo((2 * 240 * entry.gPer100!) / 100, 6);
     expect(flourRow.provenance.chain[0]?.densityKey).toBe('flour.white');
   });
 

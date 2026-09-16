@@ -9,24 +9,35 @@ import type {
   MeasurementPrefs,
   ToolId,
 } from './types.js';
-import { lookupDensity } from './data/density-table.js';
+import {
+  densityEntryByKey,
+  isKnownDataGap,
+  lookupDensity,
+} from './data/density-table.js';
 import { findCalibration } from './calibration.js';
 import { numOrNull } from './text.js';
 import { unit } from './units.js';
 
+const CALIBRATE_HINT = 'אפשר לשקול כוס אחת ולהוסיף כיול אישי.';
+
 export const NO_DENSITY_MESSAGE = (name: string | undefined): string =>
-  `אין נתון אמין להמרת ${name?.trim() || 'הרכיב הזה'} בין נפח למשקל. אפשר לשקול כוס אחת ולהוסיף כיול אישי.`;
+  `אין נתון אמין להמרת ${name?.trim() || 'הרכיב הזה'} בין נפח למשקל. ${CALIBRATE_HINT}`;
 
 /**
  * Spec §5.1 precedence:
  *   1. personal   — the user's own calibration for this exact ingredient
  *   2. recipe     — ingredient.gPer100 typed into the recipe
- *   3. system     — the shared table
+ *   3. system     — a shared-table row that carries a value
  *   4. estimate   — a table row whose value swings with the ingredient's form
  *   5. null       — no reliable data. Never a number.
  *
- * `contextUnit` is only used to pick the nicest calibration note; it never
- * changes the number, because a calibration is stored as g/100 ml.
+ * A table row that exists but carries no value (`pending-verification` or
+ * `pending-form`) lands in case 5 on purpose: the disagreement is real, so the
+ * honest answer is "no number, here is why". `densityUnavailableReason` turns
+ * that into a sentence the UI can show.
+ *
+ * `contextUnit` only picks the nicest calibration note; it never changes the
+ * number, because a calibration is stored as g/100 ml.
  */
 export function densityFor(
   ing: Pick<IngredientLike, 'name' | 'ingredientKey' | 'gPer100' | 'density'>,
@@ -35,7 +46,7 @@ export function densityFor(
 ): DensityHit | null {
   const tool: ToolId | null = unit(contextUnit)?.tool ?? null;
 
-  // 1. personal
+  // 1. personal — always wins, including for rows the table refuses to answer
   const cal = findCalibration(ing, prefs, tool);
   if (cal) return cal;
 
@@ -59,9 +70,9 @@ export function densityFor(
     };
   }
 
-  // 3 + 4. the shared table
+  // 3 + 4. the shared table, but only rows that actually carry a value
   const row = lookupDensity(ing.name);
-  if (row) {
+  if (row && row.gPer100 != null) {
     return {
       gPer100: row.gPer100,
       source: row.confidence,
@@ -71,6 +82,42 @@ export function densityFor(
     };
   }
 
-  // 5. nothing. The caller must not substitute a number.
+  // 5. nothing usable. The caller must not substitute a number.
   return null;
+}
+
+/**
+ * Why there is no density, in a sentence the UI can show as-is.
+ * Distinguishes the three honest reasons so the user knows what to do next.
+ */
+export function densityUnavailableReason(
+  ing: Pick<IngredientLike, 'name'>,
+): string {
+  const name = ing.name?.trim() || 'הרכיב הזה';
+
+  if (isKnownDataGap(name)) {
+    return `אין במערכת נתון צפיפות ל${name}. זה חומר גלם שונה מאלה שבטבלה, ולא נשתמש בערך של חומר גלם אחר. ${CALIBRATE_HINT}`;
+  }
+
+  const row = lookupDensity(name);
+  if (!row) return NO_DENSITY_MESSAGE(name);
+
+  if (row.resolution === 'pending-form') {
+    const forms = (row.forms ?? [])
+      .map((k) => densityEntryByKey(k)?.match[0])
+      .filter(Boolean)
+      .join(' · ');
+    const formsText = forms ? ` (${forms})` : '';
+    return `${name} נמדד אחרת בכל צורה${formsText}, ולכן אין לו ערך צפיפות אחד. אפשר לציין את הצורה, או ${CALIBRATE_HINT}`;
+  }
+
+  if (row.resolution === 'pending-verification') {
+    const values = Object.values(row.sources)
+      .map((v) => Math.round(v * 10) / 10)
+      .sort((a, b) => a - b);
+    const list = [...new Set(values)].join(' ו-');
+    return `יש שני נתונים סותרים ל${name} (${list} גרם ל-100 מ"ל) שטרם אומתו, ולכן לא נציג אף אחד מהם. ${CALIBRATE_HINT}`;
+  }
+
+  return NO_DENSITY_MESSAGE(name);
 }

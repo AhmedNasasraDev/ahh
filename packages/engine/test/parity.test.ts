@@ -119,28 +119,37 @@ describe('toGrams parity — within the merged table\'s own rounding', () => {
 });
 
 describe('the deliberate, documented divergences', () => {
-  it('cocoa: the prototype said 110 g per cup, the merged table says 100.8', () => {
+  it('cocoa: the prototype answered 110 g per cup, we refuse until verified', () => {
     const ing = { name: 'קקאו', qty: 1, unit: 'כוס' };
     expect(LEGACY_ENGINE.toGrams(ing)).toBeCloseTo(110, 6);
-    expect(toGrams(ing, DEFAULT_PREFS).grams!).toBeCloseTo(100.8, 6);
+    expect(toGrams(ing, DEFAULT_PREFS).grams).toBeNull();
   });
 
-  it('almonds: the prototype said 160 g per cup, the merged table says 100.8', () => {
+  it('almonds: the prototype answered 160 g per cup, we ask for the form', () => {
     const ing = { name: 'שקדים', qty: 1, unit: 'כוס' };
     expect(LEGACY_ENGINE.toGrams(ing)).toBeCloseTo(160, 6);
-    expect(toGrams(ing, DEFAULT_PREFS).grams!).toBeCloseTo(100.8, 6);
+    expect(toGrams(ing, DEFAULT_PREFS).grams).toBeNull();
   });
 
-  it('rice: the prototype said 160 g per cup, the merged table says 184.8', () => {
+  it('rice: the prototype answered 160 g per cup, we refuse until verified', () => {
     const ing = { name: 'אורז', qty: 1, unit: 'כוס' };
     expect(LEGACY_ENGINE.toGrams(ing)).toBeCloseTo(160, 6);
-    expect(toGrams(ing, DEFAULT_PREFS).grams!).toBeCloseTo(184.8, 6);
+    expect(toGrams(ing, DEFAULT_PREFS).grams).toBeNull();
   });
 
-  it('spirits: the prototype used 0.94 g/ml, the merged table uses 0.98', () => {
-    const ing = { name: 'רום', qty: 100, unit: 'מ"ל' };
-    expect(LEGACY_ENGINE.toGrams(ing)).toBeCloseTo(94, 6);
-    expect(toGrams(ing, DEFAULT_PREFS).grams!).toBeCloseTo(98, 6);
+  it('spirits: the two sources disagree, so we refuse; wine keeps its value', () => {
+    expect(LEGACY_ENGINE.toGrams({ name: 'רום', qty: 100, unit: 'מ"ל' })).toBeCloseTo(94, 6);
+    expect(toGrams({ name: 'רום', qty: 100, unit: 'מ"ל' }, DEFAULT_PREFS).grams).toBeNull();
+    // wine has one uncontradicted source, so it still resolves
+    expect(toGrams({ name: 'יין לבן', qty: 100, unit: 'מ"ל' }, DEFAULT_PREFS).grams!)
+      .toBeCloseTo(98, 6);
+  });
+
+  it('eggs by volume are refused; eggs by the piece are unaffected', () => {
+    expect(toGrams({ name: 'ביצים', qty: 1, unit: 'כוס' }, DEFAULT_PREFS).grams).toBeNull();
+    expect(
+      toGrams({ name: 'ביצים', qty: 5, unit: "יח'", unitWeight: 55 }, DEFAULT_PREFS).grams,
+    ).toBe(275);
   });
 
   it('honey: the split tables made the prototype use 150 g/cup instead of 340.8', () => {
