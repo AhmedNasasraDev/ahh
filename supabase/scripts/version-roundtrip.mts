@@ -92,7 +92,9 @@ function buildOriginal() {
     { ...emptyIngredient(), name: 'מלח', qty: '12', unit: 'g' },
   ];
   d.steps = [
-    { ...emptyStep(), text: 'ללוש 12 דקות', minutes: '12' },
+    // stage 9: one step CLASSIFIED and one left alone, because migration 0019
+    // exists precisely because a `kind` was silently dropped on the way in.
+    { ...emptyStep(), text: 'ללוש 12 דקות', minutes: '12', kind: 'active' },
     { ...emptyStep(), text: 'לאפות', temp: '240', minutes: '40' },
   ];
   return d;
@@ -352,6 +354,12 @@ function verify(rowsPath: string) {
       [`${where}: an unentered other cost is ABSENT, not 0`, !('otherCost' in r)],
       [`${where}: the packaging cost and the margin target survived`,
         r['packagingCost'] === 2.5 && r['targetGM'] === 62.5],
+      // stage 9: the step kind, which `replace_recipe_children` dropped until
+      // migration 0019. One classified step and one deliberately not.
+      [`${where}: a classified step kept its kind`,
+        ((r['steps'] as Array<Record<string, unknown>>)[0]?.['kind']) === 'active'],
+      [`${where}: an unclassified step has no kind, rather than a default`,
+        !('kind' in ((r['steps'] as Array<Record<string, unknown>>)[1] ?? {}))],
     );
   };
   say(fromSnapshot, 'snapshot');

@@ -102,7 +102,9 @@ function buildDraft() {
     },
   ];
   d.steps = [
-    { ...emptyStep(), text: 'ללוש 12 דקות', minutes: '12' },
+    // stage 9: one step CLASSIFIED and one left alone, because migration 0019
+    // exists precisely because a `kind` was silently dropped on the way in.
+    { ...emptyStep(), text: 'ללוש 12 דקות', minutes: '12', kind: 'active' },
     { ...emptyStep(), text: 'לאפות', temp: '240', minutes: '40' },
   ];
   return d;
@@ -186,24 +188,16 @@ insert into public.recipes (
 );
 
 insert into public.ingredients (
-  recipe_id, ord, name, ingredient_key, qty, unit, flour, liquid,
-  water_pct, unit_weight, g_per_100, price, price_unit, sub_recipe_id, note
+  ${Object.keys(ingredients[0] ?? {}).join(', ')}
 ) values
 ${ingredients
-  .map(
-    (r) =>
-      `  ('${RECIPE_ID}', ${r.ord}, ${q(r.name)}, ${q(r.ingredient_key)}, ${n(r.qty)}, ${q(r.unit)}, ${b(r.flour)}, ${b(r.liquid)}, ${n(r.water_pct)}, ${n(r.unit_weight)}, ${n(r.g_per_100)}, ${n(r.price)}, ${q(r.price_unit)}, NULL, ${q(r.note)})`,
-  )
+  .map((r) => `  (${Object.values(r).map(lit).join(', ')})`)
   .join(',\n')};
 
-insert into public.steps (recipe_id, ord, text, temp, temp_unit, minutes)
-values
-${steps
-  .map(
-    (r) =>
-      `  ('${RECIPE_ID}', ${r.ord}, ${q(r.text)}, ${n(r.temp)}, ${q(r.temp_unit)}, ${n(r.minutes)})`,
-  )
-  .join(',\n')};
+insert into public.steps (
+  ${Object.keys(steps[0] ?? {}).join(', ')}
+) values
+${steps.map((r) => `  (${Object.values(r).map(lit).join(', ')})`).join(',\n')};
 
 -- Read it back in exactly the nested shape RECIPE_SELECT produces.
 select jsonb_build_object(
@@ -307,6 +301,11 @@ function verify(rowsPath: string) {
     ['an unentered other cost came back ABSENT, not as 0', !('otherCost' in r)],
     ['the sale price and its basis survived', r['salePrice'] === 95 && r['salePriceBasis'] === 'unit'],
     ['the gross-margin target survived', r['targetGM'] === 62.5],
+    // stage 9: `steps.kind` through real column types (migration 0019).
+    ['a classified step kept its kind',
+      ((r['steps'] as Array<Record<string, unknown>>)[0]?.['kind']) === 'active'],
+    ['an unclassified step has no kind, rather than a default',
+      !('kind' in ((r['steps'] as Array<Record<string, unknown>>)[1] ?? {}))],
   ];
 
   let ok = true;

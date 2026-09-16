@@ -25,6 +25,7 @@ import type {
   PurchaseInput,
   PurchaseRecord,
 } from '../features/pricing/purchases.js';
+import type { ProductionPlan } from '../features/planning/plan.js';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import { createLocalDemoRepository, firstRunPrefs } from '../data/localDemoRepository.js';
 import { createSupabaseRepository } from '../data/supabaseRepository.js';
@@ -33,6 +34,7 @@ import {
   type Repository,
   type RepositoryCapabilities,
   type SaveOptions,
+  type PlanSummary,
   type StoredVersion,
 } from '../data/repository.js';
 import { supabaseStatus } from '../lib/supabase.js';
@@ -88,6 +90,16 @@ export interface AppData {
   /** Stage 8: records a purchase and moves the active price with it. */
   recordPurchase(input: PurchaseInput): Promise<CatalogItem>;
   purchaseHistory(key: string): Promise<PurchaseRecord[]>;
+  /**
+   * Stage 9: production plans. Fetched per screen rather than held here — a
+   * plan is not an input to anyone else's figures, unlike the catalog, and
+   * loading every plan to open one would be waste.
+   */
+  listPlans(): Promise<PlanSummary[]>;
+  getPlan(id: string): Promise<ProductionPlan | null>;
+  savePlan(plan: ProductionPlan): Promise<ProductionPlan>;
+  deletePlan(id: string): Promise<void>;
+  setPlanLocked(id: string, locked: boolean, snapshot: unknown): Promise<void>;
   clearError(): void;
 }
 
@@ -318,6 +330,23 @@ export function AppDataProvider({
     [repo],
   );
 
+  const listPlans = useCallback(() => repo.listPlans(), [repo]);
+  const getPlan = useCallback((id: string) => repo.getPlan(id), [repo]);
+  const savePlan = useCallback(
+    async (plan: ProductionPlan) => {
+      const saved = await repo.savePlan(plan);
+      setError(null);
+      return saved;
+    },
+    [repo],
+  );
+  const deletePlan = useCallback((id: string) => repo.deletePlan(id), [repo]);
+  const setPlanLocked = useCallback(
+    (id: string, locked: boolean, snapshot: unknown) =>
+      repo.setPlanLocked(id, locked, snapshot),
+    [repo],
+  );
+
   const value = useMemo<AppData>(
     () => ({
       ready,
@@ -341,6 +370,11 @@ export function AppDataProvider({
       recipesPricingOn,
       recordPurchase,
       purchaseHistory,
+      listPlans,
+      getPlan,
+      savePlan,
+      deletePlan,
+      setPlanLocked,
       clearError: () => setError(null),
     }),
     [
@@ -364,6 +398,11 @@ export function AppDataProvider({
       recipesPricingOn,
       recordPurchase,
       purchaseHistory,
+      listPlans,
+      getPlan,
+      savePlan,
+      deletePlan,
+      setPlanLocked,
     ],
   );
 

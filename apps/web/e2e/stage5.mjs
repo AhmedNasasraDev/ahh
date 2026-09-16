@@ -1,4 +1,4 @@
-// Browser E2E for the stage-5, 6, 7 and 8 surfaces, against the BUILT bundle.
+// Browser E2E for the stage-5 to 9 surfaces, against the BUILT bundle.
 //
 // Kept as one file rather than three because the harness — the static server,
 // the console and network guards, the onboarding walk — is the bulk of it, and
@@ -492,6 +492,55 @@ try {
       /אין עדיין חומרי גלם/.test(centre2),
     centre2.slice(0, 160),
   );
+
+  // ── stage 9: production planning, in a real browser ────────────────────
+  await page.goto('http://127.0.0.1:8124/plans', { waitUntil: 'load' });
+  await page.waitForTimeout(600);
+
+  check(
+    'the production planning screen renders',
+    (await page.getByRole('heading', { name: 'תכנון ייצור' }).count()) > 0,
+  );
+  const planText = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+  check(
+    'it says what a plan is for',
+    /מחשבת מהמתכונים כמה חומר גלם צריך/.test(planText),
+    planText.slice(0, 140),
+  );
+  check(
+    'the empty state is honest in a build with no server',
+    /אין עדיין תוכניות ייצור/.test(planText),
+  );
+  check(
+    'creating a plan is disabled with no account, rather than failing when pressed',
+    await page.getByRole('button', { name: 'תוכנית ייצור חדשה' }).isDisabled(),
+  );
+  await page.screenshot({ path: `${OUT}/19-plans-phone.png`, fullPage: true });
+
+  const plansOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  check('no horizontal overflow on the planning screen', plansOverflow <= 1, `${plansOverflow}px`);
+
+  // The step-kind picker, which is what makes a timeline possible at all.
+  await page.goto('http://127.0.0.1:8124/recipe/brioche/edit', { waitUntil: 'load' });
+  await page.waitForTimeout(700);
+  const kindPicker = page.getByLabel('סוג השלב 1');
+  check('a step can be classified from the editor', (await kindPicker.count()) > 0);
+  if ((await kindPicker.count()) > 0) {
+    const options = await kindPicker.locator('option').allInnerTexts();
+    check(
+      'and the choices include proofing, refrigeration and baking',
+      options.some((o) => o.includes('התפחה')) &&
+        options.some((o) => o.includes('קירור')) &&
+        options.some((o) => o.includes('אפייה')),
+      options.join(' · '),
+    );
+    check(
+      'with "not classified" as the default, rather than a guess',
+      (await kindPicker.inputValue()) === '',
+    );
+  }
 
   check('no page errors anywhere in the run', errors.length === 0, errors.slice(0, 3).join(' | '));
   check(

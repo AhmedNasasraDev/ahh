@@ -9,6 +9,8 @@ import { NotebookScreen } from './routes/NotebookScreen.js';
 import { RecipeScreen } from './routes/RecipeScreen.js';
 import { RecipeEditScreen } from './routes/RecipeEditScreen.js';
 import { IngredientsScreen } from './routes/IngredientsScreen.js';
+import { PlansScreen } from './routes/PlansScreen.js';
+import { PlanScreen } from './routes/PlanScreen.js';
 import { MoreScreen } from './routes/MoreScreen.js';
 import { NotImplementedScreen } from './routes/NotImplementedScreen.js';
 
@@ -53,6 +55,8 @@ export function App() {
                 <Route path="/home" element={<NotImplementedScreen screen="בית" />} />
                 <Route path="/groups" element={<NotImplementedScreen screen="קבוצות" />} />
                 <Route path="/ingredients" element={<IngredientsScreen />} />
+                <Route path="/plans" element={<PlansScreen />} />
+                <Route path="/plan/:planId" element={<PlanScreen />} />
                 <Route path="/more" element={<MoreScreen />} />
               </Route>
               <Route path="*" element={<Navigate to="/notebook" replace />} />

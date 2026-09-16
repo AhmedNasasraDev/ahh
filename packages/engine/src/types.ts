@@ -143,12 +143,32 @@ export interface GramsResult {
   provenance: Provenance;
 }
 
+/**
+ * What kind of step this is (stage 9, requirement 8).
+ *
+ * WHY THIS IS IN THE ENGINE, documented before the change as the instructions
+ * require: stage 9 asks a production timeline to distinguish active work from
+ * proofing, refrigeration and baking, and NOTHING in the model held that fact.
+ * A step had a text, a temperature and a duration; whether 90 minutes is work
+ * or waiting was unknowable, and deriving it from the Hebrew text would be the
+ * invention the instructions forbid.
+ *
+ * It is a TYPE addition and nothing else — no calculation in the engine reads
+ * it, `compute()` is byte-identical, and every existing step has it absent.
+ * The classifier that falls back to the temperature lives in the web layer,
+ * because reading "240 °C means baking" is presentation of a fact the recipe
+ * already carries, not a new engine primitive.
+ */
+export type StepKind = 'active' | 'passive' | 'chill' | 'proof' | 'bake';
+
 export interface Step {
   id?: string;
   text?: string;
   temp?: string | number;
   tempUnit?: string;
   minutes?: string | number;
+  /** undefined = nobody classified it, and a timeline must say so */
+  kind?: StepKind;
 }
 
 /** Spec §1.1 Pan. Geometry only; panFactor still lives in the prototype. */

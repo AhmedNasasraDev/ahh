@@ -28,6 +28,7 @@ import type {
 } from '@recipe-notebook/engine';
 import { ingredientKeyOf } from '@recipe-notebook/engine';
 import type { CatalogItem } from '../features/pricing/catalog.js';
+import type { PlanItem, ProductionPlan } from '../features/planning/plan.js';
 import type {
   BatchRow,
   CalibrationRow,
@@ -37,6 +38,9 @@ import type {
   IssueRow,
   Json,
   PriceUnit,
+  ProductionPlanItemRow,
+  ProductionPlanRow,
+  ProductionPlanStockRow,
   ProfileRow,
   RecipeRow,
   RecipeVersionRow,
@@ -198,6 +202,7 @@ function stepRowToDomain(row: StepRow): Step {
   if (row.temp_unit) step.tempUnit = row.temp_unit;
   const minutes = numOrUndef(row.minutes);
   if (minutes !== undefined) step.minutes = minutes;
+  if (row.kind) step.kind = row.kind;
   return step;
 }
 
@@ -503,6 +508,9 @@ export function stepsToRows(recipe: Recipe, recipeId: string): StepInsert[] {
     temp: toNullableNumber(s.temp),
     temp_unit: s.tempUnit === 'F' ? 'F' : 'C',
     minutes: toNullableNumber(s.minutes),
+    // stage 9: null = nobody classified the step, which the timeline reports
+    // rather than guessing at.
+    kind: s.kind ?? null,
   }));
 }
 
@@ -515,4 +523,78 @@ export function issuesToRows(recipe: Recipe, recipeId: string): IssueInsert[] {
     problem: toText(i.p),
     solution: toText(i.s),
   }));
+}
+
+// ── production planning (stage 9) ──────────────────────────────────────────
+
+/**
+ * A plan as the app uses it.
+ *
+ * `onHand` is a plain object keyed by ingredient key, and a key is PRESENT only
+ * when the user entered a number. That is the whole of requirement 5's
+ * null-vs-0 rule at this layer: absence means nobody said, and a present 0
+ * means the shelf is empty.
+ */
+export function planRowToDomain(
+  row: ProductionPlanRow,
+  items: readonly ProductionPlanItemRow[],
+  stock: readonly ProductionPlanStockRow[],
+): ProductionPlan {
+  const onHand: Record<string, number> = {};
+  for (const s of stock) {
+    const n = numOrNullable(s.on_hand);
+    if (n !== null) onHand[s.key] = n;
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    planDate: row.plan_date,
+    note: row.note,
+    locked: row.locked,
+    lockedAt: row.locked_at,
+    snapshot: row.snapshot,
+    updatedAt: row.updated_at,
+    items: [...items]
+      .sort((a, b) => a.ord - b.ord)
+      .map<PlanItem>((i) => ({
+        id: i.id,
+        recipeId: i.recipe_id,
+        qty: Number(i.qty),
+        qtyUnit: i.qty_unit,
+        // A `time` comes back as 'HH:MM:SS'; the form and the timeline both
+        // work in 'HH:MM'.
+        readyAt: i.ready_at ? i.ready_at.slice(0, 5) : null,
+        note: i.note,
+      })),
+    onHand,
+  };
+}
+
+/** The three payloads `save_production_plan` takes. */
+export function planToPayload(plan: ProductionPlan): {
+  p_plan: Json;
+  p_items: Json;
+  p_stock: Json;
+} {
+  return {
+    p_plan: {
+      name: toText(plan.name),
+      plan_date: plan.planDate,
+      note: toText(plan.note),
+    } as unknown as Json,
+    p_items: plan.items.map((i, ord) => ({
+      recipe_id: i.recipeId,
+      ord,
+      qty: i.qty,
+      qty_unit: i.qtyUnit,
+      ready_at: i.readyAt ?? '',
+      note: toText(i.note),
+    })) as unknown as Json,
+    // Only entered numbers are sent. A blank field is not a row, which is how
+    // "not entered" stays distinguishable from 0 without a nullable row that
+    // means nothing.
+    p_stock: Object.entries(plan.onHand)
+      .filter(([, v]) => v !== null && v !== undefined && Number.isFinite(v))
+      .map(([key, v]) => ({ key, on_hand: String(v) })) as unknown as Json,
+  };
 }

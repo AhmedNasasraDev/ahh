@@ -16,6 +16,10 @@ export type Json = string | number | boolean | null | { [k: string]: Json } | Js
 export type ProfileKind = 'home' | 'pro' | 'study';
 export type Locale = 'he' | 'ar';
 export type ToolId = 'cup' | 'tbsp' | 'tsp';
+/** Re-exported from the engine so a row type and a domain type cannot drift. */
+export type { StepKind } from '@recipe-notebook/engine';
+import type { StepKind } from '@recipe-notebook/engine';
+
 export type PriceUnit = 'ק"ג' | 'ליטר' | "יח'";
 export type DensityConfidence = 'system' | 'estimate';
 export type DensityResolution =
@@ -150,6 +154,8 @@ export type StepRow = {
   temp: number | null;
   temp_unit: 'C' | 'F';
   minutes: number | null;
+  /** stage 9: null = nobody classified this step. See migration 0018 */
+  kind: StepKind | null;
 };
 
 export type IssueRow = {
@@ -312,6 +318,51 @@ export type DensityTableRow = {
   updated_at: string;
 };
 
+/**
+ * A production plan (migration 0018). It holds INTENT only — the requirement,
+ * the purchase list and the cost are derived from the recipes and the
+ * ingredient centre every time the plan is opened.
+ */
+export type ProductionPlanRow = {
+  id: string;
+  owner_id: string;
+  name: string;
+  plan_date: string;
+  note: string;
+  /**
+   * Requirement 14. A locked plan is a record of what happened, and its
+   * snapshot is what is read; an unlocked plan has no snapshot and is
+   * computed live. The two always move together.
+   */
+  locked: boolean;
+  locked_at: string | null;
+  snapshot: Json | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlanQtyUnit = 'unit' | 'kg' | 'g';
+
+export type ProductionPlanItemRow = {
+  id: string;
+  plan_id: string;
+  recipe_id: string;
+  ord: number;
+  qty: number;
+  qty_unit: PlanQtyUnit;
+  /** the hour the product must be READY. null = the user did not say */
+  ready_at: string | null;
+  note: string;
+};
+
+export type ProductionPlanStockRow = {
+  id: string;
+  plan_id: string;
+  key: string;
+  /** null = not entered. 0 = there is none left. NOT the same thing */
+  on_hand: number | null;
+};
+
 export type Database = {
   /**
    * supabase-js reads this to pick its PostgREST behaviour. It is part of the
@@ -334,6 +385,9 @@ export type Database = {
       private_notes: Table<PrivateNoteRow>;
       ingredient_catalog: Table<IngredientCatalogRow>;
       ingredient_purchases: Table<IngredientPurchaseRow>;
+      production_plans: Table<ProductionPlanRow>;
+      production_plan_items: Table<ProductionPlanItemRow>;
+      production_plan_stock: Table<ProductionPlanStockRow>;
       density_table: Table<DensityTableRow>;
       density_data_gaps: Table<{ name: string }>;
     };
@@ -413,6 +467,23 @@ export type Database = {
       };
       // migration 0014 — an internal helper of save_recipe/restore_recipe_version
       apply_recipe_costing: { Args: { p_id: string; p_recipe: Json }; Returns: undefined };
+      // migration 0018 — production planning (stage-9 requirements 1, 13, 14)
+      owns_plan: { Args: { p_plan_id: string }; Returns: boolean };
+      save_production_plan: {
+        Args: {
+          p_plan: Json;
+          p_items: Json;
+          p_stock: Json;
+          p_plan_id: string | null;
+          p_expected_updated_at: string | null;
+        };
+        Returns: string;
+      };
+      set_plan_locked: {
+        Args: { p_plan_id: string; p_locked: boolean; p_snapshot: Json | null };
+        Returns: undefined;
+      };
+      delete_production_plan: { Args: { p_plan_id: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

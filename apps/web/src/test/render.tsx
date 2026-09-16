@@ -11,6 +11,7 @@ import type {
   PurchaseInput,
   PurchaseRecord,
 } from '../features/pricing/purchases.js';
+import type { ProductionPlan } from '../features/planning/plan.js';
 
 export interface FakeRepoOptions {
   prefs?: MeasurementPrefs | null;
@@ -28,6 +29,8 @@ export interface FakeRepoOptions {
   onRestoreVersion?(versionId: string): void;
   usedBy?: readonly { id: string; name: string }[];
   onRecordPurchase?(input: PurchaseInput): void;
+  plans?: readonly ProductionPlan[];
+  onSavePlan?(plan: ProductionPlan): void;
   /** history rows a test wants to exist before it records anything */
   history?: readonly PurchaseRecord[];
 }
@@ -49,6 +52,7 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
   let prefs = opts.prefs === undefined ? { ...defaultPrefs('pro'), done: true } : opts.prefs;
   let calib = [...(opts.calibrations ?? [])];
   let catalog: CatalogItem[] = [...(opts.catalog ?? [])];
+  let plans: ProductionPlan[] = [...(opts.plans ?? [])];
   const purchases: Array<{ key: string; record: PurchaseRecord }> = [];
   let recipes = [...(opts.recipes ?? DEMO_RECIPES)];
   const caps: RepositoryCapabilities = {
@@ -106,6 +110,43 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
       catalog = catalog.filter((c) => c.key !== key);
     },
     recipesPricingOn: async () => [...(opts.pricingOn ?? [])],
+    // Stage 9: plans live in memory, keyed by id, and a save assigns one the
+    // way the database would — so a test can tell a create from an update.
+    listPlans: async () =>
+      plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        planDate: p.planDate,
+        locked: p.locked,
+        items: p.items.length,
+      })),
+    getPlan: async (id) => plans.find((p) => p.id === id) ?? null,
+    savePlan: async (plan) => {
+      const saved: ProductionPlan = plan.id
+        ? { ...plan }
+        : { ...plan, id: `plan-${plans.length + 1}` };
+      const at = plans.findIndex((p) => p.id === saved.id);
+      if (at >= 0) plans[at] = saved;
+      else plans.push(saved);
+      opts.onSavePlan?.(saved);
+      return saved;
+    },
+    deletePlan: async (id) => {
+      plans = plans.filter((p) => p.id !== id);
+    },
+    setPlanLocked: async (id, locked, snapshot) => {
+      plans = plans.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              locked,
+              lockedAt: locked ? '2026-10-01T00:00:00Z' : null,
+              // The snapshot goes with the lock, exactly as the RPC does it.
+              snapshot: locked ? snapshot : null,
+            }
+          : p,
+      );
+    },
     // Stage 8: the same two writes `record_purchase` does in one transaction —
     // append the purchase, then move the active price.
     recordPurchase: async (input) => {

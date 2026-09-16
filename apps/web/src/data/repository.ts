@@ -19,6 +19,7 @@ import type {
   PurchaseInput,
   PurchaseRecord,
 } from '../features/pricing/purchases.js';
+import type { ProductionPlan } from '../features/planning/plan.js';
 
 /** Extra instructions for a save. All optional; a plain save still works. */
 export interface SaveOptions {
@@ -177,6 +178,39 @@ export interface CatalogRepository {
   purchaseHistory(key: string): Promise<PurchaseRecord[]>;
 }
 
+/**
+ * Production plans (stage 9).
+ *
+ * A plan holds INTENT only. The requirement, the purchase list, the cost and
+ * the timeline are all DERIVED from the recipes and the ingredient centre when
+ * the plan is opened — there is no stored copy of any of them, so a plan cannot
+ * quietly disagree with today's prices. The single exception is a plan the user
+ * marks as done: `setPlanLocked` freezes a snapshot, and a locked plan reads
+ * from it. See migration 0018 for why unlocking discards it.
+ */
+export interface PlanRepository {
+  listPlans(): Promise<PlanSummary[]>;
+  getPlan(id: string): Promise<ProductionPlan | null>;
+  /** Creates or updates, atomically. Returns the plan as it now stands */
+  savePlan(plan: ProductionPlan): Promise<ProductionPlan>;
+  deletePlan(id: string): Promise<void>;
+  /**
+   * Marks a plan done, or reopens it.
+   *
+   * Locking REQUIRES a snapshot: a record of what happened whose costs still
+   * move is not a record. Unlocking clears it.
+   */
+  setPlanLocked(id: string, locked: boolean, snapshot: unknown): Promise<void>;
+}
+
+export interface PlanSummary {
+  id: string;
+  name: string;
+  planDate: string;
+  locked: boolean;
+  items: number;
+}
+
 export interface PrefsRepository {
   getPrefs(): Promise<MeasurementPrefs | null>;
   savePrefs(prefs: MeasurementPrefs): Promise<MeasurementPrefs>;
@@ -189,6 +223,7 @@ export interface CalibrationRepository {
 
 export interface Repository
   extends RecipeRepository,
+    PlanRepository,
     PrefsRepository,
     CalibrationRepository,
     CatalogRepository {

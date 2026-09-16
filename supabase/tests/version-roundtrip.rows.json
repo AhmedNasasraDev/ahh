@@ -12,7 +12,8 @@
       "text": "ללוש 12 דקות",
       "minutes": 12,
       "recipe_id": "5258b18b-228b-442b-9933-4d6002dc5f00",
-      "temp_unit": "C"
+      "temp_unit": "C",
+      "kind": "active"
      },
      {
       "id": "3468203c-8231-4fa8-88f2-6144255c3eca",
@@ -21,7 +22,8 @@
       "text": "לאפות",
       "minutes": 40,
       "recipe_id": "5258b18b-228b-442b-9933-4d6002dc5f00",
-      "temp_unit": "C"
+      "temp_unit": "C",
+      "kind": null
      }
     ],
     "issues": [],
@@ -164,7 +166,8 @@
       "text": "ללוש 12 דקות",
       "minutes": 12,
       "recipe_id": "5258b18b-228b-442b-9933-4d6002dc5f00",
-      "temp_unit": "C"
+      "temp_unit": "C",
+      "kind": "active"
      },
      {
       "id": "09cf57b7-862d-40dd-af4b-f526cb8179ba",
@@ -173,7 +176,8 @@
       "text": "לאפות",
       "minutes": 40,
       "recipe_id": "5258b18b-228b-442b-9933-4d6002dc5f00",
-      "temp_unit": "C"
+      "temp_unit": "C",
+      "kind": null
      }
     ],
     "issues": [],

@@ -13,6 +13,7 @@ import {
   draftToRecipe,
   emptyDraft,
   emptyIngredient,
+  emptyStep,
   isDirty,
   moveRow,
   patchIngredientRow,
@@ -130,8 +131,8 @@ describe('what gets dropped on save', () => {
       name: 'x',
       ingredients: [{ ...emptyIngredient(), name: 'קמח', qty: '1' }],
       steps: [
-        { key: 'a', text: '', temp: '', minutes: '' },
-        { key: 'b', text: '', temp: '', minutes: '30' },
+        { key: 'a', text: '', temp: '', minutes: '', kind: '' },
+        { key: 'b', text: '', temp: '', minutes: '30', kind: '' },
       ],
     };
     expect(draftToRecipe(draft).steps).toHaveLength(1);
@@ -326,5 +327,42 @@ describe('the stored ingredient identity survives an edit', () => {
     const fresh = emptyIngredient();
     expect(fresh.ingredientKey).toBe('');
     expect(patchIngredientRow(fresh, { name: 'מים' }).ingredientKey).toBe('');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+describe('stage 9 — the step kind', () => {
+  it('is absent from the recipe until the user classifies a step', () => {
+    const draft: RecipeDraft = {
+      ...emptyDraft(),
+      name: 'x',
+      ingredients: [{ ...emptyIngredient(), name: 'קמח', qty: '1' }],
+      steps: [{ ...emptyStep(), text: 'התפחה', minutes: '90' }],
+    };
+    const step = draftToRecipe(draft).steps![0]!;
+    // NOT 'active' by default, and not inferred from the word "התפחה".
+    expect('kind' in step).toBe(false);
+  });
+
+  it('carries a classified step through, and back into the form', () => {
+    const draft: RecipeDraft = {
+      ...emptyDraft(),
+      name: 'x',
+      ingredients: [{ ...emptyIngredient(), name: 'קמח', qty: '1' }],
+      steps: [{ ...emptyStep(), text: 'התפחה', minutes: '90', kind: 'proof' }],
+    };
+    const recipe = draftToRecipe(draft);
+    expect(recipe.steps![0]!.kind).toBe('proof');
+    expect(draftFromRecipe(recipe).steps[0]!.kind).toBe('proof');
+  });
+
+  it('counts a step that carries only a kind as a real step', () => {
+    const draft: RecipeDraft = {
+      ...emptyDraft(),
+      name: 'x',
+      ingredients: [{ ...emptyIngredient(), name: 'קמח', qty: '1' }],
+      steps: [{ ...emptyStep(), kind: 'chill' }],
+    };
+    expect(draftToRecipe(draft).steps).toHaveLength(1);
   });
 });

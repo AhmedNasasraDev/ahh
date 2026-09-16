@@ -72,6 +72,13 @@ const ownsRecipe: Policy = (row, uid, db) => {
   return parent?.['owner_id'] === uid;
 };
 
+/** `owns_plan(plan_id)`, migration 0018. */
+const ownsPlan: Policy = (row, uid, db) => {
+  if (!uid) return false;
+  const parent = (db['production_plans'] ?? []).find((p) => p['id'] === row['plan_id']);
+  return parent?.['owner_id'] === uid;
+};
+
 const POLICIES: Record<string, Policy> = {
   // profiles_own / calibrations_own / private_notes_own: user_id = auth.uid()
   profiles: (row, uid) => Boolean(uid) && row['user_id'] === uid,
@@ -95,6 +102,11 @@ const POLICIES: Record<string, Policy> = {
   // exception. A purchase total and a supplier are private business data, and
   // there is no such thing as a shared one.
   ingredient_purchases: (row, uid) => Boolean(uid) && row['owner_id'] === uid,
+  // production_plans_own / _via_plan (0018): a plan is the account's own, and
+  // its children are reached only through it — the same shape as a recipe's.
+  production_plans: (row, uid) => Boolean(uid) && row['owner_id'] === uid,
+  production_plan_items: ownsPlan,
+  production_plan_stock: ownsPlan,
   // shared reference data: SELECT to authenticated, and no write policy at all
   density_table: (_row, uid) => Boolean(uid),
   density_data_gaps: (_row, uid) => Boolean(uid),
@@ -207,6 +219,22 @@ const INSERT_DEFAULTS: Record<string, () => Row> = {
     package_count: 1,
     usable_pct: null,
   }),
+  production_plans: () => ({
+    created_at: NOW,
+    updated_at: NOW,
+    name: '',
+    note: '',
+    locked: false,
+    locked_at: null,
+    snapshot: null,
+  }),
+  production_plan_items: () => ({
+    ord: 0,
+    qty_unit: 'unit',
+    ready_at: null,
+    note: '',
+  }),
+  production_plan_stock: () => ({ on_hand: null }),
 };
 
 const NOW = '2026-04-01T12:00:00Z';
@@ -219,8 +247,22 @@ const RLS_DENIED: PostgrestLikeError = {
 /** `ingredients (*)` inside a select string — the nested-embed syntax. */
 function embeddedTables(select: string | undefined): string[] {
   if (!select) return [];
-  return [...select.matchAll(/(\w+)\s*\(\s*\*\s*\)/g)].map((m) => m[1]!);
+  // Any column list, not just `(*)`: the plans list embeds
+  // `production_plan_items (id)` purely to count them.
+  return [...select.matchAll(/(\w+)\s*\(\s*[^()]*\)/g)].map((m) => m[1]!);
 }
+
+/**
+ * Which column an embedded child joins on.
+ *
+ * PostgREST reads this from the foreign key; here it is declared, because a
+ * child table that joined on the wrong column would silently return nothing
+ * and a test would read that as "the plan has no lines".
+ */
+const CHILD_FK: Readonly<Record<string, string>> = {
+  recipes: 'recipe_id',
+  production_plans: 'plan_id',
+};
 
 export interface FakeSupabase {
   client: unknown;
@@ -309,11 +351,12 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
     private embed(rows: Row[]): Row[] {
       const children = embeddedTables(this.selectStr);
       if (!children.length) return rows;
+      const fk = CHILD_FK[this.table] ?? 'recipe_id';
       return rows.map((r) => {
         const out: Row = { ...r };
         for (const child of children) {
           out[child] = visible(child, db[child] ?? []).filter(
-            (c) => c['recipe_id'] === r['id'],
+            (c) => c[fk] === r['id'],
           );
         }
         return out;
@@ -912,6 +955,154 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
       return { data: out.reverse(), error: null };
     }
 
+    if (name === 'save_production_plan') {
+      if (!authUid) {
+        return { data: null, error: { message: 'לא ניתן לשמור בלי התחברות', code: '42501' } };
+      }
+      const plan = (args['p_plan'] ?? {}) as Row;
+      const items = (args['p_items'] ?? []) as Row[];
+      const stock = (args['p_stock'] ?? []) as Row[];
+      const planId = args['p_plan_id'] ? String(args['p_plan_id']) : null;
+
+      let row: Row | undefined;
+      if (planId) {
+        row = (db['production_plans'] ?? []).find(
+          (p) => p['id'] === planId && p['owner_id'] === authUid,
+        );
+        if (!row) {
+          return { data: null, error: { message: 'התוכנית לא נמצאה', code: '02000' } };
+        }
+        // A locked plan is a record of what happened. The RPC refuses, and so
+        // must the double, or a test would pass on an edit the database
+        // rejects.
+        if (row['locked']) {
+          return {
+            data: null,
+            error: {
+              message: 'התוכנית סומנה כבוצעה. יש לבטל את הסימון לפני עריכה.',
+              code: '42501',
+            },
+          };
+        }
+        const expected = args['p_expected_updated_at'];
+        if (expected && row['updated_at'] !== expected) {
+          return {
+            data: null,
+            error: {
+              message: 'התוכנית שונתה במקום אחר מאז שנטענה. יש לרענן ולנסות שוב.',
+              code: '40001',
+            },
+          };
+        }
+        Object.assign(row, {
+          name: plan['name'] ?? '',
+          plan_date: plan['plan_date'] ?? NOW.slice(0, 10),
+          note: plan['note'] ?? '',
+          updated_at: new Date().toISOString(),
+        });
+      } else {
+        row = {
+          id: `plan-${(db['production_plans'] ?? []).length + 1}`,
+          owner_id: authUid,
+          name: plan['name'] ?? '',
+          plan_date: plan['plan_date'] ?? NOW.slice(0, 10),
+          note: plan['note'] ?? '',
+          locked: false,
+          locked_at: null,
+          snapshot: null,
+          created_at: NOW,
+          updated_at: NOW,
+        };
+        db['production_plans'] = [...(db['production_plans'] ?? []), row];
+      }
+
+      const id = String(row['id']);
+      db['production_plan_items'] = (db['production_plan_items'] ?? []).filter(
+        (i) => i['plan_id'] !== id,
+      );
+      db['production_plan_stock'] = (db['production_plan_stock'] ?? []).filter(
+        (i) => i['plan_id'] !== id,
+      );
+
+      let n = 0;
+      for (const e of items) {
+        // The 0018 owner guard: a line may not point at another account's
+        // recipe, and the FK alone does not stop it.
+        const recipe = (db['recipes'] ?? []).find((r) => r['id'] === e['recipe_id']);
+        if (!recipe || recipe['owner_id'] !== authUid) {
+          return {
+            data: null,
+            error: { message: 'המתכון אינו של החשבון הזה', code: '42501' },
+          };
+        }
+        db['production_plan_items']!.push({
+          id: `pi-${(db['production_plan_items'] ?? []).length + 1}`,
+          plan_id: id,
+          recipe_id: e['recipe_id'],
+          ord: e['ord'] ?? n,
+          qty: e['qty'],
+          qty_unit: e['qty_unit'] ?? 'unit',
+          ready_at: e['ready_at'] ? String(e['ready_at']) : null,
+          note: e['note'] ?? '',
+        });
+        n += 1;
+      }
+      for (const e of stock) {
+        const key = String(e['key'] ?? '');
+        if (!key) continue;
+        const raw = e['on_hand'];
+        db['production_plan_stock']!.push({
+          id: `ps-${(db['production_plan_stock'] ?? []).length + 1}`,
+          plan_id: id,
+          key,
+          // '' stays NULL. A blank field is not a zero.
+          on_hand: raw === '' || raw === null || raw === undefined ? null : Number(raw),
+        });
+      }
+      return { data: id, error: null };
+    }
+
+    if (name === 'set_plan_locked') {
+      const id = String(args['p_plan_id'] ?? '');
+      const row = (db['production_plans'] ?? []).find(
+        (p) => p['id'] === id && p['owner_id'] === authUid,
+      );
+      if (!row) {
+        return {
+          data: null,
+          error: { message: 'התוכנית אינה של החשבון הזה', code: '42501' },
+        };
+      }
+      const lock = args['p_locked'] === true;
+      if (lock && (args['p_snapshot'] === null || args['p_snapshot'] === undefined)) {
+        return {
+          data: null,
+          error: { message: 'לא ניתן לנעול תוכנית בלי snapshot', code: '23514' },
+        };
+      }
+      Object.assign(row, {
+        locked: lock,
+        locked_at: lock ? new Date().toISOString() : null,
+        // The snapshot goes with the lock, in both directions.
+        snapshot: lock ? args['p_snapshot'] : null,
+      });
+      return { data: null, error: null };
+    }
+
+    if (name === 'delete_production_plan') {
+      const id = String(args['p_plan_id'] ?? '');
+      // RLS: another account's id matches no row, so this is a silent no-op.
+      const row = (db['production_plans'] ?? []).find(
+        (p) => p['id'] === id && p['owner_id'] === authUid,
+      );
+      if (!row) return { data: null, error: null };
+      db['production_plans'] = (db['production_plans'] ?? []).filter((p) => p !== row);
+      for (const child of ['production_plan_items', 'production_plan_stock']) {
+        db[child] = (db[child] ?? []).filter((c) => c['plan_id'] !== id);
+      }
+      return { data: null, error: null };
+    }
+
     if (name === 'delete_recipe') {
       const target = String(args['p_recipe_id'] ?? '');
 
@@ -1069,6 +1260,22 @@ export function ingredientRow(recipeId: string, over: Row = {}): Row {
     price_unit: null,
     sub_recipe_id: null,
     note: '',
+    ...over,
+  };
+}
+
+/** A step row, for the stage-9 timeline tests. */
+export function stepRow(recipeId: string, over: Row = {}): Row {
+  return {
+    id: newId('step'),
+    recipe_id: recipeId,
+    ord: 0,
+    text: '',
+    temp: null,
+    temp_unit: 'C',
+    minutes: null,
+    // null = nobody classified it, which is what the timeline reports
+    kind: null,
     ...over,
   };
 }

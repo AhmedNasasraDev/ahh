@@ -1,0 +1,142 @@
+.page {
+  display: grid;
+  gap: 14px;
+}
+
+.head {
+  display: grid;
+  gap: 6px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-screen-title);
+  font-weight: 700;
+}
+
+.lede,
+.empty,
+.notice {
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  color: var(--c-muted);
+}
+
+.notice,
+.empty {
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--c-sand);
+}
+
+.error {
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--c-red-bg);
+  color: var(--c-red);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+}
+
+.addBtn {
+  min-height: var(--hit-min);
+  padding: 0 16px;
+  border: 1px dashed var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-paper);
+  color: var(--c-ink);
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  background: var(--c-paper);
+}
+
+.itemHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itemName {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--c-ink);
+}
+
+.itemWhen {
+  font-size: var(--fs-meta);
+  color: var(--c-muted);
+}
+
+.itemMeta {
+  font-size: var(--fs-meta);
+  color: var(--c-muted);
+}
+
+.lockedTag {
+  color: var(--c-green);
+  font-weight: 700;
+}
+
+.itemActions,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondary,
+.danger {
+  min-height: var(--hit-compact);
+  padding: 0 14px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--c-line);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+}
+
+.secondary {
+  background: var(--c-paper);
+  color: var(--c-ink);
+}
+
+.danger {
+  background: var(--c-red-bg);
+  color: var(--c-red);
+  border-color: var(--c-red);
+}
+
+.secondary:disabled,
+.danger:disabled {
+  opacity: 0.5;
+}
+
+.confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-red);
+  border-radius: var(--r-card);
+  background: var(--c-red-bg);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+}

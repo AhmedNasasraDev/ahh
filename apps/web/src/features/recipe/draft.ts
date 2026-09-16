@@ -21,7 +21,7 @@
 // way to the database.
 
 import { normalizeName } from '@recipe-notebook/engine';
-import type { IngredientLike, Recipe, Step } from '@recipe-notebook/engine';
+import type { IngredientLike, Recipe, Step, StepKind } from '@recipe-notebook/engine';
 
 /** A form row for one ingredient. Ids are kept so React keys stay stable. */
 export interface IngredientDraft {
@@ -62,6 +62,11 @@ export interface StepDraft {
   text: string;
   temp: string;
   minutes: string;
+  /**
+   * stage 9: what kind of step this is. '' = not classified, which the
+   * production timeline reports rather than guessing at (migration 0018).
+   */
+  kind: '' | StepKind;
 }
 
 export interface RecipeDraft {
@@ -132,7 +137,7 @@ export function emptyIngredient(): IngredientDraft {
 }
 
 export function emptyStep(): StepDraft {
-  return { key: nextKey('step'), text: '', temp: '', minutes: '' };
+  return { key: nextKey('step'), text: '', temp: '', minutes: '', kind: '' };
 }
 
 /**
@@ -233,6 +238,7 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
       text: str(s.text),
       temp: str(s.temp),
       minutes: str(s.minutes),
+      kind: s.kind ?? '',
     })),
   };
 }
@@ -249,7 +255,7 @@ const isBlankIngredient = (i: IngredientDraft): boolean =>
   i.name.trim() === '' && i.qty.trim() === '';
 
 const isBlankStep = (s: StepDraft): boolean =>
-  s.text.trim() === '' && s.temp.trim() === '' && s.minutes.trim() === '';
+  s.text.trim() === '' && s.temp.trim() === '' && s.minutes.trim() === '' && s.kind === '';
 
 /**
  * Draft → Recipe, ready for the repository.
@@ -310,6 +316,7 @@ export function draftToRecipe(draft: RecipeDraft): Recipe {
       const step: Step = { id: s.key, text: s.text.trim() };
       if (s.temp.trim()) step.temp = s.temp.trim();
       if (s.minutes.trim()) step.minutes = s.minutes.trim();
+      if (s.kind) step.kind = s.kind;
       return step;
     }),
   };

@@ -20,6 +20,7 @@
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import type { CatalogItem } from '../features/pricing/catalog.js';
 import type { PurchaseRecord } from '../features/pricing/purchases.js';
+import type { ProductionPlan } from '../features/planning/plan.js';
 import { defaultPrefs, normalizeCalibrations } from '@recipe-notebook/engine';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from './demoRecipes.js';
 import * as mirror from './offlineMirror.js';
@@ -154,6 +155,30 @@ export function createLocalDemoRepository(): Repository {
 
     async purchaseHistory(): Promise<PurchaseRecord[]> {
       return [];
+    },
+
+    // ── production plans (stage 9) ─────────────────────────────────────────
+    // A plan is an account's own production intent, so there is none here.
+    // Demo plans would be invented business data, and the purchase list and
+    // cost they implied would be invented too.
+    async listPlans() {
+      return [];
+    },
+
+    async getPlan(): Promise<ProductionPlan | null> {
+      return null;
+    },
+
+    async savePlan(): Promise<ProductionPlan> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
+    async deletePlan(): Promise<void> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
+    async setPlanLocked(): Promise<void> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
     },
 
     async getPrefs() {

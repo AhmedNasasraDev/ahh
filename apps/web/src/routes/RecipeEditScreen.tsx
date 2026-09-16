@@ -36,7 +36,9 @@ import {
   unitLabel,
   type Recipe,
 } from '@recipe-notebook/engine';
+import type { StepKind } from '@recipe-notebook/engine';
 import { useAppData } from '../app/AppDataProvider.js';
+import { STEP_KINDS } from '../features/planning/timeline.js';
 import { SourceBadge } from '../components/SourceBadge.js';
 import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState } from '../features/recipe/completeness.js';
@@ -1076,6 +1078,33 @@ export function RecipeEditScreen() {
                     onChange={(e) => patchStep(i, { minutes: e.target.value })}
                     aria-label={`זמן בדקות בשלב ${i + 1}`}
                   />
+                </div>
+                {/*
+                  Stage 9. A production timeline has to tell 90 minutes of work
+                  from 90 minutes of proofing, and nothing else in the row says
+                  which. Left empty it stays empty: the timeline reports the
+                  step as unclassified rather than reading the description.
+                */}
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor={`k-${step.key}`}>
+                    סוג השלב
+                  </label>
+                  <select
+                    id={`k-${step.key}`}
+                    className={styles.input}
+                    value={step.kind}
+                    onChange={(e) =>
+                      patchStep(i, { kind: e.target.value as '' | StepKind })
+                    }
+                    aria-label={`סוג השלב ${i + 1}`}
+                  >
+                    <option value="">— לא מסווג —</option>
+                    {STEP_KINDS.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </li>

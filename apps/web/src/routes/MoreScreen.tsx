@@ -87,6 +87,17 @@ export function MoreScreen() {
         </Link>
       </section>
 
+      <section className={styles.calibSection} aria-label="תכנון ייצור">
+        <h2 className={styles.accountTitle}>תכנון ייצור ורכש</h2>
+        <p className={styles.calibNote}>
+          מגדירים מה מייצרים ובאיזו כמות, והמערכת מחשבת מהמתכונים כמה חומר גלם
+          צריך, מה לקנות, כמה זה צפוי לעלות ומתי להתחיל לעבוד.
+        </p>
+        <Link to="/plans" className={styles.linkBtn}>
+          תוכניות הייצור
+        </Link>
+      </section>
+
       <section className={styles.calibSection} aria-label="הכיולים שלי">
         <h2 className={styles.accountTitle}>כלי המדידה שלי</h2>
         <p className={styles.note}>

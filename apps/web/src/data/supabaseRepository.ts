@@ -26,12 +26,20 @@ import type {
   PurchaseInput,
   PurchaseRecord,
 } from '../features/pricing/purchases.js';
+import type { ProductionPlan } from '../features/planning/plan.js';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
-import type { Json, RecipeVersionRow } from '../lib/database.types.js';
+import type {
+  Json,
+  ProductionPlanItemRow,
+  ProductionPlanRow,
+  ProductionPlanStockRow,
+  RecipeVersionRow,
+} from '../lib/database.types.js';
 import {
   RecipeInUseError,
   WriteNotAllowedError,
+  type PlanSummary,
   type Repository,
   type RepositoryCapabilities,
   type SaveOptions,
@@ -45,6 +53,8 @@ import {
   catalogRowToItem,
   ingredientsToRows,
   issuesToRows,
+  planRowToDomain,
+  planToPayload,
   prefsToProfileUpdate,
   profileRowToPrefs,
   recipeToRow,
@@ -449,6 +459,87 @@ export function createSupabaseRepository({
         prevPrice: r.prev_price === null ? null : Number(r.prev_price),
         pctChange: r.pct_change === null ? null : Number(r.pct_change),
       }));
+    },
+
+    // ── production plans (stage 9) ─────────────────────────────────────────
+
+    async listPlans(): Promise<PlanSummary[]> {
+      const { data, error } = await client
+        .from('production_plans')
+        .select('*, production_plan_items (id)')
+        .eq('owner_id', userId)
+        .order('plan_date', { ascending: false });
+      if (error) throw new SupabaseRepositoryError('טעינת תוכניות הייצור נכשלה', error);
+      return (data ?? []).map((row) => {
+        const r = row as unknown as ProductionPlanRow & {
+          production_plan_items?: unknown[];
+        };
+        return {
+          id: r.id,
+          name: r.name,
+          planDate: r.plan_date,
+          locked: r.locked,
+          items: r.production_plan_items?.length ?? 0,
+        };
+      });
+    },
+
+    async getPlan(id: string): Promise<ProductionPlan | null> {
+      const { data, error } = await client
+        .from('production_plans')
+        .select('*, production_plan_items (*), production_plan_stock (*)')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new SupabaseRepositoryError('טעינת תוכנית הייצור נכשלה', error);
+      if (!data) return null;
+      const row = data as unknown as ProductionPlanRow & {
+        production_plan_items?: ProductionPlanItemRow[];
+        production_plan_stock?: ProductionPlanStockRow[];
+      };
+      return planRowToDomain(
+        row,
+        row.production_plan_items ?? [],
+        row.production_plan_stock ?? [],
+      );
+    },
+
+    async savePlan(plan: ProductionPlan): Promise<ProductionPlan> {
+      requireOnline('תוכנית הייצור');
+      const payload = planToPayload(plan);
+      // ONE call: the plan row, its lines and its on-hand figures are replaced
+      // together, so a half-saved plan cannot exist.
+      const { data, error } = await client.rpc('save_production_plan', {
+        p_plan: payload.p_plan,
+        p_items: payload.p_items,
+        p_stock: payload.p_stock,
+        p_plan_id: plan.id || null,
+        p_expected_updated_at: plan.id ? plan.updatedAt : null,
+      });
+      if (error) throw new SupabaseRepositoryError('שמירת תוכנית הייצור נכשלה', error);
+
+      const saved = await this.getPlan(String(data));
+      if (!saved) {
+        throw new SupabaseRepositoryError('התוכנית נשמרה אבל לא נמצאה בקריאה חזרה', {
+          message: 'not found after save',
+        });
+      }
+      return saved;
+    },
+
+    async deletePlan(id: string): Promise<void> {
+      requireOnline('תוכנית הייצור');
+      const { error } = await client.rpc('delete_production_plan', { p_plan_id: id });
+      if (error) throw new SupabaseRepositoryError('מחיקת תוכנית הייצור נכשלה', error);
+    },
+
+    async setPlanLocked(id: string, locked: boolean, snapshot: unknown): Promise<void> {
+      requireOnline('תוכנית הייצור');
+      const { error } = await client.rpc('set_plan_locked', {
+        p_plan_id: id,
+        p_locked: locked,
+        p_snapshot: locked ? (snapshot as never) : null,
+      });
+      if (error) throw new SupabaseRepositoryError('שינוי מצב התוכנית נכשל', error);
     },
 
     async recipesPricingOn(key: string) {
