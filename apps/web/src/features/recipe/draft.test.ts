@@ -366,3 +366,58 @@ describe('stage 9 — the step kind', () => {
     expect(draftToRecipe(draft).steps).toHaveLength(1);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-10 audit, §2 and §11 — the editor must be able to SHOW what is stored.
+//
+// Found by reading the built edit form in a real browser: every measurement
+// dropdown reported grams, whatever the recipe held. The option values are the
+// engine's canonical ids, the stored rows hold the Hebrew names, nothing
+// matched, and the browser fell back to the first option — which is grams, so
+// it looked right on a gram-measured row and wrong on every other one.
+//
+// The consequence was not cosmetic. Open, save, and 5 יח' of eggs are stored
+// as 5 g: the quantity kept and the unit replaced, with no warning.
+describe('stage-10 audit: a stored unit survives a trip through the form', () => {
+  const LEGACY: Recipe = {
+    id: 'legacy',
+    name: 'בריוש',
+    ingredients: [
+      { id: 'i1', name: 'קמח לחם', qty: 500, unit: 'גרם', flour: true },
+      { id: 'i2', name: 'ביצים', qty: 5, unit: "יח'", unitWeight: 55 },
+      { id: 'i3', name: 'חלב', qty: 60, unit: 'מ"ל' },
+      { id: 'i4', name: 'שמן', qty: 2, unit: 'כף' },
+    ],
+    steps: [],
+  } as unknown as Recipe;
+
+  it('normalises each stored unit to the id the dropdown can display', () => {
+    const rows = draftFromRecipe(LEGACY).ingredients;
+    expect(rows.map((r) => r.unit)).toEqual(['g', 'unit', 'ml', 'tbsp']);
+  });
+
+  it('and a save no longer rewrites those units as grams', () => {
+    const recipe = draftToRecipe(draftFromRecipe(LEGACY));
+    expect(recipe.ingredients!.map((i) => i.unit)).toEqual(['g', 'unit', 'ml', 'tbsp']);
+    // The quantities are untouched: this is a re-spelling, not a conversion.
+    // They come back as the strings the form holds — that is the stage-4
+    // decision that keeps '' apart from 0 — and the mapper makes them numbers.
+    expect(recipe.ingredients!.map((i) => String(i.qty))).toEqual(['500', '5', '60', '2']);
+  });
+
+  it('weighs the same before and after, which is what proves it is a re-spelling', () => {
+    const prefs = { ...defaultPrefs('pro'), done: true, tools: { cup: 240, tbsp: 15, tsp: 5 } };
+    const before = compute(LEGACY, [LEGACY], { prefs });
+    const after = draftToRecipe(draftFromRecipe(LEGACY));
+    const afterComputed = compute({ ...after, id: 'legacy' }, [after as Recipe], { prefs });
+    expect(afterComputed.rows.map((r) => r.g)).toEqual(before.rows.map((r) => r.g));
+  });
+
+  it('keeps a unit the engine does not know, rather than calling it grams', () => {
+    const odd = {
+      ...LEGACY,
+      ingredients: [{ id: 'i1', name: 'משהו', qty: 1, unit: 'קורט' }],
+    } as unknown as Recipe;
+    expect(draftFromRecipe(odd).ingredients[0]!.unit).toBe('קורט');
+  });
+});

@@ -440,3 +440,38 @@ describe('an explicit price of zero is a price', () => {
     expect(screen.queryByText('חלקי')).not.toBeInTheDocument();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-10 audit, §10 — two controls, one name.
+//
+// Found by running Chromium's accessibility tree over the built page at three
+// viewports: both button groups had a "כמו במתכון", one under "מצב שינוי
+// כמויות" and one under "תצוגת יחידות". A screen reader that announces the
+// group can tell them apart; a voice-control user saying the words cannot, and
+// nor can a list of the page's controls. This guard is the same question asked
+// of the rendered DOM, so it cannot come back.
+describe('stage-10 audit, §10: every control on the page has its own name', () => {
+  it('no button is addressable by the bare name that used to be ambiguous', async () => {
+    renderRecipe('brioche');
+    await screen.findByRole('heading', { name: 'בריוש נאנטר' });
+
+    // `name` here is Testing Library's accessible-name query — the same
+    // algorithm `getByRole` uses everywhere else, so a name it matches is a
+    // name a user can address. Nothing answers to the bare words any more,
+    // which is precisely what stops the two buttons colliding.
+    expect(screen.queryAllByRole('button', { name: 'כמו במתכון' })).toHaveLength(0);
+  });
+
+  it('each of the two carries the name of what it changes', async () => {
+    renderRecipe('brioche');
+    await screen.findByRole('heading', { name: 'בריוש נאנטר' });
+
+    const scale = screen.getByRole('button', { name: 'כמויות כמו במתכון' });
+    const view = screen.getByRole('button', { name: 'תצוגה כמו במתכון' });
+    // WCAG 2.5.3 (Label in Name): the accessible name contains the visible
+    // text, so speaking what is written still hits the control.
+    expect(scale).toHaveTextContent('כמו במתכון');
+    expect(view).toHaveTextContent('כמו במתכון');
+    expect(scale).not.toBe(view);
+  });
+});

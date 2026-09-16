@@ -256,4 +256,23 @@ describe('requirement 2 — signing out', () => {
     // AuthGate swaps the app for the sign-in screen.
     expect(await screen.findByRole('button', { name: 'כניסה למחברת' })).toBeInTheDocument();
   });
+
+  // ── stage-10 audit, §11: a session that dies on its own ────────────────
+  it('an expired session lands on the sign-in screen, not on a broken app', async () => {
+    const db = emptyDb();
+    db['profiles']!.push(newProfileRow(USER_A, { onboarding_done: true }));
+    db['recipes']!.push(recipeRow('r1', USER_A, { name: 'בריוש' }));
+    const { client, auth } = project(db, USER_A);
+
+    render(<AppUnderTest client={client} route="/notebook" />);
+    expect(await screen.findByText('בריוש')).toBeInTheDocument();
+
+    // GoTrue emits this when a refresh fails and the token is gone — the user
+    // pressed nothing. Nothing else in the app tells it the session died.
+    auth.emit('SIGNED_OUT', null);
+
+    expect(await screen.findByRole('button', { name: 'כניסה למחברת' })).toBeInTheDocument();
+    // And the notebook is no longer on screen behind it.
+    expect(screen.queryByText('בריוש')).not.toBeInTheDocument();
+  });
 });

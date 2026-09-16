@@ -115,3 +115,83 @@ describe('every container query names a container that exists', () => {
     });
   }
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// STAGE-10 AUDIT GUARD: text has to be readable on the background it sits on.
+//
+// The audit found `--c-sand` (#c4a99b) used as a PANEL BACKGROUND under
+// `--c-muted` text — 2.02:1 measured, on the "no connection" notice and on
+// three empty states — and as small TEXT on paper and on white, at 2.14 and
+// 2.21:1, including on a tab label and on the "המר" affordance. The token's
+// own comment says sand is a fill ("step numbers, paper frame"), and nothing
+// caught the misuse because every one of those rules is valid CSS with a
+// declared token.
+//
+// So the pairing is checked arithmetically. A rule that sets BOTH a background
+// token and a text colour token is measured; a rule that sets only one is
+// skipped, because its counterpart comes from the cascade and this is a static
+// file check rather than a browser. The browser-side measurement that found
+// these lives in the stage-10 report.
+const HEX: Readonly<Record<string, string>> = Object.fromEntries(
+  [...tokens.matchAll(/(--c-[\w-]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1]!, m[2]!]),
+);
+
+const luminance = (hex: string): number => {
+  const v = (i: number) => {
+    const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * v(0) + 0.7152 * v(1) + 0.0722 * v(2);
+};
+
+const contrast = (a: string, b: string): number => {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+};
+
+/**
+ * Pairings that come straight from the spec's §16 palette and are therefore
+ * NOT this test's business to reject. They are reported as a known limitation
+ * in REVIEW_STEP10_FINAL_REPORT.md instead, because changing them means
+ * changing the product's colours — a decision for the designer, not a test.
+ */
+const SPEC_PAIRS: ReadonlySet<string> = new Set([
+  '--c-amber-bg/--c-amber', // 3.81:1 — the warning banner, as specified
+  '--c-paper/--c-muted', // 4.33:1 — secondary text on a card
+  '--c-app-bg/--c-muted', // 4.32:1 — secondary text on a screen
+  '--c-neutral-bg/--c-muted', // 3.87:1
+  '--c-white/--c-muted', // 4.47:1 — the active tab label
+  '--c-paper/--c-sand', // 2.14:1 — §16 step numerals, from the prototype
+  '--c-outer-bg/--c-muted', // label and order sheets
+]);
+
+describe('stage-10 audit: no stylesheet pairs unreadable colours', () => {
+  const findings: string[] = [];
+
+  for (const sheet of moduleSheets()) {
+    const css = readFileSync(sheet, 'utf8');
+    const name = sheet.slice(SRC.length + 1);
+    for (const rule of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const body = rule[2]!;
+      const bg = /background(?:-color)?:\s*var\((--c-[\w-]+)\)/.exec(body);
+      const fg = /(?<!-)\bcolor:\s*var\((--c-[\w-]+)\)/.exec(body);
+      if (!bg || !fg) continue;
+      const bgHex = HEX[bg[1]!];
+      const fgHex = HEX[fg[1]!];
+      if (!bgHex || !fgHex) continue;
+      if (SPEC_PAIRS.has(`${bg[1]}/${fg[1]}`)) continue;
+      const ratio = contrast(bgHex, fgHex);
+      if (ratio < 4.5) {
+        findings.push(
+          `${name} · ${rule[1]!.trim().replace(/\s+/g, ' ')} · ` +
+            `${fg[1]} on ${bg[1]} = ${ratio.toFixed(2)}:1`,
+        );
+      }
+    }
+  }
+
+  it('every rule that sets both a background and a text colour reaches 4.5:1', () => {
+    expect(findings).toEqual([]);
+  });
+});

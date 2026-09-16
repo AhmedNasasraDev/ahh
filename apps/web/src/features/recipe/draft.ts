@@ -20,7 +20,7 @@
 // Nothing here invents a value. A field the user left alone stays empty all the
 // way to the database.
 
-import { normalizeName } from '@recipe-notebook/engine';
+import { normalizeName, unitId } from '@recipe-notebook/engine';
 import type { IngredientLike, Recipe, Step, StepKind } from '@recipe-notebook/engine';
 
 /** A form row for one ingredient. Ids are kept so React keys stay stable. */
@@ -222,7 +222,27 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
       name: str(ing.name),
       ingredientKey: str(ing.ingredientKey),
       qty: str(ing.qty),
-      unit: str(ing.unit) || 'g',
+      /*
+        STAGE-10 AUDIT FIX (§2, §11). This read `str(ing.unit) || 'g'`, so the
+        draft carried whatever spelling the stored row used. The <select> below
+        it lists the engine's canonical ids as its option VALUES ('g', 'ml',
+        'unit'…), and every recipe saved before — the demo set, the fixtures,
+        the rows in the database — stores the Hebrew names ('גרם', 'מ"ל',
+        "יח'"). No option matched, so the browser fell back to the first one and
+        the form showed GRAMS for every row.
+
+        It looked harmless because the first option IS grams, so a
+        gram-measured row appeared correct. It was not harmless: opening the
+        brioche and pressing save rewrote 5 יח' of eggs as 5 g and 60 מ"ל of
+        milk as 60 g — the quantity kept, the unit replaced, silently. A form
+        that cannot show what is stored must not be allowed to save over it.
+
+        `unitId` is the engine's own normaliser (units.ts, LEGACY_UNIT_NAMES),
+        so there is no second mapping table here. A unit the engine does not
+        recognise is kept verbatim rather than turned into grams: the select
+        cannot display it, but nothing invents a value for it either.
+      */
+      unit: unitId(ing.unit) ?? (str(ing.unit) || 'g'),
       flour: ing.flour === true,
       liquid: ing.liquid === true,
       waterPct: str(ing.waterPct),

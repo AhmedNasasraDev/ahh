@@ -372,3 +372,66 @@ describe('accessibility of the per-row controls', () => {
     expect(screen.getByRole('button', { name: 'הסרת שלב 1' })).toBeInTheDocument();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-10 audit, §11 — what the editor does when the SERVER says no.
+//
+// The rule being tested is the one that matters most in this section: a save
+// that did not happen must never look like one that did. The form stays open
+// with its typed values, the reason is announced, and nothing navigates away
+// to a page that would then show the old recipe as if it had been updated.
+describe('stage-10 audit, §11: a save the server refuses', () => {
+  /** A repository whose write fails the way PostgREST reports a failure. */
+  function renderWithFailingSave(message: string) {
+    const calls: Recipe[] = [];
+    renderRoute(<RecipeEditScreen />, {
+      path: '/recipe/:recipeId/edit',
+      route: `/recipe/${BRIOCHE.id}/edit`,
+      repository: fakeRepository({
+        prefs,
+        recipes: [BRIOCHE],
+        canWrite: true,
+        onSaveRecipe: (r) => {
+          calls.push(r);
+          throw new Error(message);
+        },
+      }),
+    });
+    return calls;
+  }
+
+  it('keeps the user on the form and says why, rather than reporting success', async () => {
+    const user = userEvent.setup();
+    // The message the RPC really raises when another device saved in between
+    // (migration 0007, errcode serialization_failure).
+    renderWithFailingSave(
+      'עדכון המתכון נכשל: המתכון שונה במקום אחר מאז שנטען. יש לרענן ולנסות שוב.',
+    );
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    await user.clear(screen.getByLabelText('שם המתכון'));
+    await user.type(screen.getByLabelText('שם המתכון'), 'בריוש מעודכן');
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/המתכון שונה במקום אחר/);
+    // Still the editor, and still holding what was typed: nothing was lost and
+    // nothing pretended to be saved.
+    expect(screen.getByRole('heading', { name: 'עריכת מתכון' })).toBeInTheDocument();
+    expect(screen.getByLabelText('שם המתכון')).toHaveValue('בריוש מעודכן');
+  });
+
+  it('can be retried after the failure, rather than leaving the button dead', async () => {
+    const user = userEvent.setup();
+    const calls = renderWithFailingSave('עדכון המתכון נכשל: השרת לא זמין.');
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    const save = screen.getByRole('button', { name: 'שמירת השינויים' });
+    await user.click(save);
+    await screen.findByRole('alert');
+    // `busy` is cleared in a finally block, so the second attempt is possible.
+    await waitFor(() => expect(save).not.toBeDisabled());
+    await user.click(save);
+    await waitFor(() => expect(calls.length).toBe(2));
+  });
+});

@@ -8,7 +8,9 @@
 --     supplied by hand, straight at the table
 --   · that `locked` and `snapshot` cannot come apart — the CHECK refuses a
 --     lock with no snapshot and a snapshot with no lock
---   · that a locked plan cannot be edited, and that unlocking clears the freeze
+--   · that a locked plan cannot be edited — not through the RPC and not
+--     through any direct path at the three tables — and that unlocking clears
+--     the freeze
 --   · that a cycle of sub-recipes is still impossible, so the dependency walk
 --     the timeline does cannot loop
 --   · that one account cannot read, write, or delete another's plans, their
@@ -43,6 +45,7 @@ declare
   a uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   b uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   ra uuid; rsub uuid; rb uuid; pid uuid; n int; txt text;
+  rtmp uuid; ptmp uuid;
 begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', a, 'role','authenticated')::text, true);
@@ -166,11 +169,14 @@ begin
       'refused','refused');
   end;
   begin
+    -- Refused twice over since 0021: the guard answers first (a snapshot is
+    -- written only by the lock transition) and the CHECK behind it still
+    -- refuses a snapshot on an unlocked row.
     update public.production_plans set snapshot = '{"x":1}'::jsonb where id = pid;
-    insert into p values (13,'14','a snapshot without a lock is refused by the CHECK',
+    insert into p values (13,'14','a snapshot cannot be set without a lock',
       'refused','ACCEPTED');
   exception when others then
-    insert into p values (13,'14','a snapshot without a lock is refused by the CHECK',
+    insert into p values (13,'14','a snapshot cannot be set without a lock',
       'refused','refused');
   end;
 
@@ -196,6 +202,151 @@ begin
   select format('%s|%s', locked::text, (snapshot is null)::text) into txt
     from public.production_plans where id = pid;
   insert into p values (16,'14','unlocking clears the freeze','false|true', txt);
+
+  -- ── stage-10 audit, §7: the freeze is enforced by the DATABASE ───────
+  --
+  -- Until 0021 the rule "a locked plan is a record and cannot be edited"
+  -- lived in exactly one place: the `if v_locked then raise` inside
+  -- `save_production_plan`. Probe 15 above passed, and six other paths
+  -- straight at the tables succeeded — the owner's own session, holding
+  -- nothing but the anon key and its JWT, could rename a locked plan,
+  -- rewrite its frozen snapshot, unlock it without clearing the freeze, add
+  -- a line to it, change its lines and delete its stock. Every one of them
+  -- must now be refused with 42501, and the row must come out of the
+  -- attempt byte for byte as it went in.
+  perform public.set_plan_locked(pid, true,
+    jsonb_build_object('at','2026-10-02','total',80,'level','full'));
+
+  begin
+    update public.production_plans set name = 'נחטף' where id = pid;
+    get diagnostics n = row_count;
+    insert into p values (50,'7','a direct UPDATE of a locked plan is refused',
+      'refused: 42501', n || ' rows changed');
+  exception when others then
+    insert into p values (50,'7','a direct UPDATE of a locked plan is refused',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+  begin
+    update public.production_plans set snapshot = jsonb_build_object('total',1)
+     where id = pid;
+    get diagnostics n = row_count;
+    insert into p values (51,'7','the frozen snapshot cannot be rewritten',
+      'refused: 42501', n || ' rows changed');
+  exception when others then
+    insert into p values (51,'7','the frozen snapshot cannot be rewritten',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+  begin
+    update public.production_plans set locked = false, snapshot = null where id = pid;
+    get diagnostics n = row_count;
+    insert into p values (52,'7','and it cannot be unlocked behind the RPC''s back',
+      'refused: 42501', n || ' rows changed');
+  exception when others then
+    insert into p values (52,'7','and it cannot be unlocked behind the RPC''s back',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+  begin
+    insert into public.production_plan_items (plan_id, recipe_id, ord, qty, qty_unit)
+    values (pid, ra, 9, 99, 'unit');
+    get diagnostics n = row_count;
+    insert into p values (53,'7','no line can be added to a locked plan',
+      'refused: 42501', n || ' rows added');
+  exception when others then
+    insert into p values (53,'7','no line can be added to a locked plan',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+  begin
+    update public.production_plan_items set qty = 999 where plan_id = pid;
+    get diagnostics n = row_count;
+    insert into p values (54,'7','nor any of its lines changed',
+      'refused: 42501', n || ' rows changed');
+  exception when others then
+    insert into p values (54,'7','nor any of its lines changed',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+  begin
+    -- The one that first came back as 42703 rather than 42501: `old.recipe_id`
+    -- in the guard's condition, resolved on the table that has no such column.
+    -- Refused, and for the wrong reason. The expected SQLSTATE below is the
+    -- whole point of writing it down.
+    delete from public.production_plan_stock where plan_id = pid;
+    get diagnostics n = row_count;
+    insert into p values (55,'7','nor its store-room figures deleted',
+      'refused: 42501', n || ' rows removed');
+  exception when others then
+    insert into p values (55,'7','nor its store-room figures deleted',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+  begin
+    insert into public.production_plans (owner_id, name, locked, snapshot)
+    values (a, 'רשומה מפוברקת', true, jsonb_build_object('total',0));
+    get diagnostics n = row_count;
+    insert into p values (56,'7','a plan cannot be born locked, with figures never produced',
+      'refused: 42501', n || ' rows added');
+  exception when others then
+    insert into p values (56,'7','a plan cannot be born locked, with figures never produced',
+      'refused: 42501','refused: ' || SQLSTATE);
+  end;
+
+  select format('%s|%s|%s|%s', name, locked::text,
+                trim_scale((snapshot->>'total')::numeric),
+                (select count(*) from public.production_plan_items where plan_id = pid)::text)
+    into txt from public.production_plans where id = pid;
+  insert into p values (57,'7','after all of it the record is untouched',
+    'שישי|true|80|1', txt);
+
+  -- The legitimate transition is not collateral damage: the one function that
+  -- owns the lock still works, in both directions.
+  perform public.set_plan_locked(pid, false);
+  select format('%s|%s', locked::text, (snapshot is null)::text) into txt
+    from public.production_plans where id = pid;
+  insert into p values (58,'7','the RPC still unlocks, and clears the freeze','false|true', txt);
+  -- Re-saved with the content it already had, so the isolation probes that
+  -- follow still have a line and a store-room figure to fail to reach.
+  perform public.save_production_plan(
+    jsonb_build_object('name','שישי','plan_date','2026-10-02','note','הכול לבוקר'),
+    jsonb_build_array(jsonb_build_object(
+      'recipe_id', ra, 'qty', 60, 'qty_unit','unit','ready_at','08:00','note','ארגז')),
+    jsonb_build_array(
+      jsonb_build_object('key','קמח לבן','on_hand','4'),
+      jsonb_build_object('key','חמאה','on_hand','0'),
+      jsonb_build_object('key','סוכר','on_hand','')),
+    pid, null);
+  select format('%s|%s|%s', name,
+                (select trim_scale(count(*)) from public.production_plan_items
+                  where plan_id = pid),
+                (select trim_scale(count(*)) from public.production_plan_stock
+                  where plan_id = pid))
+    into txt from public.production_plans where id = pid;
+  insert into p values (59,'7','and an unlocked plan is editable again','שישי|1|3', txt);
+
+  -- And the cascade 0018 chose on purpose still passes the guard: deleting a
+  -- RECIPE removes it from a locked plan's lines, because the record of what
+  -- was produced lives in the snapshot rather than in the lines.
+  rtmp := public.save_recipe('{"name":"מתכון זמני","yield_units":2,"unit_weight":100}'::jsonb,
+    jsonb_build_array(jsonb_build_object(
+      'ord',0,'name','קמח לבן','ingredient_key','קמח לבן','qty',500,'unit','גרם')),
+    '[]'::jsonb, '[]'::jsonb);
+  ptmp := public.save_production_plan('{"name":"תוכנית זמנית"}'::jsonb,
+    jsonb_build_array(jsonb_build_object('recipe_id', rtmp, 'qty', 2, 'qty_unit','unit')),
+    '[]'::jsonb);
+  perform public.set_plan_locked(ptmp, true, jsonb_build_object('total',9));
+  begin
+    perform public.delete_recipe(rtmp);
+    select count(*) into n from public.production_plan_items where plan_id = ptmp;
+    insert into p values (60,'7','deleting a recipe still cascades out of a locked plan',
+      '0', n::text);
+  exception when others then
+    insert into p values (60,'7','deleting a recipe still cascades out of a locked plan',
+      '0','refused: ' || SQLERRM);
+  end;
+  select format('%s|%s', locked::text, trim_scale((snapshot->>'total')::numeric)) into txt
+    from public.production_plans where id = ptmp;
+  insert into p values (61,'7','and the frozen record of it survives','true|9', txt);
+  -- A record may be deleted; it may only not be rewritten.
+  perform public.delete_production_plan(ptmp);
+  select count(*) into n from public.production_plans where id = ptmp;
+  insert into p values (62,'7','a locked plan can still be deleted outright','0', n::text);
 
   -- ── requirement 11: a cycle is still impossible ──────────────────────
   begin

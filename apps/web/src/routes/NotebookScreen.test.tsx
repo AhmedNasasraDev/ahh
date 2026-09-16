@@ -83,3 +83,71 @@ describe('§2 the notebook', () => {
     expect(screen.queryByText(/ייצוא/)).not.toBeInTheDocument();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+describe('stage-10 audit: the card costs what the recipe page costs', () => {
+  /** One recipe with NO price of its own — the normal case since stage 7. */
+  const inherited = [
+    {
+      id: 'inh',
+      name: 'לחם לבן',
+      category: 'לחמים',
+      yieldUnits: 2,
+      unitWeight: 500,
+      ingredients: [
+        { id: 'i1', name: 'קמח לבן', ingredientKey: 'קמח לבן', qty: 1000, unit: 'g', flour: true },
+      ],
+      steps: [],
+    },
+  ] as unknown as NonNullable<Parameters<typeof fakeRepository>[0]>['recipes'];
+
+  const priced = [
+    {
+      id: 'cat-flour',
+      key: 'קמח לבן',
+      name: 'קמח לבן',
+      purchaseUnit: 'kg' as const,
+      packageQty: 1,
+      packageCount: 1,
+      purchaseTotal: 6,
+      usablePct: null,
+      supplier: '',
+      purchasedAt: null,
+      priceUpdatedAt: null,
+      note: '',
+      purchasePrice: 6,
+      price: 6,
+      priceUnit: 'ק"ג' as const,
+      allergens: [],
+    },
+  ];
+
+  it('shows the cost per kilo that comes from the ingredient centre', async () => {
+    // The defect this pins: the list used to compute from the recipe's OWN row
+    // prices only, so a recipe priced centrally — the documented normal case —
+    // showed no cost on its card while its page showed ₪6/kg.
+    renderRoute(<NotebookScreen />, {
+      repository: fakeRepository({
+        prefs: { ...defaultPrefs('pro'), done: true },
+        recipes: inherited,
+        catalog: priced,
+      }),
+    });
+    const card = await screen.findByText('לחם לבן');
+    const row = card.closest('a')!;
+    expect(row).toHaveTextContent('₪6');
+    expect(row).toHaveTextContent('לק"ג');
+  });
+
+  it('shows no cost when nothing prices the material, rather than ₪0', async () => {
+    renderRoute(<NotebookScreen />, {
+      repository: fakeRepository({
+        prefs: { ...defaultPrefs('pro'), done: true },
+        recipes: inherited,
+        catalog: [],
+      }),
+    });
+    const card = await screen.findByText('לחם לבן');
+    expect(card.closest('a')!).not.toHaveTextContent('₪');
+  });
+});

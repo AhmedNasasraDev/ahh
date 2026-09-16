@@ -31,15 +31,30 @@ import styles from '../features/recipe/recipe.module.css';
 type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
 type ViewMode = 'orig' | 'g' | 'home';
 
-const SCALE_TABS: readonly { id: ScaleMode; label: string }[] = [
-  { id: 'recipe', label: 'כמו במתכון' },
+/*
+  `srLabel` exists for exactly one reason, found by the stage-10 §10 audit
+  against Chromium's real accessibility tree: BOTH groups on this page had a
+  button whose accessible name was "כמו במתכון", one meaning "do not scale" and
+  one meaning "show the units as written". The group labels below disambiguate
+  them for a screen reader that announces the group — but a voice-control user
+  saying "כמו במתכון" has two targets and no way to choose, and a list of the
+  page's controls reads the same name twice.
+
+  The visible text is unchanged and the accessible name CONTAINS it, which is
+  what WCAG 2.5.3 (Label in Name) requires: speaking what is on screen still
+  matches. Only the two colliding buttons carry one.
+*/
+type Tab<T> = { id: T; label: string; srLabel?: string };
+
+const SCALE_TABS: readonly Tab<ScaleMode>[] = [
+  { id: 'recipe', label: 'כמו במתכון', srLabel: 'כמויות כמו במתכון' },
   { id: 'units', label: 'יחידות' },
   { id: 'weight', label: 'משקל' },
   { id: 'stock', label: 'לפי מלאי' },
 ];
 
-const VIEW_TABS: readonly { id: ViewMode; label: string }[] = [
-  { id: 'orig', label: 'כמו במתכון' },
+const VIEW_TABS: readonly Tab<ViewMode>[] = [
+  { id: 'orig', label: 'כמו במתכון', srLabel: 'תצוגה כמו במתכון' },
   { id: 'g', label: 'גרמים' },
   { id: 'home', label: 'ביתי' },
 ];
@@ -466,6 +481,7 @@ export function RecipeScreen() {
                 setScaleValue('');
               }}
               aria-pressed={scaleMode === t.id}
+              {...(t.srLabel ? { 'aria-label': t.srLabel } : {})}
             >
               {t.label}
             </button>
@@ -537,6 +553,7 @@ export function RecipeScreen() {
                 className={view === t.id ? styles.tabSmallOn : styles.tabSmall}
                 onClick={() => setView(t.id)}
                 aria-pressed={view === t.id}
+                {...(t.srLabel ? { 'aria-label': t.srLabel } : {})}
               >
                 {t.label}
               </button>

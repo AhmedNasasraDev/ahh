@@ -26,11 +26,17 @@
   font-weight: 600;
 }
 
+/*
+  STAGE-10 AUDIT FIX. A pending tab's label was `--c-sand` on white: 2.21:1
+  measured, on a NAVIGATION CONTROL. `--c-muted` is the app's own secondary-text
+  colour and measures 4.47:1 here — the same treatment every other secondary
+  label in the product gets, instead of a fill colour used as text.
+*/
 .pending {
-  color: var(--c-sand);
+  color: var(--c-muted);
 }
 
 .pendingHint {
   font-size: var(--fs-label);
-  color: var(--c-sand);
+  color: var(--c-muted);
 }

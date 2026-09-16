@@ -26,7 +26,13 @@ const TABS: readonly TabDef[] = [
     label: 'עוד',
     // `/ingredients` is owned here because the centre is reached from "עוד",
     // so the tab must stay lit while the user is in it.
-    owns: ['/more', '/settings', '/tools', '/plan', '/stock', '/ingredients'],
+    //
+    // STAGE-10 AUDIT FIX: `/plans` was missing. `tabOf` matches a path exactly
+    // or as a `${p}/` prefix, so `/plan/:id` matched `/plan` but the LIST at
+    // `/plans` matched nothing and fell through to the notebook — the bottom
+    // bar told a user standing in their production plans that they were in the
+    // notebook. Found by comparing the screenshots of the two routes.
+    owns: ['/more', '/settings', '/tools', '/plan', '/plans', '/stock', '/ingredients'],
     ready: false,
   },
 ];

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { compute, formatGrams, formatNis } from '@recipe-notebook/engine';
+import { compute, formatGrams, formatNis, type Computed } from '@recipe-notebook/engine';
 import { useAppData } from '../app/AppDataProvider.js';
+import { resolveFromCatalog } from '../features/pricing/catalog.js';
 import styles from './NotebookScreen.module.css';
 
 /**
@@ -13,11 +14,36 @@ import styles from './NotebookScreen.module.css';
  * a button that lies is worse than a button that is absent.
  */
 export function NotebookScreen() {
-  const { recipes, categories, prefs, capabilities } = useAppData();
+  const { recipes, categories, prefs, capabilities, catalog } = useAppData();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('הכל');
 
   const pro = prefs.pro === true;
+
+  /*
+    STAGE-10 AUDIT FIX, two defects in one place.
+
+    1. THE CARDS IGNORED THE CENTRAL PRICES. This ran `compute(r, recipes)` on
+       the RAW recipes, so a card's "₪ לק"ג" came from prices typed into the
+       recipe's own rows. Since stage 7 the normal case is the opposite — the
+       price lives in the ingredient centre and the row has none — so a
+       properly priced recipe showed NO cost on its card and a full cost on its
+       own page. One figure, two screens, two answers. The catalog is resolved
+       here now, exactly as the recipe screen does it.
+
+    2. IT RAN INSIDE THE RENDER LOOP. Measured: 120 recipes of 40 rows cost
+       24.4 ms per render, so typing a ten-letter search term spent ~244 ms
+       recomputing the whole notebook — on a phone, several times that. The
+       computation is keyed on the notebook, the catalog and the preferences
+       instead of on the filtered subset, so searching and switching category
+       now cost nothing: only a real change to the data recomputes.
+  */
+  const computedById = useMemo(() => {
+    const priced = recipes.map((r) => resolveFromCatalog(r, catalog));
+    const out = new Map<string, Computed>();
+    for (const r of priced) out.set(r.id, compute(r, priced, { prefs }));
+    return out;
+  }, [recipes, catalog, prefs]);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -107,9 +133,10 @@ export function NotebookScreen() {
       ) : (
         <ul className={styles.list}>
           {filtered.map((r) => {
-            // The list shows real computed figures, from the same engine the
-            // recipe page uses — one conversion path, per B1/B2.
-            const c = compute(r, recipes, { prefs });
+            // The list shows real computed figures, from the same engine AND
+            // the same central prices the recipe page uses — one conversion
+            // path, per B1/B2, and one cost.
+            const c = computedById.get(r.id) ?? compute(r, recipes, { prefs });
             const yieldLabel = r.yieldUnits
               ? `${r.yieldUnits} יח' · ${r.unitWeight} גר' ליחידה`
               : formatGrams(c.actualYield);

@@ -50,6 +50,7 @@
 import {
   compute,
   ingredientKeyOf,
+  unitId,
   unitLabel,
   type IngredientLike,
   type MeasurementPrefs,
@@ -179,7 +180,9 @@ function amountChanged(a: RowFacts, b: RowFacts): boolean {
     return Math.abs(a.grams - b.grams) >= 1;
   }
   // One or both could not be weighed: compare what was actually written.
-  return a.qty !== b.qty || a.unit !== b.unit;
+  // The unit is compared as the engine's canonical id, so "גרם" and "g" — the
+  // same unit spelled the two ways the stored data uses — is not a change.
+  return a.qty !== b.qty || (unitId(a.unit) ?? a.unit) !== (unitId(b.unit) ?? b.unit);
 }
 
 export interface VersionDiffInput {
@@ -263,6 +266,13 @@ function ingCells(ing: IngredientLike): Map<string, CellValue> {
     // `flour` and `liquid` are flags: absent means false, not "unknown".
     if (key === 'flour' || key === 'liquid') {
       out.set(key, (ing as Record<string, unknown>)[key] === true);
+    } else if (key === 'unit') {
+      // Compared, and displayed, as the Hebrew label of the canonical unit:
+      // the stored data holds both "גרם" and "g" for the same unit, and a
+      // comparison that called that a change would report a change on every
+      // row of the first save after the units were normalised. It also reads
+      // better than the id would.
+      out.set(key, cell(unitLabel((ing as Record<string, unknown>)[key] as string)));
     } else {
       out.set(key, cell((ing as Record<string, unknown>)[key]));
     }

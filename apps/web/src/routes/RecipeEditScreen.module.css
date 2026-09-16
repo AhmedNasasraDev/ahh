@@ -195,7 +195,9 @@
   place-items: center;
   border-radius: 50%;
   background: var(--c-sand);
-  color: var(--c-white);
+  /* stage-10 audit: white on sand measured 2.21:1 on the row number.
+     Ink on the same sand badge is 7.93:1, and the badge looks unchanged. */
+  color: var(--c-ink);
   font-size: var(--fs-meta);
 }
 

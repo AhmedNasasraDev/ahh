@@ -24,11 +24,20 @@
   color: var(--c-muted);
 }
 
+/*
+  STAGE-10 AUDIT FIX. These boxes paired a `--c-sand` background with
+  `--c-muted` text, measured at 2.02:1 — the worst contrast in the app, and
+  far under the 4.5:1 that 10.5-11.5px text needs. The token's own comment
+  says sand is a FILL ("step numbers, paper frame"), not a background for
+  secondary text. The palette itself is untouched (the handoff protects §16);
+  only the text is darkened here, which measures 7.93:1.
+*/
 .notice,
 .empty {
   padding: 12px 14px;
   border-radius: var(--r-card);
   background: var(--c-sand);
+  color: var(--c-ink);
 }
 
 .locked {

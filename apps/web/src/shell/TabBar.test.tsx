@@ -22,6 +22,16 @@ describe('§2 tabOf — a deep screen highlights the tab that owns it', () => {
     }
   });
 
+  it('maps BOTH production-planning routes, the list and one plan', () => {
+    // The stage-10 audit found `/plans` falling through to the notebook: the
+    // matcher takes an exact path or a `${p}/` prefix, so `/plan/:id` matched
+    // `/plan` and the list did not. A user in their plans was told they were
+    // in the notebook.
+    expect(tabOf('/plans')).toBe('/more');
+    expect(tabOf('/plan/abc-123')).toBe('/more');
+    expect(tabOf('/ingredients')).toBe('/more');
+  });
+
   it('falls back to the notebook for anything unknown', () => {
     expect(tabOf('/nope')).toBe('/notebook');
   });
