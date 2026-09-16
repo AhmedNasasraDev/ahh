@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { toolLabel } from '@recipe-notebook/engine';
 import { useAuth } from '../auth/AuthProvider.js';
+import { Link } from 'react-router-dom';
 import { useAppData } from '../app/AppDataProvider.js';
 import { NotImplementedScreen } from './NotImplementedScreen.js';
 import styles from './MoreScreen.module.css';
@@ -75,6 +76,17 @@ export function MoreScreen() {
         takes precedence over every table value (§5.1 rank 1) and wears a green
         "personal" badge while doing it. So it has to be visible and removable.
       */}
+      <section className={styles.calibSection} aria-label="חומרי גלם ותמחור">
+        <h2 className={styles.accountTitle}>חומרי גלם ותמחור</h2>
+        <p className={styles.calibNote}>
+          המחיר של כל חומר גלם נמצא במקום אחד. שינוי מחיר שם מעדכן את העלות בכל
+          המתכונים שמשתמשים בו.
+        </p>
+        <Link to="/ingredients" className={styles.linkBtn}>
+          מרכז חומרי הגלם
+        </Link>
+      </section>
+
       <section className={styles.calibSection} aria-label="הכיולים שלי">
         <h2 className={styles.accountTitle}>כלי המדידה שלי</h2>
         <p className={styles.note}>

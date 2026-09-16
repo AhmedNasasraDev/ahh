@@ -20,6 +20,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
+import type { CatalogItem } from '../features/pricing/catalog.js';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import { createLocalDemoRepository, firstRunPrefs } from '../data/localDemoRepository.js';
 import { createSupabaseRepository } from '../data/supabaseRepository.js';
@@ -67,6 +68,19 @@ export interface AppData {
   restoreVersion(versionId: string): Promise<Recipe>;
   /** Which of the account's recipes use this one as a base. */
   recipesUsing(recipeId: string): Promise<Array<{ id: string; name: string }>>;
+
+  /**
+   * The ingredient centre (stage 7). Held in context rather than fetched per
+   * screen because EVERY recipe computation needs it: a row with no price of
+   * its own resolves one from here, so the catalog is an input to the engine's
+   * figures and not a side panel.
+   */
+  catalog: readonly CatalogItem[];
+  saveCatalogItem(item: CatalogItem): Promise<CatalogItem>;
+  deleteCatalogItem(key: string): Promise<void>;
+  recipesPricingOn(key: string): Promise<
+    Array<{ id: string; name: string; rows: number; overridden: number }>
+  >;
   clearError(): void;
 }
 
@@ -121,6 +135,7 @@ export function AppDataProvider({
   const [prefs, setPrefsState] = useState<MeasurementPrefs>(firstRunPrefs);
   const [recipes, setRecipes] = useState<readonly Recipe[]>([]);
   const [categories, setCategories] = useState<readonly string[]>([]);
+  const [catalog, setCatalog] = useState<readonly CatalogItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [caps, setCaps] = useState<RepositoryCapabilities>(() => repo.capabilities());
 
@@ -128,11 +143,12 @@ export function AppDataProvider({
     let cancelled = false;
     (async () => {
       try {
-        const [stored, calib, list, cats] = await Promise.all([
+        const [stored, calib, list, cats, materials] = await Promise.all([
           repo.getPrefs(),
           repo.listCalibrations(),
           repo.listRecipes(),
           repo.listCategories(),
+          repo.listCatalog(),
         ]);
         if (cancelled) return;
         // §1.2: prefs own the calibration list, so they are merged into one object
@@ -140,6 +156,7 @@ export function AppDataProvider({
         setPrefsState({ ...(stored ?? firstRunPrefs()), calib: normalizeCalibrations(calib) });
         setRecipes(list);
         setCategories(cats);
+        setCatalog(materials);
         setCaps(repo.capabilities());
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'טעינת הנתונים נכשלה');
@@ -250,6 +267,33 @@ export function AppDataProvider({
     [repo],
   );
 
+  const saveCatalogItem = useCallback(
+    async (item: CatalogItem): Promise<CatalogItem> => {
+      const saved = await repo.saveCatalogItem(item);
+      // Replaced in place, so every open screen recomputes with the new price
+      // immediately. This is what requirement 2 means in practice: one write,
+      // and every recipe that inherits the price has moved.
+      setCatalog((list) => [...list.filter((c) => c.key !== saved.key), saved]);
+      setError(null);
+      return saved;
+    },
+    [repo],
+  );
+
+  const deleteCatalogItem = useCallback(
+    async (key: string): Promise<void> => {
+      await repo.deleteCatalogItem(key);
+      setCatalog((list) => list.filter((c) => c.key !== key));
+      setError(null);
+    },
+    [repo],
+  );
+
+  const recipesPricingOn = useCallback(
+    (key: string) => repo.recipesPricingOn(key),
+    [repo],
+  );
+
   const value = useMemo<AppData>(
     () => ({
       ready,
@@ -267,6 +311,10 @@ export function AppDataProvider({
       listVersions,
       restoreVersion,
       recipesUsing,
+      catalog,
+      saveCatalogItem,
+      deleteCatalogItem,
+      recipesPricingOn,
       clearError: () => setError(null),
     }),
     [
@@ -284,6 +332,10 @@ export function AppDataProvider({
       listVersions,
       restoreVersion,
       recipesUsing,
+      catalog,
+      saveCatalogItem,
+      deleteCatalogItem,
+      recipesPricingOn,
     ],
   );
 

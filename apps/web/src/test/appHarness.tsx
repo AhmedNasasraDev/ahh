@@ -21,6 +21,7 @@ import { OnboardingScreen } from '../routes/OnboardingScreen.js';
 import { NotebookScreen } from '../routes/NotebookScreen.js';
 import { RecipeScreen } from '../routes/RecipeScreen.js';
 import { RecipeEditScreen } from '../routes/RecipeEditScreen.js';
+import { IngredientsScreen } from '../routes/IngredientsScreen.js';
 import { MoreScreen } from '../routes/MoreScreen.js';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import { createFakeSupabase, type FakeDb, type FakeSupabase } from './fakeSupabase.js';
@@ -51,6 +52,7 @@ export function AppUnderTest({
                 <Route path="/recipe/new" element={<RecipeEditScreen />} />
                 <Route path="/recipe/:recipeId/edit" element={<RecipeEditScreen />} />
                 <Route path="/recipe/:recipeId" element={<RecipeScreen />} />
+                <Route path="/ingredients" element={<IngredientsScreen />} />
                 <Route path="/more" element={<MoreScreen />} />
               </Route>
               <Route path="*" element={<Navigate to="/notebook" replace />} />
@@ -66,6 +68,7 @@ export function emptyDb(): FakeDb {
   return {
     profiles: [], recipes: [], ingredients: [], steps: [], issues: [],
     trials: [], batches: [], recipe_versions: [], private_notes: [], calibrations: [],
+    ingredient_catalog: [],
   };
 }
 

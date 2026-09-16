@@ -14,6 +14,7 @@
 // a save button knows whether saving is possible right now.
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
+import type { CatalogItem } from '../features/pricing/catalog.js';
 
 /** Extra instructions for a save. All optional; a plain save still works. */
 export interface SaveOptions {
@@ -120,6 +121,41 @@ export interface RecipeRepository {
   recipesUsing(recipeId: string): Promise<Array<{ id: string; name: string }>>;
 }
 
+/**
+ * The ingredient centre (stage 7).
+ *
+ * The catalog is the single source of truth for a material's price. A recipe
+ * row that has no price of its own resolves one from here at read time, so
+ * changing a price here moves every recipe that inherits it — see
+ * `features/pricing/catalog.ts` for how that coexists with frozen version
+ * snapshots.
+ */
+export interface CatalogRepository {
+  listCatalog(): Promise<CatalogItem[]>;
+  /**
+   * Creates or updates one material, keyed by `key` within the account.
+   *
+   * `price` and `priceUnit` on the item are IGNORED: they are generated
+   * columns in the database, derived from the package. Sending them would be
+   * rejected, and accepting them here would invite a caller to think it could
+   * set a price directly.
+   */
+  saveCatalogItem(item: CatalogItem): Promise<CatalogItem>;
+  deleteCatalogItem(key: string): Promise<void>;
+  /**
+   * Which of the caller's recipes would move if this material's price changed
+   * (stage-7 requirement 5).
+   *
+   * `rows` counts the lines that INHERIT the central price. `overridden`
+   * counts the lines in the same recipe that carry their own price and would
+   * therefore not move — saying a recipe is affected when every line overrides
+   * would be wrong.
+   */
+  recipesPricingOn(key: string): Promise<
+    Array<{ id: string; name: string; rows: number; overridden: number }>
+  >;
+}
+
 export interface PrefsRepository {
   getPrefs(): Promise<MeasurementPrefs | null>;
   savePrefs(prefs: MeasurementPrefs): Promise<MeasurementPrefs>;
@@ -133,7 +169,8 @@ export interface CalibrationRepository {
 export interface Repository
   extends RecipeRepository,
     PrefsRepository,
-    CalibrationRepository {
+    CalibrationRepository,
+    CatalogRepository {
   capabilities(): RepositoryCapabilities;
   /** categories available for the picker (§1.1 `category` comes from CATEGORIES) */
   listCategories(): Promise<readonly string[]>;

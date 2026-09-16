@@ -6,6 +6,7 @@ import type { Repository, RepositoryCapabilities } from '../data/repository.js';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from '../data/demoRecipes.js';
 import type { StoredVersion } from '../data/repository.js';
 import { defaultPrefs, type Calibration, type MeasurementPrefs, type Recipe } from '@recipe-notebook/engine';
+import { basePriceOf, type CatalogItem } from '../features/pricing/catalog.js';
 
 export interface FakeRepoOptions {
   prefs?: MeasurementPrefs | null;
@@ -17,6 +18,9 @@ export interface FakeRepoOptions {
   onDeleteRecipe?(id: string): void;
   onSaveCalibrations?(list: readonly Calibration[]): void;
   versions?: readonly StoredVersion[];
+  catalog?: readonly CatalogItem[];
+  onSaveCatalogItem?(item: CatalogItem): void;
+  pricingOn?: readonly { id: string; name: string; rows: number; overridden: number }[];
   onRestoreVersion?(versionId: string): void;
   usedBy?: readonly { id: string; name: string }[];
 }
@@ -25,6 +29,7 @@ export interface FakeRepoOptions {
 export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
   let prefs = opts.prefs === undefined ? { ...defaultPrefs('pro'), done: true } : opts.prefs;
   let calib = [...(opts.calibrations ?? [])];
+  let catalog: CatalogItem[] = [...(opts.catalog ?? [])];
   let recipes = [...(opts.recipes ?? DEMO_RECIPES)];
   const caps: RepositoryCapabilities = {
     source: 'local-demo',
@@ -67,6 +72,28 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
       opts.onSavePrefs?.(p);
       return p;
     },
+    // The ingredient centre. A screen test opts in by passing `catalog`;
+    // otherwise it is empty, so nothing inherits a price and the existing
+    // tests keep testing what they tested.
+    listCatalog: async () => [...(opts.catalog ?? [])],
+    saveCatalogItem: async (item) => {
+      const saved: CatalogItem = {
+        ...item,
+        // Mirrors the generated columns: the DATABASE derives the unit price,
+        // so a double that echoed the input would let a test pass on a price
+        // the real thing would have recomputed.
+        ...(basePriceOf(item)
+          ? { price: basePriceOf(item)!.price, priceUnit: basePriceOf(item)!.unit }
+          : { price: null, priceUnit: null }),
+      };
+      catalog = [...catalog.filter((c) => c.key !== saved.key), saved];
+      opts.onSaveCatalogItem?.(saved);
+      return saved;
+    },
+    deleteCatalogItem: async (key) => {
+      catalog = catalog.filter((c) => c.key !== key);
+    },
+    recipesPricingOn: async () => [...(opts.pricingOn ?? [])],
     listCalibrations: async () => calib,
     saveCalibrations: async (list) => {
       calib = [...list];

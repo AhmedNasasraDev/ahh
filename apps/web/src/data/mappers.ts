@@ -27,9 +27,12 @@ import type {
   Step,
 } from '@recipe-notebook/engine';
 import { ingredientKeyOf } from '@recipe-notebook/engine';
+import type { CatalogItem } from '../features/pricing/catalog.js';
 import type {
   BatchRow,
   CalibrationRow,
+  IngredientCatalogRow,
+  IngredientCatalogWrite,
   IngredientRow,
   IssueRow,
   Json,
@@ -52,6 +55,19 @@ const numOrUndef = (v: number | string | null | undefined): number | undefined =
 const numOrZero = (v: number | string | null | undefined): number => numOrUndef(v) ?? 0;
 
 /** undefined and '' both mean "no value" on the way to a nullable column. */
+/**
+ * A nullable numeric column as a nullable number.
+ *
+ * PostgREST hands `numeric` back as a string when it cannot fit a JS number
+ * safely, so the read side has to coerce — but NULL must survive as null and
+ * not become 0, which is the distinction the whole model turns on.
+ */
+const numOrNullable = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
 const toNullableNumber = (v: unknown): number | null => {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
@@ -276,6 +292,12 @@ export function bundleToRecipe(bundle: RecipeBundle): Recipe {
     steps: [...bundle.steps].sort((a, b) => a.ord - b.ord).map(stepRowToDomain),
   };
 
+  // Stage 7: the sale price. Absent when the user has not set one, which is
+  // NOT the same as 0 — 0 means they give it away, and then the food cost is
+  // undefined rather than zero. `numOrUndef` keeps the two apart.
+  const salePrice = numOrUndef(r.sale_price);
+  if (salePrice !== undefined) recipe.salePrice = salePrice;
+
   // §1.1 / §18.11: NULL yield_actual means theoretical. Leave it absent.
   const yieldActual = numOrUndef(r.yield_actual);
   if (yieldActual !== undefined) recipe.yieldActual = yieldActual;
@@ -353,6 +375,10 @@ export function recipeToRow(recipe: Recipe, ownerId: string): RecipeInsert {
     room_temp: toNullableNumber(recipe.roomTemp),
     friction: toNullableNumber(recipe.friction),
     target_fc: numOrZero(recipe.targetFC as number | string | undefined),
+    // NULL-preserving on purpose: an untouched sale price must stay NULL, and
+    // an explicit 0 must stay 0. `numOrZero` here would turn "not set" into
+    // "given away", which changes whether a food cost exists at all.
+    sale_price: toNullableNumber(recipe['salePrice']),
     shelf_life: toText(recipe.shelfLife),
     storage: toText(recipe.storage),
     freezing: toText(recipe.freezing),
@@ -364,6 +390,53 @@ export function recipeToRow(recipe: Recipe, ownerId: string): RecipeInsert {
     version_of: recipe.versionOf ?? null,
     version_note: toText(recipe.versionNote),
     saved_from_item_id: recipe.savedFrom ?? null,
+  };
+}
+
+// ── ingredient centre (stage 7) ────────────────────────────────────────────
+
+/**
+ * A catalog row as the app uses it.
+ *
+ * `price` and `price_unit` are GENERATED columns — read them, never write
+ * them. `catalogItemToRow` below omits them for exactly that reason, and
+ * Postgres would reject the insert if it did not.
+ */
+export function catalogRowToItem(row: IngredientCatalogRow): CatalogItem {
+  return {
+    id: row.id,
+    key: row.key,
+    name: row.name,
+    purchaseUnit: row.purchase_unit,
+    // NULL-preserving: an unpriced package is not a package costing 0.
+    packageQty: numOrNullable(row.package_qty),
+    packagePrice: numOrNullable(row.package_price),
+    supplier: row.supplier,
+    priceUpdatedAt: row.price_updated_at,
+    note: row.note,
+    price: numOrNullable(row.price),
+    priceUnit: row.price_unit,
+    allergens: [...(row.allergens ?? [])],
+  };
+}
+
+export function catalogItemToRow(
+  item: CatalogItem,
+  ownerId: string,
+): IngredientCatalogWrite {
+  return {
+    owner_id: ownerId,
+    group_id: null,
+    key: item.key,
+    name: toText(item.name),
+    purchase_unit: item.purchaseUnit,
+    package_qty: item.packageQty,
+    package_price: item.packagePrice,
+    supplier: toText(item.supplier),
+    note: toText(item.note),
+    g_per_100: null,
+    water_pct: null,
+    allergens: [...item.allergens],
   };
 }
 

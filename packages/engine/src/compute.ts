@@ -25,6 +25,7 @@ import type {
 } from './types.js';
 import { toGrams } from './convert.js';
 import { densityFor } from './density.js';
+import { gramsPerItem } from './convert.js';
 import { allergensFor } from './data/allergens.js';
 import { lookupWaterPct } from './data/water.js';
 import { num, numOrNull } from './text.js';
@@ -86,11 +87,26 @@ export function compute(
         cost: 0,
         bakerPct: 0,
         sub: null,
+        // Nothing was weighed, so nothing could be priced.
+        priced: false,
       };
     }
 
     let lineCost = 0;
     let subInfo: Computed | null = null;
+    /**
+     * Was this row's own price actually APPLIED to produce `lineCost`?
+     *
+     * The primitive the presentation layer could not derive for itself. "This
+     * row carries a price" and "this row's cost is real" are different facts
+     * once a price can fail to apply — a per-item price with no item weight is
+     * the case that forced it — and a caller that reads only `ing.price`
+     * reports a finished cost for a row that contributed nothing.
+     *
+     * Deliberately narrow: false for a sub-recipe line, which has no price of
+     * its own by design (§18.6) and whose cost comes from the base recipe.
+     */
+    let priced = false;
 
     if (ing.subId) {
       const sub = recipes.find((r) => r.id === ing.subId);
@@ -121,8 +137,30 @@ export function compute(
           );
         }
         lineCost = (g / (gPer100 / 100) / 1000) * p;
+        priced = true;
+      } else if (ing.priceUnit === "יח'") {
+        // STAGE 7. This branch did not exist: a price in `יח'` fell through to
+        // the per-kilogram formula below, so three eggs at ₪1.30 each were
+        // costed at ₪0.21 instead of ₪3.90 — silently, and reachable straight
+        // from the editor's price-unit picker.
+        //
+        // Pricing per item needs the weight of one item, which is why
+        // `gramsPerItem` is now exported rather than private to convert.ts.
+        const per = gramsPerItem(ing);
+        if (per === null || per <= 0) {
+          // NOT costed at zero. An unknown item weight means the price cannot
+          // be applied, and saying so is the only honest answer — costing it at
+          // nothing is the "₪0 means free" failure one layer down.
+          warnings.push(
+            `${ing.name}: מחיר ליחידה בלי משקל ליחידה, ולכן אי אפשר לחשב את העלות של השורה הזאת.`,
+          );
+        } else {
+          lineCost = (g / per) * p;
+          priced = true;
+        }
       } else {
         lineCost = (g / 1000) * p;
+        priced = true;
       }
     }
 
@@ -141,7 +179,15 @@ export function compute(
     totalG += g;
     cost += lineCost;
 
-    return { ing, g, provenance: base.provenance, cost: lineCost, bakerPct: 0, sub: subInfo };
+    return {
+      ing,
+      g,
+      provenance: base.provenance,
+      cost: lineCost,
+      bakerPct: 0,
+      sub: subInfo,
+      priced,
+    };
   });
 
   const theoretical = totalG;

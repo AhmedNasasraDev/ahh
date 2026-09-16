@@ -261,6 +261,18 @@ export interface ComputedRow {
   cost: number;
   bakerPct: number;
   sub: Computed | null;
+  /**
+   * Was this row's own price applied to produce `cost`? (stage 7)
+   *
+   * `cost` alone cannot answer it — a row can legitimately cost 0 because
+   * someone priced it at 0, and can cost 0 because its price could not be
+   * applied at all. Added when a per-item price with no known item weight
+   * turned out to be the second case while every caller read it as the first.
+   *
+   * false for a sub-recipe line: it has no price of its own by design, and its
+   * cost rolls up from the base recipe.
+   */
+  priced: boolean;
 }
 
 export interface Unresolved {

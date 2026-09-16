@@ -112,3 +112,22 @@
   font-family: var(--font-body);
   font-size: var(--fs-meta-lg);
 }
+
+/* The link into the ingredient centre (stage 7). */
+.calibNote {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.7;
+  margin-block-end: 10px;
+}
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  padding-inline: 16px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  color: var(--c-green);
+  font-size: var(--fs-meta-lg);
+  font-weight: 600;
+}

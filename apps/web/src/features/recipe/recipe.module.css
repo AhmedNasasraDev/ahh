@@ -906,7 +906,7 @@
 .cmpHeading {
   font-size: var(--fs-meta-lg);
   font-weight: 700;
-  color: var(--c-ink-2);
+  color: var(--c-muted);
   margin-block-end: 8px;
 }
 .cmpSummary {
@@ -923,7 +923,7 @@
   background: var(--c-sand);
   font-size: var(--fs-meta-lg);
   line-height: 1.7;
-  color: var(--c-ink-2);
+  color: var(--c-muted);
 }
 
 .cmpList {
@@ -961,12 +961,12 @@
   border-inline-start: 3px solid var(--c-green);
 }
 .cmpRemoved {
-  border-inline-start: 3px solid var(--c-clay);
+  border-inline-start: 3px solid var(--c-red);
 }
 
 .cmpLabel {
   font-size: var(--fs-meta);
-  color: var(--c-ink-2);
+  color: var(--c-muted);
   font-weight: 600;
 }
 .cmpValues {
@@ -981,10 +981,10 @@
    which of the two is the earlier one. */
 .cmpBefore {
   text-decoration: line-through;
-  color: var(--c-ink-2);
+  color: var(--c-muted);
 }
 .cmpArrow {
-  color: var(--c-ink-2);
+  color: var(--c-muted);
 }
 .cmpAfter {
   font-weight: 700;
@@ -1007,10 +1007,68 @@
   margin-block-start: 10px;
   padding-inline: 14px;
   border: 1px solid var(--c-line);
-  border-radius: var(--r-btn);
+  border-radius: var(--r-control);
   background: transparent;
   color: var(--c-green);
   font-size: var(--fs-meta-lg);
   font-weight: 600;
   cursor: pointer;
+}
+
+/* ── food cost (stage-7 requirement 4) ───────────────────────────────────── */
+.fcBlock {
+  background: var(--c-paper);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  padding: 12px;
+  margin-block-end: 12px;
+}
+.fcTitle {
+  font-size: var(--fs-secondary);
+  font-weight: 700;
+  margin-block-end: 8px;
+}
+.fcGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fcRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding-block: 5px;
+  font-size: var(--fs-meta-lg);
+  border-block-end: 1px dotted var(--c-line);
+}
+.fcRow:last-child {
+  border-block-end: none;
+}
+/* The percentage is the one figure a pricing decision is made on. */
+.fcHeadline {
+  margin-block-start: 4px;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--c-line);
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+.fcWhy {
+  margin-block-start: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-card);
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+  font-size: var(--fs-meta);
+  line-height: 1.7;
+}
+.fcTodo {
+  margin-block-start: 8px;
+  font-size: var(--fs-meta);
+  line-height: 1.7;
+  color: var(--c-muted);
+}
+.fcTodo a {
+  color: var(--c-green);
+  font-weight: 600;
 }

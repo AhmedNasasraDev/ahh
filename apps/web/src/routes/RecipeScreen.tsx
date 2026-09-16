@@ -15,6 +15,8 @@ import { SourceBadge } from '../components/SourceBadge.js';
 import { ConvertSheet } from '../features/recipe/ConvertSheet.js';
 import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState, type CalcState } from '../features/recipe/completeness.js';
+import { resolveFromCatalog, unpricedKeys } from '../features/pricing/catalog.js';
+import { foodCost } from '../features/pricing/foodCost.js';
 import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import { VersionHistory } from '../features/recipe/VersionHistory.js';
 import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
@@ -63,6 +65,7 @@ export function RecipeScreen() {
     listVersions,
     restoreVersion,
     recipesUsing,
+    catalog,
   } = useAppData();
 
   const [scaleMode, setScaleMode] = useState<ScaleMode>('recipe');
@@ -116,9 +119,29 @@ export function RecipeScreen() {
   }, [recipeId, recipesUsing]);
 
   // Baseline at factor 1, then the scaled pass. Both come from the one engine.
+  /**
+   * The recipe and the notebook, with prices resolved from the ingredient
+   * centre (stage-7 requirement 2).
+   *
+   * `recipes` is resolved too, not just this recipe: a sub-recipe's cost rolls
+   * up from ITS OWN computation, so a base recipe whose prices come from the
+   * centre would contribute nothing unless it is resolved as well. That was
+   * worth thinking about once rather than debugging later.
+   *
+   * Resolution is idempotent, so a row with its own price keeps it.
+   */
+  const pricedNotebook = useMemo(
+    () => recipes.map((r) => resolveFromCatalog(r, catalog)),
+    [recipes, catalog],
+  );
+  const pricedRecipe = useMemo(
+    () => (recipe ? resolveFromCatalog(recipe, catalog) : null),
+    [recipe, catalog],
+  );
+
   const baseline = useMemo(
-    () => (recipe ? compute(recipe, recipes, { prefs }) : null),
-    [recipe, recipes, prefs],
+    () => (pricedRecipe ? compute(pricedRecipe, pricedNotebook, { prefs }) : null),
+    [pricedRecipe, pricedNotebook, prefs],
   );
 
   const factor = useMemo(() => {
@@ -127,7 +150,7 @@ export function RecipeScreen() {
   }, [baseline, scaleMode, scaleValue, scaleIngredient]);
 
   const computed = useMemo(
-    () => (recipe ? compute(recipe, recipes, { factor, prefs }) : null),
+    () => (pricedRecipe ? compute(pricedRecipe, pricedNotebook, { factor, prefs }) : null),
     [recipe, recipes, factor, prefs],
   );
 
@@ -222,6 +245,19 @@ export function RecipeScreen() {
       setActionBusy(null);
     }
   };
+
+  // Requirement 4. `calc` decides whether the cost figures mean anything;
+  // `foodCost` decides which of them may be shown and computes the one ratio.
+  const fc = foodCost(pricedRecipe ?? recipe, computed, calc);
+  const toPrice = unpricedKeys(pricedRecipe ?? recipe, catalog);
+
+  /**
+   * A money figure, or a dash.
+   *
+   * `null` is "not known" and renders as an em dash; 0 is a real price and
+   * renders as ₪0. Collapsing them is the mistake this whole stage is about.
+   */
+  const money = (v: number | null): string => (v === null ? '—' : formatNis(v));
 
   const totalMinutes = (recipe.steps ?? []).reduce((a, s) => a + Number(s.minutes ?? 0), 0);
   const timeLabel =
@@ -558,6 +594,53 @@ export function RecipeScreen() {
 
         {showProduction && (
           <div className={styles.prodBlocks}>
+            {/* ── stage-7 requirement 4: food cost ─────────────────────── */}
+            <section className={styles.fcBlock} aria-label="פוד קוסט">
+              <h3 className={styles.fcTitle}>פוד קוסט</h3>
+              <dl className={styles.fcGrid}>
+                <div className={styles.fcRow}>
+                  <dt>עלות חומרי הגלם</dt>
+                  <dd className="ltr">{money(fc.cost)}</dd>
+                </div>
+                <div className={styles.fcRow}>
+                  <dt>עלות לק&quot;ג</dt>
+                  <dd className="ltr">{money(fc.costPerKg)}</dd>
+                </div>
+                <div className={styles.fcRow}>
+                  <dt>עלות ליחידה</dt>
+                  <dd className="ltr">{money(fc.costPerUnit)}</dd>
+                </div>
+                <div className={styles.fcRow}>
+                  <dt>מחיר מכירה</dt>
+                  <dd className="ltr">{money(fc.salePrice)}</dd>
+                </div>
+                <div className={`${styles.fcRow} ${styles.fcHeadline}`}>
+                  <dt>אחוז פוד קוסט</dt>
+                  <dd className="ltr" aria-label="אחוז פוד קוסט">
+                    {fc.percent === null ? '—' : `${fc.percent.toFixed(1)}%`}
+                  </dd>
+                </div>
+              </dl>
+
+              {/*
+                A dash with no explanation reads as a bug. Requirement 4 says
+                not to show a food cost when an input is unknown, and this is
+                the other half of that: saying WHICH input.
+              */}
+              {fc.why && (
+                <p className={styles.fcWhy} role="status" aria-label="למה אין אחוז פוד קוסט">
+                  {fc.why}
+                </p>
+              )}
+
+              {toPrice.length > 0 && (
+                <p className={styles.fcTodo}>
+                  חסר מחיר ל: {toPrice.map((m) => m.name).join(' · ')}.{' '}
+                  <Link to="/ingredients">להזין מחיר במרכז חומרי הגלם</Link>
+                </p>
+              )}
+            </section>
+
             {/*
               Every figure in these three blocks is a sum over the ingredient
               rows, so `partial` marks all of them at once rather than each

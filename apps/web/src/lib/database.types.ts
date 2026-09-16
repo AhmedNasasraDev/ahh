@@ -89,6 +89,8 @@ export type RecipeRow = {
   room_temp: number | null;
   friction: number | null;
   target_fc: number;
+  /** stage 7: what the user charges. null = not set; 0 = given away */
+  sale_price: number | null;
   shelf_life: string;
   storage: string;
   freezing: string;
@@ -188,12 +190,30 @@ export type PrivateNoteRow = {
   updated_at: string;
 };
 
+/** What a material is bought in. Not everything is bought by the kilogram. */
+export type PurchaseUnit = 'kg' | 'g' | 'l' | 'ml' | 'unit';
+
 export type IngredientCatalogRow = {
   id: string;
   owner_id: string | null;
   group_id: string | null;
   key: string;
   name: string;
+  /** what was actually bought — the source of truth for the price (0011) */
+  purchase_unit: PurchaseUnit;
+  /** how much is in one package, in `purchase_unit`. null = unknown */
+  package_qty: number | null;
+  /** what one package costs. null = unpriced; 0 = free, and they differ */
+  package_price: number | null;
+  supplier: string;
+  /** stamped only when the package actually changes — see 0011 */
+  price_updated_at: string | null;
+  note: string;
+  /**
+   * GENERATED STORED in the database, from the package above. Read-only: an
+   * insert or update that includes either of these is rejected by Postgres,
+   * which is the point — they cannot drift from the package they came from.
+   */
   price: number | null;
   price_unit: PriceUnit | null;
   g_per_100: number | null;
@@ -202,6 +222,16 @@ export type IngredientCatalogRow = {
   created_at: string;
   updated_at: string;
 };
+
+/**
+ * The columns a client may actually write. `price` and `price_unit` are
+ * generated, so they are absent here on purpose — the type is what stops a
+ * caller trying.
+ */
+export type IngredientCatalogWrite = Omit<
+  IngredientCatalogRow,
+  'id' | 'price' | 'price_unit' | 'created_at' | 'updated_at' | 'price_updated_at'
+>;
 
 export type DensityTableRow = {
   key: string;
@@ -275,6 +305,11 @@ export type Database = {
       // migration 0009 — stage-6 requirements 1-6. Returns void; the refusal is
       // an error with code 23503, not a value.
       delete_recipe: { Args: { p_recipe_id: string }; Returns: undefined };
+      // migration 0011 — which of the caller's recipes a price change moves
+      recipes_pricing_on: {
+        Args: { p_key: string };
+        Returns: Array<{ id: string; name: string; rows: number; overridden: number }>;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

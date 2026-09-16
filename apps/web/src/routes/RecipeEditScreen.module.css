@@ -300,7 +300,7 @@
 /* The base-recipe name on a linked row's summary. It wraps rather than
    truncating: a recipe name the reader cannot finish is not an identification. */
 .moreSub {
-  color: var(--c-ink-2);
+  color: var(--c-muted);
   font-weight: 600;
 }
 .moreSummary {

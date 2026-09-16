@@ -21,7 +21,14 @@ const TABS: readonly TabDef[] = [
   { to: '/home', label: 'בית', owns: ['/home'], ready: false },
   { to: '/notebook', label: 'מחברת', owns: ['/notebook', '/recipe'], ready: true },
   { to: '/groups', label: 'קבוצות', owns: ['/groups', '/group', '/perms'], ready: false },
-  { to: '/more', label: 'עוד', owns: ['/more', '/settings', '/tools', '/plan', '/stock'], ready: false },
+  {
+    to: '/more',
+    label: 'עוד',
+    // `/ingredients` is owned here because the centre is reached from "עוד",
+    // so the tab must stay lit while the user is in it.
+    owns: ['/more', '/settings', '/tools', '/plan', '/stock', '/ingredients'],
+    ready: false,
+  },
 ];
 
 /** §2 tabOf(): a deep screen highlights the tab that owns it. */

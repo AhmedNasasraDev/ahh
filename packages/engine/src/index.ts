@@ -95,7 +95,7 @@ export {
 } from './provenance.js';
 
 // conversion
-export { convert, convertScaled, homeMeasure, toGrams } from './convert.js';
+export { convert, convertScaled, gramsPerItem, homeMeasure, toGrams } from './convert.js';
 
 // formatting
 export {

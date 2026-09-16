@@ -105,15 +105,22 @@ function unresolvedInTree(computed: Computed): string[] {
   return [...own, ...inner];
 }
 
-/** Is this row's own `price` field a real price? `0` is; empty is not. */
+/**
+ * Did this row's own price actually reach the cost?
+ *
+ * Stage 7 replaced a check on `row.ing.price` with the engine's own answer.
+ * The two differ in a case that turned out to be reachable from the editor: a
+ * price in `יח'` with no known item weight. The field is filled, so the old
+ * check said "priced" — and the row contributed nothing, so the recipe showed
+ * a finished cost that was missing an ingredient. `row.priced` is true only
+ * when the price was applied.
+ *
+ * A row with `price: 0` is still priced, and that is the engine's answer too —
+ * someone typed a zero, and a foraged or donated ingredient really does cost
+ * nothing. Treating an EMPTY price as zero is what all of this exists to avoid.
+ */
 function hasOwnPrice(row: ComputedRow): boolean {
-  const price = row.ing.price;
-  // A row with `price: 0` counts as priced — someone typed a zero, and a
-  // foraged or donated ingredient really does cost nothing. Treating an empty
-  // price as zero is the thing this exists to avoid.
-  return (
-    price !== undefined && price !== null && price !== '' && Number.isFinite(Number(price))
-  );
+  return row.priced;
 }
 
 /**

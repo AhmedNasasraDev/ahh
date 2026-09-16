@@ -21,6 +21,7 @@
 // all of it in a single transaction. Reads stay as ordinary selects.
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
+import type { CatalogItem } from '../features/pricing/catalog.js';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import type { Json, RecipeVersionRow } from '../lib/database.types.js';
@@ -36,6 +37,8 @@ import {
   bundleToRecipe,
   calibrationRowToDomain,
   calibrationToInsert,
+  catalogItemToRow,
+  catalogRowToItem,
   ingredientsToRows,
   issuesToRows,
   prefsToProfileUpdate,
@@ -343,6 +346,60 @@ export function createSupabaseRepository({
       await mirror.forgetRecipe(id);
       const index = await mirror.readRecipeIndex();
       void mirror.writeRecipeIndex(index.filter((r) => r.id !== id));
+    },
+
+    // ── the ingredient centre (stage 7) ────────────────────────────────────
+
+    async listCatalog(): Promise<CatalogItem[]> {
+      const { data, error } = await client
+        .from('ingredient_catalog')
+        .select('*')
+        .eq('owner_id', userId)
+        .order('name');
+      if (error) throw new SupabaseRepositoryError('טעינת חומרי הגלם נכשלה', error);
+      return (data ?? []).map(catalogRowToItem);
+    },
+
+    async saveCatalogItem(item: CatalogItem): Promise<CatalogItem> {
+      requireOnline('חומר הגלם');
+      if (!item.key.trim()) {
+        throw new WriteNotAllowedError('לחומר גלם חייב להיות שם.');
+      }
+
+      // `price` and `price_unit` are generated columns, so the row that goes
+      // up deliberately does not contain them — see `catalogItemToRow`. What
+      // comes BACK does, computed by the database, which is why this reads the
+      // saved row rather than echoing the input.
+      const { data, error } = await client
+        .from('ingredient_catalog')
+        .upsert(catalogItemToRow(item, userId) as never, { onConflict: 'owner_id,key' })
+        .select('*')
+        .single();
+      if (error) throw new SupabaseRepositoryError('שמירת חומר הגלם נכשלה', error);
+      return catalogRowToItem(data as never);
+    },
+
+    async deleteCatalogItem(key: string): Promise<void> {
+      requireOnline('חומר הגלם');
+      const { error } = await client
+        .from('ingredient_catalog')
+        .delete()
+        .eq('owner_id', userId)
+        .eq('key', key);
+      if (error) throw new SupabaseRepositoryError('מחיקת חומר הגלם נכשלה', error);
+    },
+
+    async recipesPricingOn(key: string) {
+      const { data, error } = await client.rpc('recipes_pricing_on', { p_key: key });
+      // Informative only — it tells the user what a price change will move. A
+      // failure must not stop them changing a price.
+      if (error) return [];
+      return (data ?? []) as Array<{
+        id: string;
+        name: string;
+        rows: number;
+        overridden: number;
+      }>;
     },
 
     // ── preferences (§1.2) ─────────────────────────────────────────────────

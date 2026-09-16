@@ -37,7 +37,7 @@ export interface FakeResult<T> {
 /** Everything a test may want to know about what the repository actually did. */
 export interface FakeLog {
   table: string;
-  op: 'select' | 'insert' | 'update' | 'delete';
+  op: 'select' | 'insert' | 'upsert' | 'update' | 'delete';
   select?: string | undefined;
   filters: [string, unknown][];
   rowsIn?: number | undefined;
@@ -86,12 +86,59 @@ const POLICIES: Record<string, Policy> = {
   trials: ownsRecipe,
   batches: ownsRecipe,
   recipe_versions: ownsRecipe,
+  // ingredient_catalog_read / _write (0003): own rows, plus system rows with a
+  // NULL owner readable by anyone signed in. Write is own rows only, which is
+  // what keeps one account's prices and suppliers out of another's reach.
+  ingredient_catalog: (row, uid) =>
+    Boolean(uid) && (row['owner_id'] === uid || row['owner_id'] === null),
   // shared reference data: SELECT to authenticated, and no write policy at all
   density_table: (_row, uid) => Boolean(uid),
   density_data_gaps: (_row, uid) => Boolean(uid),
 };
 
 const READ_ONLY_TABLES = new Set(['density_table', 'density_data_gaps']);
+
+/**
+ * Columns the DATABASE computes, recomputed here after every write.
+ *
+ * `ingredient_catalog.price` and `price_unit` are GENERATED STORED columns
+ * (migration 0011), derived from the package. Modelling them matters for a
+ * reason beyond fidelity: a double that simply stored whatever the client sent
+ * would let a test pass on a price the real database would have recomputed —
+ * and the per-base-unit conversion (a 200 g pack at ₪8.90 is ₪44.50/kg) is
+ * exactly the arithmetic worth getting wrong.
+ *
+ * It also keeps NULL and 0 apart, which is the whole point: no package price
+ * gives NO unit price, and a package price of 0 gives a unit price of 0.
+ */
+function generated(table: string, row: Row): Row {
+  if (table !== 'ingredient_catalog') return {};
+
+  const qty = row['package_qty'] === null || row['package_qty'] === undefined
+    ? null
+    : Number(row['package_qty']);
+  const price = row['package_price'] === null || row['package_price'] === undefined
+    ? null
+    : Number(row['package_price']);
+
+  if (price === null || qty === null || qty <= 0) {
+    return { price: null, price_unit: null };
+  }
+  switch (row['purchase_unit']) {
+    case 'kg':
+      return { price: price / qty, price_unit: 'ק"ג' };
+    case 'g':
+      return { price: (price / qty) * 1000, price_unit: 'ק"ג' };
+    case 'l':
+      return { price: price / qty, price_unit: 'ליטר' };
+    case 'ml':
+      return { price: (price / qty) * 1000, price_unit: 'ליטר' };
+    case 'unit':
+      return { price: price / qty, price_unit: "יח'" };
+    default:
+      return { price: null, price_unit: null };
+  }
+}
 
 /**
  * Column defaults the database fills in on INSERT.
@@ -109,7 +156,19 @@ const INSERT_DEFAULTS: Record<string, () => Row> = {
   private_notes: () => ({ updated_at: NOW }),
   recipe_versions: () => ({ created_at: NOW }),
   batches: () => ({ created_at: NOW }),
-  ingredient_catalog: () => ({ created_at: NOW, updated_at: NOW }),
+  ingredient_catalog: () => ({
+    created_at: NOW,
+    updated_at: NOW,
+    purchase_unit: 'kg',
+    supplier: '',
+    note: '',
+    allergens: [],
+    g_per_100: null,
+    water_pct: null,
+    group_id: null,
+    // Stamped by the 0011 trigger when a package is priced.
+    price_updated_at: NOW,
+  }),
 };
 
 const NOW = '2026-04-01T12:00:00Z';
@@ -157,6 +216,8 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
     private cardinality: 'many' | 'one' | 'maybe' = 'many';
     private orderBy: { column: string; ascending: boolean } | null = null;
 
+    private conflictOn: string[] = ['id'];
+
     constructor(private table: string) {}
 
     select(cols?: string): this {
@@ -168,6 +229,17 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
     insert(payload: Row | Row[]): this {
       this.op = 'insert';
       this.payload = payload;
+      return this;
+    }
+    /**
+     * `upsert` with an `onConflict` key, which is how the catalog is written.
+     * Modelled as a real upsert rather than an insert, because "save this
+     * material again" is the ordinary case and an insert would collide.
+     */
+    upsert(payload: Row | Row[], opts?: { onConflict?: string }): this {
+      this.op = 'upsert';
+      this.payload = payload;
+      this.conflictOn = (opts?.onConflict ?? 'id').split(',').map((c) => c.trim());
       return this;
     }
     update(payload: Row): this {
@@ -225,6 +297,38 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
 
       const all = (db[this.table] ??= []);
 
+      if (this.op === 'upsert') {
+        const incoming = Array.isArray(this.payload) ? this.payload : [this.payload!];
+        entry.rowsIn = incoming.length;
+        const out: Row[] = [];
+        for (const raw of incoming) {
+          const row: Row = { ...raw };
+          const policy = POLICIES[this.table];
+          if (policy && !policy(row, authUid, db)) {
+            log.push({ ...entry, rowsOut: 0 });
+            return { data: null, error: RLS_DENIED };
+          }
+          const existing = all.find((r) =>
+            this.conflictOn.every((c) => r[c] === row[c]),
+          );
+          if (existing) {
+            Object.assign(existing, row, generated(this.table, { ...existing, ...row }));
+            out.push(existing);
+          } else {
+            const made: Row = {
+              id: newId(this.table),
+              ...(INSERT_DEFAULTS[this.table]?.() ?? {}),
+              ...row,
+            };
+            Object.assign(made, generated(this.table, made));
+            all.push(made);
+            out.push(made);
+          }
+        }
+        log.push({ ...entry, rowsOut: out.length });
+        return this.shape(out);
+      }
+
       if (this.op === 'insert') {
         const incoming = Array.isArray(this.payload) ? this.payload : [this.payload!];
         entry.rowsIn = incoming.length;
@@ -236,6 +340,7 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
         const defaults = INSERT_DEFAULTS[this.table]?.() ?? {};
         for (const raw of incoming) {
           const row: Row = { id: newId(this.table), ...defaults, ...raw };
+          Object.assign(row, generated(this.table, row));
           // WITH CHECK: a row the policy would not admit is refused outright,
           // which is how the real database reports it too.
           const policy = POLICIES[this.table];
@@ -257,7 +362,12 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
           log.push({ ...entry, rowsOut: 0 });
           return { data: null, error: null }; // no policy admits it: zero rows
         }
-        for (const row of candidates) Object.assign(row, this.payload);
+        for (const row of candidates) {
+          Object.assign(row, this.payload);
+          // Generated columns are recomputed by the database after every write,
+          // never sent by the client.
+          Object.assign(row, generated(this.table, row));
+        }
         log.push({ ...entry, rowsOut: candidates.length });
         return this.shape(candidates);
       }
@@ -375,7 +485,22 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
     recipe: { ...(db['recipes'] ?? []).find((r) => r['id'] === recipeId) },
     ingredients: (db['ingredients'] ?? [])
       .filter((i) => i['recipe_id'] === recipeId)
-      .map((i) => ({ ...i })),
+      .map((i) => {
+        // Migration 0011: the snapshot FREEZES the effective price, so a
+        // version keeps its historical meaning when the centre changes later.
+        // `coalesce(i.price, c.price)` — an override wins, and NULL survives
+        // when neither has a price, so an unpriced recipe does not acquire a
+        // cost retroactively.
+        const owner = (db['recipes'] ?? []).find((r) => r['id'] === recipeId)?.['owner_id'];
+        const cat = (db['ingredient_catalog'] ?? []).find(
+          (c) => c['key'] === i['ingredient_key'] && c['owner_id'] === owner,
+        );
+        return {
+          ...i,
+          price: i['price'] ?? cat?.['price'] ?? null,
+          price_unit: i['price_unit'] ?? cat?.['price_unit'] ?? null,
+        };
+      }),
     steps: (db['steps'] ?? [])
       .filter((x) => x['recipe_id'] === recipeId)
       .map((x) => ({ ...x })),
@@ -614,6 +739,33 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
       }
       return {
         data: [...out].map(([id, name]) => ({ id, name })),
+        error: null,
+      };
+    }
+
+    if (name === 'recipes_pricing_on') {
+      const key = String(args['p_key'] ?? '');
+      const mine = new Set(
+        (db['recipes'] ?? [])
+          .filter((r) => r['owner_id'] === authUid)
+          .map((r) => String(r['id'])),
+      );
+      const out = new Map<string, { id: string; name: string; rows: number; overridden: number }>();
+      for (const i of db['ingredients'] ?? []) {
+        if (i['ingredient_key'] !== key || i['sub_recipe_id']) continue;
+        const rid = String(i['recipe_id']);
+        if (!mine.has(rid)) continue;
+        const r = (db['recipes'] ?? []).find((x) => x['id'] === rid);
+        if (!r) continue;
+        const acc = out.get(rid) ?? { id: rid, name: String(r['name'] ?? ''), rows: 0, overridden: 0 };
+        // A line with its own price does NOT move when the centre changes, and
+        // is counted separately rather than ignored.
+        if (i['price'] === null || i['price'] === undefined) acc.rows += 1;
+        else acc.overridden += 1;
+        out.set(rid, acc);
+      }
+      return {
+        data: [...out.values()].filter((r) => r.rows > 0),
         error: null,
       };
     }

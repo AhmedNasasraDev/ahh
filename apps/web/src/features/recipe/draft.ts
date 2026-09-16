@@ -77,6 +77,8 @@ export interface RecipeDraft {
   /** '' = theoretical yield (§18.11). NOT the same as '0' */
   yieldActual: string;
   targetFC: string;
+  /** stage 7: what the user charges. '' = not set, '0' = given away */
+  salePrice: string;
   shelfLife: string;
   storage: string;
   equipment: string;
@@ -161,6 +163,7 @@ export function emptyDraft(category = 'אחר'): RecipeDraft {
     unitWeight: '',
     yieldActual: '',
     targetFC: '',
+    salePrice: '',
     shelfLife: '',
     storage: '',
     equipment: '',
@@ -183,6 +186,7 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
     unitWeight: str(recipe.unitWeight),
     yieldActual: str(recipe.yieldActual),
     targetFC: str(recipe.targetFC),
+    salePrice: str(recipe['salePrice']),
     shelfLife: str(recipe.shelfLife),
     storage: str(recipe.storage),
     equipment: str(recipe.equipment),
@@ -251,6 +255,7 @@ export function draftToRecipe(draft: RecipeDraft): Recipe {
     unitWeight: draft.unitWeight.trim(),
     yieldActual: draft.yieldActual.trim(),
     targetFC: draft.targetFC.trim(),
+    salePrice: draft.salePrice.trim(),
     shelfLife: draft.shelfLife.trim(),
     storage: draft.storage.trim(),
     equipment: draft.equipment.trim(),
@@ -341,6 +346,7 @@ export function validateDraft(draft: RecipeDraft): DraftProblem[] {
     ['unitWeight', 'המשקל ליחידה'],
     ['yieldActual', 'התשואה בפועל'],
     ['targetFC', 'יעד הפוד קוסט'],
+    ['salePrice', 'מחיר המכירה'],
   ] as const) {
     const raw = draft[key].trim();
     if (raw && !Number.isFinite(Number(raw))) {

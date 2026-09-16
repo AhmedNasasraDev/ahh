@@ -54,6 +54,33 @@ function toolNoteFor(
   return `${toolLabel(tool)} = ${round(toolMl(prefs, tool))} מ"ל לפי ההגדרות שלך`;
 }
 
+/**
+ * Grams per item, for pricing a row whose price is per ITEM.
+ *
+ * ADDED IN STAGE 7, and the reason is recorded here because changing the engine
+ * needs one. `compute()` costs a row from its weight in grams, and it
+ * special-cased a per-litre price but nothing else — so a price in `יח'` fell
+ * through to the per-kilogram formula. Three eggs at ₪1.30 each came out at
+ * ₪0.21 instead of ₪3.90, with no warning. `יח'` is a selectable price unit in
+ * the editor and a legal value in the database, so this was reachable from the
+ * UI and wrong by a factor of eighteen.
+ *
+ * Pricing per item needs one thing the cost branch could not get: how much one
+ * item weighs. `itemGrams` below already knows, so this exports it rather than
+ * computing a second answer — the recipe's own `unitWeight` first, then the
+ * unit table's average, and null when neither exists.
+ *
+ * Returns null when the item weight is unknown, which is not the same as zero:
+ * the caller must report that it cannot price the row rather than costing it
+ * at nothing.
+ */
+export function gramsPerItem(
+  ing: Pick<IngredientLike, 'unitWeight' | 'unit'>,
+  countUnitId?: string,
+): number | null {
+  return itemGrams(ing, countUnitId ?? unit(ing.unit)?.id)?.grams ?? null;
+}
+
 /** Grams per item for a count unit: the recipe's value, else the unit average. */
 function itemGrams(
   ing: Pick<IngredientLike, 'unitWeight'>,

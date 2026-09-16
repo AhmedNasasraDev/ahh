@@ -1,4 +1,8 @@
-// Browser E2E for the stage-5 surfaces, against the BUILT production bundle.
+// Browser E2E for the stage-5, 6 and 7 surfaces, against the BUILT bundle.
+//
+// Kept as one file rather than three because the harness — the static server,
+// the console and network guards, the onboarding walk — is the bulk of it, and
+// three copies of that would rot independently.
 //
 // WHAT THIS DOES AND DOES NOT PROVE — read this before quoting it as evidence.
 //
@@ -368,6 +372,77 @@ try {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   check('no horizontal overflow on a tablet', tabletOverflow <= 1, `${tabletOverflow}px`);
+
+  // ── stage 7: the ingredient centre and food cost ────────────────────────
+  //
+  // WHAT THIS BUILD CAN AND CANNOT SHOW. The demo repository returns an EMPTY
+  // catalog, and honestly so: the centre holds business data — prices,
+  // suppliers — which belongs to an account, and there is no account here.
+  // Demo prices would be an invented cost basis. So the centre's own behaviour
+  // is covered by IngredientsScreen.test.tsx (21 cases) and PricingFlow.test.tsx
+  // (14), and the database half by supabase/tests/pricing.sql (27, live).
+  //
+  // What a real browser can add: that the screen exists, that it is reachable
+  // from "עוד", that it says the right thing with nothing in it, and that the
+  // food-cost panel renders and withholds the percentage it cannot compute.
+  await page.goto('http://127.0.0.1:8124/more', { waitUntil: 'load' });
+  await page.waitForTimeout(700);
+  const centreLink = page.getByRole('link', { name: 'מרכז חומרי הגלם' });
+  check('the ingredient centre is reachable from "עוד"', (await centreLink.count()) > 0);
+  await centreLink.click();
+  await page.waitForTimeout(700);
+
+  check(
+    'the centre renders',
+    (await page.getByRole('heading', { name: 'חומרי גלם' }).count()) > 0,
+  );
+  const centreText = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+  check(
+    'and explains what it is for',
+    /שינוי מחיר כאן משנה את העלות בכל המתכונים/.test(centreText),
+    centreText.slice(0, 120),
+  );
+  check(
+    'the empty state says what happens once a material is priced',
+    /אין עדיין חומרי גלם/.test(centreText),
+  );
+  check(
+    'adding is disabled with no account, rather than failing when pressed',
+    await page.getByRole('button', { name: 'הוספת חומר גלם' }).isDisabled(),
+  );
+  await page.screenshot({ path: `${OUT}/16-ingredients-phone.png`, fullPage: true });
+
+  // The food-cost panel on a demo recipe. The demo set prices its rows
+  // directly, so there IS a cost; nobody has set a sale price, so the
+  // percentage must be withheld WITH a reason.
+  await page.goto('http://127.0.0.1:8124/recipe/brioche', { waitUntil: 'load' });
+  await page.waitForTimeout(700);
+  await page.getByRole('button', { name: 'נתוני ייצור ועלויות' }).click();
+  await page.waitForTimeout(400);
+
+  const fc = page.locator('[aria-label="פוד קוסט"]');
+  check('the recipe page shows a food cost panel', (await fc.count()) > 0);
+  const fcText = (await fc.first().innerText()).replace(/\s+/g, ' ');
+  check('with the total ingredient cost', /עלות חומרי הגלם/.test(fcText));
+  check('the cost per kilogram', /עלות לק"ג/.test(fcText));
+  check('and the sale price row', /מחיר מכירה/.test(fcText));
+  check(
+    'the percentage is withheld, as a dash',
+    (await fc.locator('[aria-label="אחוז פוד קוסט"]').innerText()).trim() === '—',
+    await fc.locator('[aria-label="אחוז פוד קוסט"]').innerText(),
+  );
+  check(
+    'and the reason is given rather than leaving a bare dash',
+    /מחיר מכירה/.test(
+      await fc.locator('[aria-label="למה אין אחוז פוד קוסט"]').innerText(),
+    ),
+  );
+  await page.screenshot({ path: `${OUT}/17-food-cost-phone.png`, fullPage: true });
+
+  const fcOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  check('no horizontal overflow with the food cost panel open', fcOverflow <= 1, `${fcOverflow}px`);
 
   check('no page errors anywhere in the run', errors.length === 0, errors.slice(0, 3).join(' | '));
   check(

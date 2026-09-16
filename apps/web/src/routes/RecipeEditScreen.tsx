@@ -32,6 +32,7 @@ import {
   compute,
   formatGrams,
   formatNis,
+  ingredientKeyOf,
   unitLabel,
   type Recipe,
 } from '@recipe-notebook/engine';
@@ -41,6 +42,11 @@ import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState } from '../features/recipe/completeness.js';
 import { versionDiff } from '../features/recipe/versionDiff.js';
 import { subRecipeOptions } from '../features/recipe/subRecipe.js';
+import {
+  catalogByKey,
+  priceOriginOf,
+  resolveFromCatalog,
+} from '../features/pricing/catalog.js';
 import {
   draftFromRecipe,
   draftToRecipe,
@@ -77,6 +83,7 @@ export function RecipeEditScreen() {
     saveRecipe,
     setCalibrations,
     ready,
+    catalog,
   } = useAppData();
 
   const isNew = !recipeId;
@@ -127,9 +134,22 @@ export function RecipeEditScreen() {
   // The preview. Built from the draft exactly as it will be saved, so what is
   // on screen is what the recipe page will show afterwards.
   const previewRecipe = useMemo<Recipe>(() => draftToRecipe(draft), [draft]);
+  // Prices resolved from the ingredient centre, exactly as the recipe page
+  // does it — otherwise the editor would show a cost of nothing for every
+  // material whose price lives in the centre, and the two screens would
+  // disagree about the same recipe.
+  const pricedPreview = useMemo(
+    () => resolveFromCatalog(previewRecipe, catalog),
+    [previewRecipe, catalog],
+  );
+  const pricedNotebook = useMemo(
+    () => recipes.map((r) => resolveFromCatalog(r, catalog)),
+    [recipes, catalog],
+  );
+  const byKey = useMemo(() => catalogByKey(catalog), [catalog]);
   const computed = useMemo(
-    () => compute(previewRecipe, [...recipes, previewRecipe], { prefs }),
-    [previewRecipe, recipes, prefs],
+    () => compute(pricedPreview, [...pricedNotebook, pricedPreview], { prefs }),
+    [pricedPreview, pricedNotebook, prefs],
   );
   const calc = calcState(computed);
   const pro = prefs.pro === true;
@@ -526,6 +546,36 @@ export function RecipeEditScreen() {
                         onChange={(e) => patchIngredient(i, { price: e.target.value })}
                         aria-label={`מחיר של ${label}`}
                       />
+                      {/*
+                        Where this row's price comes from (stage-7 requirement 2).
+                        Without this the field is simply empty on a row that
+                        HAS a price — from the centre — and the user cannot tell
+                        that from a row nobody has priced at all.
+                      */}
+                      <p
+                        className={styles.hint}
+                        aria-label={`מקור המחיר של ${label}`}
+                      >
+                        {(() => {
+                          const origin = priceOriginOf(
+                            previewRecipe.ingredients?.[i] ?? {},
+                            byKey,
+                          );
+                          if (origin === 'own') {
+                            return 'מחיר שהוזן במתכון הזה. הוא גובר על המחיר שבמרכז חומרי הגלם.';
+                          }
+                          if (origin === 'catalog') {
+                            const hit = byKey.get(
+                              ingredientKeyOf(previewRecipe.ingredients?.[i] ?? {}),
+                            );
+                            return `מחיר מהמרכז: ${formatNis(hit?.price ?? 0)} ל${hit?.priceUnit}. שדה ריק כאן פירושו שהמחיר מתעדכן משם.`;
+                          }
+                          if (row.subId) {
+                            return 'שורת תת־מתכון — העלות מתגלגלת מהמתכון המקושר ואין לה מחיר משלה.';
+                          }
+                          return 'אין מחיר לחומר הגלם הזה, לא כאן ולא במרכז חומרי הגלם.';
+                        })()}
+                      </p>
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor={`pu-${row.key}`}>
@@ -820,6 +870,30 @@ export function RecipeEditScreen() {
                   value={draft.targetFC}
                   onChange={(e) => patch({ targetFC: e.target.value })}
                 />
+                <p className={styles.hint}>
+                  היעד שממנו מחושב מחיר מכירה מוצע. אינו אחוז הפוד קוסט בפועל.
+                </p>
+              </div>
+            )}
+
+            {pro && (
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="r-sale">
+                  מחיר מכירה ₪
+                </label>
+                <input
+                  id="r-sale"
+                  className={`${styles.input} ltr`}
+                  inputMode="decimal"
+                  value={draft.salePrice}
+                  onChange={(e) => patch({ salePrice: e.target.value })}
+                  aria-label="מחיר מכירה"
+                />
+                <p className={styles.hint}>
+                  המחיר שאתם גובים בפועל. ממנו מחושב אחוז הפוד קוסט האמיתי. שדה
+                  ריק פירושו שלא הוגדר מחיר, ואפס פירושו שהמוצר נמסר בחינם — שני
+                  דברים שונים.
+                </p>
               </div>
             )}
           </div>

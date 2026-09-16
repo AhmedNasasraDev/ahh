@@ -18,6 +18,7 @@
 // nothing had happened. This layer makes that shape of bug impossible.
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
+import type { CatalogItem } from '../features/pricing/catalog.js';
 import { defaultPrefs, normalizeCalibrations } from '@recipe-notebook/engine';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from './demoRecipes.js';
 import * as mirror from './offlineMirror.js';
@@ -122,6 +123,26 @@ export function createLocalDemoRepository(): Repository {
             (r.ingredients ?? []).some((i) => i.subId === recipeId),
         )
         .map((r) => ({ id: r.id, name: String(r.name ?? '') }));
+    },
+
+    // ── the ingredient centre (stage 7) ────────────────────────────────────
+    // Empty, and honestly so: the centre holds business data — prices,
+    // suppliers — which belongs to an account. There is no account here, so
+    // there is nothing to show. Demo prices would be an invented cost basis.
+    async listCatalog(): Promise<CatalogItem[]> {
+      return [];
+    },
+
+    async saveCatalogItem(): Promise<CatalogItem> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
+    async deleteCatalogItem(): Promise<void> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
+    async recipesPricingOn() {
+      return [];
     },
 
     async getPrefs() {
