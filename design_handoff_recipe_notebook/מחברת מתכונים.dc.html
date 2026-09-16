@@ -1,0 +1,2729 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#E9ECE8}
+*{box-sizing:border-box}
+a{color:#1E6B4C}a:hover{color:#17543c}
+input,textarea,select,button{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+@media print{
+  @page{size:A4;margin:15mm}
+  body *{visibility:hidden!important;box-shadow:none!important}
+  #orderSheet,#orderSheet *{visibility:visible!important}
+  #orderSheet{position:fixed!important;top:0!important;right:0!important;left:0!important;width:auto!important;max-width:none!important;border:0!important;border-radius:0!important;padding:0!important;background:#fff!important}
+  #orderSheet .noprint{display:none!important}
+}
+</style>
+<meta name="omelette-owns-print" content="1">
+<script src="./image-slot.js"></script>
+<script src="./engine.js"></script>
+<script src="./parser.js"></script>
+<script src="./data.js"></script>
+<script src="./learn.js"></script>
+<script src="./measure.js"></script>
+<script src="./groups.js"></script>
+</helmet>
+<div dir="rtl" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;background:#E9ECE8;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ deviceW }}" height="{{ deviceH }}" hint-size="402px,874px">
+
+<sc-if value="{{ isOnb }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 20px 12px">
+    <div style="display:flex;gap:5px">
+      <sc-for list="{{ onbDots }}" as="d" hint-placeholder-count="3">
+        <div style="{{ d.style }}"></div>
+      </sc-for>
+    </div>
+    <div style="margin-top:14px;font-family:'Frank Ruhl Libre',serif;font-size:25px;font-weight:600;color:#171A18;line-height:1.2;text-wrap:pretty">{{ onbTitle }}</div>
+    <div style="margin-top:7px;font-size:13px;color:#6E7A73;line-height:1.6">{{ onbSub }}</div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:4px 20px 20px">
+    <sc-if value="{{ onbIsProfile }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <sc-for list="{{ onbProfiles }}" as="p" hint-placeholder-count="3">
+          <button onClick="{{ p.onClick }}" style="{{ p.style }}">
+            <div style="font-family:'Frank Ruhl Libre',serif;font-size:18px;font-weight:600">{{ p.he }}</div>
+            <div style="font-size:12.5px;margin-top:4px;opacity:.8;line-height:1.5">{{ p.desc }}</div>
+          </button>
+        </sc-for>
+        <div style="margin-top:4px;font-size:12px;color:#6E7A73;line-height:1.6">הבחירה קובעת רק מה נחשף לכם קודם וברירות מחדל. שום כלי לא נחסם, ואפשר לשנות בכל רגע בהגדרות.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ onbIsUnits }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <sc-for list="{{ onbUnitGroups }}" as="g" hint-placeholder-count="4">
+          <div>
+            <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:7px">{{ g.he }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ g.units }}" as="u" hint-placeholder-count="3">
+                <button onClick="{{ u.onClick }}" style="{{ u.style }}">{{ u.he }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+        <div style="padding:11px 12px;background:#E2EFE8;border-radius:11px;font-size:12px;color:#1E6B4C;line-height:1.6">oz הוא משקל. fl oz הוא נפח. הם לא אותו דבר ולא מומרים זה לזה בלי לדעת מה חומר הגלם.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ onbIsTools }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{ toolRows }}" as="t" hint-placeholder-count="3">
+          <div>
+            <div style="font-size:13.5px;color:#171A18;margin-bottom:7px">{{ t.label }}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ t.options }}" as="o" hint-placeholder-count="3">
+                <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.he }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="padding:11px 20px 34px;border-top:1px solid #CDD4CE;display:flex;gap:10px">
+    <sc-if value="{{ onbCanBack }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ onbBack }}" style="flex:1;min-height:50px;border-radius:13px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:14.5px;cursor:pointer">הקודם</button>
+    </sc-if>
+    <button onClick="{{ onbNext }}" style="flex:2;min-height:50px;border-radius:13px;border:0;background:#1E6B4C;color:#fff;font-size:15px;font-weight:500;cursor:pointer">{{ onbNextLabel }}</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMore }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 20px 12px;border-bottom:1px solid #CDD4CE">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:27px;font-weight:600;color:#171A18">עוד</div>
+    <div style="margin-top:4px;font-size:12.5px;color:#6E7A73">{{ moreSub }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 24px">
+    <sc-for list="{{ moreGroups }}" as="g" hint-placeholder-count="2">
+      <div style="margin-bottom:18px">
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">{{ g.title }}</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="3">
+            <button onClick="{{ i.onClick }}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:right;padding:12px 13px;background:#fff;border:1px solid #CDD4CE;border-radius:13px;cursor:pointer">
+              <div style="flex:1">
+                <div style="font-size:14.5px;color:#171A18">{{ i.label }}</div>
+                <div style="font-size:11.5px;color:#6E7A73;margin-top:2px;line-height:1.45">{{ i.desc }}</div>
+              </div>
+              <div style="font-size:15px;color:#C4A99B">‹</div>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;border-top:1px solid #CDD4CE;background:#FBFBF9;padding:6px 0 26px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goMore }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← עוד</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">הגדרות</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px;display:flex;flex-direction:column;gap:18px">
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">איך אני עובד</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <sc-for list="{{ onbProfiles }}" as="p" hint-placeholder-count="3">
+          <button onClick="{{ p.onClick }}" style="{{ p.style }}">
+            <div style="font-size:14.5px;font-weight:500">{{ p.he }}</div>
+            <div style="font-size:11.5px;margin-top:3px;opacity:.78;line-height:1.45">{{ p.desc }}</div>
+          </button>
+        </sc-for>
+      </div>
+      <div style="margin-top:8px;font-size:11.5px;color:#6E7A73;line-height:1.6">הפרופיל קובע ברירות מחדל ורמת חשיפה ראשונית. כל הכלים המקצועיים נשארים נגישים בכל פרופיל.</div>
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">יחידות שאני משתמש בהן</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <sc-for list="{{ onbUnitGroups }}" as="g" hint-placeholder-count="4">
+          <div>
+            <div style="font-size:12px;color:#171A18;margin-bottom:6px">{{ g.he }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ g.units }}" as="u" hint-placeholder-count="3">
+                <button onClick="{{ u.onClick }}" style="{{ u.style }}">{{ u.he }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:8px;font-size:11.5px;color:#6E7A73;line-height:1.6">זו ברירת מחדל בלבד. בכל מתכון אפשר להזין ולהציג כל יחידה אחרת.</div>
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">שפה וכיווניות</div>
+      <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;font-size:14px;color:#171A18">עברית · RTL</div>
+          <div style="font-size:12px;color:#1E6B4C">פעיל</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:9px;border-top:1px solid rgba(205,212,206,.6)">
+          <div style="flex:1;font-size:14px;color:#6E7A73">العربية · RTL</div>
+          <div style="font-size:12px;color:#A56A0E">בהכנה</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">פרטיות</div>
+      <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px;font-size:12.5px;color:#171A18;line-height:1.65">
+        המחברת האישית שלכם פרטית כברירת מחדל. מדריכים ותלמידים אחרים אינם רואים אותה, גם לא את ההערות האישיות ולא את הכיול שלכם. שיתוף קורה רק כשאתם בוחרים לשתף.
+        <div style="margin-top:8px;font-size:11.5px;color:#A56A0E">בגרסת העיצוב הזו אין עדיין חשבונות משתמש, והכול נשמר מקומית במכשיר.</div>
+      </div>
+    </div>
+
+    <button onClick="{{ resetOnb }}" style="width:100%;min-height:48px;border-radius:12px;border:1px solid #C4A99B;background:#fff;color:#A56A0E;font-size:14px;cursor:pointer">איפוס והרצת שאלות הפתיחה מחדש</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isTools }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goMore }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← עוד</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">כלי המדידה שלי</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px;display:flex;flex-direction:column;gap:18px">
+    <div style="padding:11px 12px;background:#E2EFE8;border-radius:12px;font-size:12.5px;color:#1E6B4C;line-height:1.65">
+      כוס אינה מידה אחת בעולם. בחרו את הכלים שבאמת נמצאים אצלכם במטבח — כל ההמרות יחושבו לפיהם.
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">גודל הכלים</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{ toolRows }}" as="t" hint-placeholder-count="3">
+          <div>
+            <div style="font-size:13.5px;color:#171A18;margin-bottom:7px">{{ t.label }}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ t.options }}" as="o" hint-placeholder-count="3">
+                <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.he }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">oz מול fl oz</div>
+      <div style="display:flex;gap:9px">
+        <div style="flex:1;background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:11px 12px">
+          <div style="font-size:15px;font-weight:600;color:#171A18;direction:ltr;text-align:right">oz</div>
+          <div style="font-size:12px;color:#6E7A73;margin-top:4px;line-height:1.5">משקל. אונקיה אחת = 28.35 גרם. נמדד במשקל.</div>
+        </div>
+        <div style="flex:1;background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:11px 12px">
+          <div style="font-size:15px;font-weight:600;color:#171A18;direction:ltr;text-align:right">fl oz</div>
+          <div style="font-size:12px;color:#6E7A73;margin-top:4px;line-height:1.5">נפח. אונקיית נוזל אחת = 29.57 מ"ל. נמדד בכלי.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">כיול אישי</div>
+      <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+        <div style="font-size:12.5px;color:#6E7A73;line-height:1.6">שקלו כוס אחת מחומר הגלם אצלכם, ורשמו את המשקל. מכאן והלאה ההמרות של הרכיב הזה יהיו שלכם, ולא הערכה.</div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+          <input value="{{ calibName }}" onChange="{{ setCalibName }}" placeholder="שם חומר הגלם, למשל קמח לחם" style="width:100%;border:1px solid #CDD4CE;border-radius:10px;padding:10px;font-size:13.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+          <div style="display:flex;gap:7px">
+            <select value="{{ calibTool }}" onChange="{{ setCalibTool }}" style="width:96px;border:1px solid #CDD4CE;border-radius:10px;padding:9px;font-size:13px;background:#FBFBF9;color:#171A18">
+              <option value="cup">כוס</option>
+              <option value="tbsp">כף</option>
+              <option value="tsp">כפית</option>
+            </select>
+            <input value="{{ calibGrams }}" onChange="{{ setCalibGrams }}" placeholder="משקל בגרם" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:9px 10px;font-size:13.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+          </div>
+          <button onClick="{{ addCalib }}" style="width:100%;min-height:46px;border-radius:11px;border:0;background:#1E6B4C;color:#fff;font-size:14px;font-weight:500;cursor:pointer">שמירת הכיול</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+        <sc-for list="{{ calibList }}" as="c" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:9px;background:#FDFBF6;border:1px solid #CDD4CE;border-radius:12px;padding:10px 11px">
+            <div style="flex:1">
+              <div style="font-size:13.5px;color:#171A18">{{ c.name }}</div>
+              <div style="font-size:11.5px;color:#1E6B4C;margin-top:2px">{{ c.detail }}</div>
+            </div>
+            <button onClick="{{ c.remove }}" style="border:0;background:transparent;color:#9E362C;font-size:16px;cursor:pointer;min-width:44px;min-height:44px">×</button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ calibEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:12px;color:#6E7A73;line-height:1.6">אין עדיין כיול. בלי כיול אישי המערכת משתמשת בנתון מערכת, ומסמנת אותו ככזה בכל המרה.</div>
+        </sc-if>
+      </div>
+      <div style="margin-top:9px;font-size:11.5px;color:#A56A0E;line-height:1.6">הכיול שייך רק לכם. הוא לא נשלח לקבוצה ולא למדריך.</div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isGroups }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 20px 12px;border-bottom:1px solid #CDD4CE">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:27px;font-weight:600;color:#171A18">קבוצות</div>
+    <div style="margin-top:4px;font-size:12.5px;color:#6E7A73">{{ groupsSub }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 24px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ groupList }}" as="g" hint-placeholder-count="2">
+        <button onClick="{{ g.onClick }}" style="width:100%;text-align:right;background:#FDFBF6;border:1px solid #CDD4CE;border-radius:14px;padding:13px 14px;cursor:pointer">
+          <div style="display:flex;align-items:flex-start;gap:9px">
+            <div style="flex:1">
+              <div style="font-family:'Frank Ruhl Libre',serif;font-size:18px;font-weight:600;color:#171A18;line-height:1.25">{{ g.name }}</div>
+              <div style="font-size:11.5px;color:#6E7A73;margin-top:3px">{{ g.kind }}</div>
+            </div>
+            <div style="{{ g.roleStyle }}">{{ g.role }}</div>
+          </div>
+          <div style="margin-top:9px;font-size:12.5px;color:#171A18">{{ g.counts }}</div>
+          <div style="margin-top:7px;font-size:11px;color:#6E7A73">קבוצה פרטית · {{ g.members }}</div>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:16px;background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+      <div style="font-size:13.5px;color:#171A18">הצטרפות לקבוצה</div>
+      <div style="margin-top:5px;font-size:12px;color:#6E7A73;line-height:1.6">קבוצות פרטיות אינן מופיעות בחיפוש. אפשר להיכנס רק באחת מהדרכים האלה:</div>
+      <div style="margin-top:9px;display:flex;flex-direction:column;gap:7px">
+        <sc-for list="{{ joinMethods }}" as="j" hint-placeholder-count="4">
+          <div style="display:flex;gap:9px;align-items:baseline">
+            <div style="width:88px;flex:none;font-size:12.5px;color:#1E6B4C">{{ j.he }}</div>
+            <div style="flex:1;font-size:12px;color:#6E7A73;line-height:1.5">{{ j.desc }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:11px;display:flex;gap:7px">
+        <input value="{{ joinCode }}" onChange="{{ setJoinCode }}" placeholder="קוד קבוצה" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:10px;font-size:13.5px;background:#FBFBF9;color:#171A18;outline:0;direction:ltr;text-align:right"/>
+        <button onClick="{{ doJoin }}" style="min-height:46px;padding:0 16px;border-radius:11px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:13.5px;cursor:pointer">בקשת הצטרפות</button>
+      </div>
+      <div style="margin-top:9px;font-size:11px;color:#A56A0E;line-height:1.55">הצטרפות אמיתית דורשת שרת ואישור מנהל. כאן זה הדגמה של המסך בלבד.</div>
+    </div>
+  </div>
+  <div style="display:flex;border-top:1px solid #CDD4CE;background:#FBFBF9;padding:6px 0 26px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isGroup }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 12px;border-bottom:1px solid #CDD4CE">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onClick="{{ goGroups }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← קבוצות</button>
+      <div style="flex:1"></div>
+      <div style="{{ gRoleStyle }}">{{ gRole }}</div>
+    </div>
+    <div style="margin-top:4px;font-family:'Frank Ruhl Libre',serif;font-size:21px;font-weight:600;color:#171A18;line-height:1.2">{{ gName }}</div>
+    <div style="margin-top:4px;font-size:12px;color:#6E7A73">{{ gMeta }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px">
+    <div style="font-size:12px;color:#6E7A73;line-height:1.6">{{ gNote }}</div>
+
+    <sc-if value="{{ gCanManage }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">
+        <button onClick="{{ goPerms }}" style="width:100%;min-height:46px;border-radius:12px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:13.5px;cursor:pointer">הרשאות מתכונים בקבוצה</button>
+        <sc-if value="{{ gHasPending }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#fff;border:1px solid #C4A99B;border-radius:12px;padding:11px 12px">
+            <div style="font-size:12.5px;color:#A56A0E">בקשות הצטרפות ממתינות</div>
+            <div style="margin-top:7px;display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ gPending }}" as="p" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:9px">
+                  <div style="flex:1;font-size:13px;color:#171A18">{{ p.name }}<span style="color:#6E7A73;font-size:11.5px"> · {{ p.via }} · {{ p.at }}</span></div>
+                  <div style="font-size:11.5px;color:#6E7A73">{{ p.state }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <div style="margin-top:18px;display:flex;flex-direction:column;gap:16px">
+      <sc-for list="{{ gCourses }}" as="c" hint-placeholder-count="2">
+        <div>
+          <div style="font-family:'Frank Ruhl Libre',serif;font-size:17px;font-weight:600;color:#171A18">{{ c.name }}</div>
+          <div style="margin-top:9px;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ c.lessons }}" as="l" hint-placeholder-count="2">
+              <div style="background:#FDFBF6;border:1px solid #CDD4CE;border-radius:14px;padding:12px 13px">
+                <div style="display:flex;align-items:baseline;gap:9px">
+                  <div style="flex:1;font-size:15px;font-weight:500;color:#171A18;line-height:1.3">{{ l.name }}</div>
+                  <div style="{{ l.dateStyle }}">{{ l.date }}</div>
+                </div>
+                <div style="margin-top:5px;font-size:12px;color:#6E7A73;line-height:1.55">{{ l.summary }}</div>
+                <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ l.items }}" as="i" hint-placeholder-count="2">
+                    <button onClick="{{ i.onClick }}" style="display:flex;align-items:center;gap:9px;width:100%;text-align:right;padding:10px 11px;background:#fff;border:1px solid #CDD4CE;border-radius:11px;cursor:pointer">
+                      <div style="flex:1">
+                        <div style="font-size:13.5px;color:#171A18">{{ i.name }}</div>
+                        <div style="font-size:11px;color:#6E7A73;margin-top:2px">{{ i.permSummary }}</div>
+                      </div>
+                      <div style="font-size:14px;color:#C4A99B">‹</div>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isGroupRecipe }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FDFBF6;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;background:#FBFBF9;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ backGroup }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← {{ grLessonShort }}</button>
+    <div style="flex:1"></div>
+    <div style="font-size:11.5px;color:#6E7A73">מתכון של הקבוצה</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:18px 18px 40px;border-right:3px solid #C4A99B">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:25px;font-weight:600;color:#171A18;line-height:1.2">{{ grName }}</div>
+    <div style="margin-top:6px;font-size:12px;color:#6E7A73;line-height:1.55">{{ grMeta }}</div>
+
+    <div style="margin-top:14px;background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">מה מותר לי כאן</div>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ grPerms }}" as="p" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:9px">
+            <div style="width:16px;flex:none;font-size:12px;{{ p.iconStyle }}">{{ p.icon }}</div>
+            <div style="flex:1;font-size:12.5px;{{ p.textStyle }}">{{ p.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:9px;font-size:11px;color:#6E7A73;line-height:1.55">{{ grPermNote }}</div>
+    </div>
+
+    <div style="margin-top:18px;font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18">רכיבים</div>
+    <div style="margin-top:9px;display:flex;flex-direction:column">
+      <sc-for list="{{ grRows }}" as="r" hint-placeholder-count="5">
+        <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(205,212,206,.6)">
+          <div style="width:74px;flex:none;text-align:left;direction:ltr;font-size:14px;font-weight:600;color:#171A18">{{ r.qty }}</div>
+          <div style="flex:1;font-size:14px;color:#171A18;line-height:1.35">{{ r.name }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:20px;font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18">אופן ההכנה</div>
+    <div style="margin-top:9px;display:flex;flex-direction:column;gap:13px">
+      <sc-for list="{{ grSteps }}" as="s" hint-placeholder-count="4">
+        <div style="display:flex;gap:11px">
+          <div style="width:26px;flex:none;font-family:'Frank Ruhl Libre',serif;font-size:22px;color:#C4A99B;line-height:1">{{ s.num }}</div>
+          <div style="flex:1;font-size:14px;color:#171A18;line-height:1.5">{{ s.text }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:22px;background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">הערה אישית שלי</div>
+      <textarea value="{{ grNote }}" onChange="{{ setGrNote }}" placeholder="אצלי בתנור 32 דקות" style="margin-top:8px;width:100%;height:70px;border:1px solid #CDD4CE;border-radius:11px;padding:10px;font-size:13.5px;line-height:1.55;background:#fff;color:#171A18;outline:0;resize:none"></textarea>
+      <div style="margin-top:6px;font-size:11px;color:#1E6B4C;line-height:1.55">ההערה נשמרת רק אצלכם. המדריך ושאר התלמידים אינם רואים אותה.</div>
+    </div>
+
+    <sc-if value="{{ grCanSave }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ saveToNotebook }}" style="margin-top:14px;width:100%;min-height:50px;border-radius:13px;border:0;background:#1E6B4C;color:#fff;font-size:15px;font-weight:500;cursor:pointer">{{ grSaveLabel }}</button>
+      <div style="margin-top:8px;font-size:11.5px;color:#6E7A73;line-height:1.6">נוצר עותק אישי במחברת שלכם. אפשר לערוך, לשנות כמויות ולנסות — המתכון של הקבוצה לא משתנה.</div>
+    </sc-if>
+    <sc-if value="{{ grCannotSave }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:14px;padding:12px 13px;border:1px dashed #C4A99B;border-radius:12px;font-size:12.5px;color:#A56A0E;line-height:1.6">המדריך לא אישר שמירה של המתכון הזה למחברת אישית. אפשר לצפות ולכתוב הערה אישית.</div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPerms }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ backGroup }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← הקבוצה</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">הרשאות</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px">
+    <div style="font-size:12.5px;color:#6E7A73;line-height:1.6">מה מותר לתלמידי הקבוצה לעשות עם כל מתכון. ברירת המחדל היא צפייה בלבד.</div>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ permItems }}" as="it" hint-placeholder-count="2">
+        <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+          <div style="font-size:14.5px;color:#171A18">{{ it.name }}</div>
+          <div style="font-size:11px;color:#6E7A73;margin-top:2px">{{ it.where }}</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ it.perms }}" as="p" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="flex:1">
+                  <div style="font-size:13px;color:#171A18">{{ p.label }}</div>
+                  <div style="font-size:11px;color:#6E7A73;margin-top:1px;line-height:1.4">{{ p.desc }}</div>
+                </div>
+                <button onClick="{{ p.toggle }}" style="{{ p.style }}">{{ p.state }}</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#A56A0E;line-height:1.6">שינוי הרשאה כאן משנה את המסך בלבד. אכיפה אמיתית דורשת שרת והרשאות במסד הנתונים.</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="flex:1;overflow-y:auto;padding:58px 0 16px">
+    <div style="padding:0 20px">
+      <div style="font-size:12.5px;color:#6E7A73">{{ todayLabel }}</div>
+      <div style="display:flex;align-items:flex-end;gap:10px;margin-top:3px">
+        <div style="flex:1;font-family:'Frank Ruhl Libre',serif;font-size:27px;font-weight:600;color:#171A18;line-height:1.15">המחברת שלי</div>
+        <button onClick="{{ toggleSimple }}" style="{{ simpleStyle }}">{{ simpleLabel }}</button>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;padding:0 20px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">להמשיך מאיפה שעצרת</div>
+      <div onClick="{{ openLast }}" style="position:relative;border-radius:16px;overflow:hidden;border:1px solid #CDD4CE;cursor:pointer;background:#FDFBF6">
+        <div style="position:relative;height:132px">
+          <image-slot id="home-hero" src="{{ lastImg }}" shape="rect" placeholder="גררו לכאן תמונה של המתכון"></image-slot>
+        </div>
+        <div style="padding:11px 13px 12px">
+          <div style="font-family:'Frank Ruhl Libre',serif;font-size:19px;font-weight:600;color:#171A18">{{ lastName }}</div>
+          <div style="font-size:12px;color:#6E7A73;margin-top:4px">{{ lastMeta }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding:0 20px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">קטגוריות</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <sc-for list="{{ catTiles }}" as="t" hint-placeholder-count="6">
+          <div onClick="{{ t.onClick }}" style="display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid #CDD4CE;background:#FDFBF6;cursor:pointer">
+            <div style="height:84px">
+              <image-slot id="{{ t.slotId }}" src="{{ t.img }}" shape="rect" placeholder="תמונה"></image-slot>
+            </div>
+            <div style="padding:8px 11px 10px">
+              <div style="font-family:'Frank Ruhl Libre',serif;font-size:15.5px;font-weight:600;color:#171A18">{{ t.name }}</div>
+              <div style="font-size:11px;color:#6E7A73;margin-top:2px">{{ t.count }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding:0 20px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">מתכוני בסיס</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ subCards }}" as="s" hint-placeholder-count="2">
+          <div onClick="{{ s.onClick }}" style="display:flex;align-items:center;gap:11px;padding:9px 11px;background:#FDFBF6;border:1px solid #CDD4CE;border-radius:13px;cursor:pointer">
+            <div style="width:46px;height:46px;flex:none;border-radius:10px;overflow:hidden">
+              <image-slot id="{{ s.slotId }}" src="{{ s.img }}" shape="rect" placeholder="תמונה"></image-slot>
+            </div>
+            <div style="flex:1">
+              <div style="font-family:'Frank Ruhl Libre',serif;font-size:16px;font-weight:600;color:#171A18">{{ s.name }}</div>
+              <div style="font-size:11.5px;color:#6E7A73;margin-top:2px">{{ s.meta }}</div>
+            </div>
+            <div style="font-size:15px;color:#C4A99B">‹</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding:0 20px 8px;display:flex;gap:9px">
+      <button onClick="{{ goPaste }}" style="flex:1;min-height:48px;border-radius:13px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:13.5px;cursor:pointer">הדבקת מתכון</button>
+      <button onClick="{{ newRecipe }}" style="flex:1;min-height:48px;border-radius:13px;border:0;background:#1E6B4C;color:#fff;font-size:13.5px;font-weight:500;cursor:pointer">מתכון חדש</button>
+    </div>
+  </div>
+  <div style="display:flex;border-top:1px solid #CDD4CE;background:#FBFBF9;padding:6px 0 26px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+      <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDiff }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המתכון</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">השוואת גרסאות</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px">
+    <div style="display:flex;gap:9px;align-items:center">
+      <div style="font-size:12.5px;color:#6E7A73;flex:none">להשוות מול</div>
+      <select value="{{ diffOther }}" onChange="{{ setDiffOther }}" style="flex:1;min-height:44px;border:1px solid #CDD4CE;border-radius:10px;padding:0 8px;font-size:13.5px;background:#fff;color:#171A18">
+        <sc-for list="{{ diffOptions }}" as="o" hint-placeholder-count="3">
+          <option value="{{ o.id }}">{{ o.name }}</option>
+        </sc-for>
+      </select>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:9px">
+      <div style="flex:1;background:#FDFBF6;border:1px solid #CDD4CE;border-radius:12px;padding:10px 11px">
+        <div style="font-size:11px;color:#6E7A73">הנוכחי</div>
+        <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18;margin-top:3px;line-height:1.25">{{ rName }}</div>
+      </div>
+      <div style="flex:1;background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:10px 11px">
+        <div style="font-size:11px;color:#6E7A73">מול</div>
+        <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18;margin-top:3px;line-height:1.25">{{ diffOtherName }}</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">מדדים</div>
+    <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:4px 12px 8px">
+      <sc-for list="{{ diffStats }}" as="s" hint-placeholder-count="5">
+        <div style="display:flex;gap:8px;align-items:baseline;padding:8px 0;border-bottom:1px solid rgba(205,212,206,.55)">
+          <div style="flex:1;font-size:12.5px;color:#6E7A73">{{ s.k }}</div>
+          <div style="width:74px;text-align:left;font-size:13.5px;font-weight:600;color:#171A18;direction:ltr">{{ s.a }}</div>
+          <div style="width:74px;text-align:left;font-size:13.5px;color:#171A18;direction:ltr">{{ s.b }}</div>
+          <div style="width:56px;text-align:left;font-size:12px;direction:ltr;{{ s.deltaColor }}">{{ s.delta }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:16px;font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">רכיבים שנשתנו</div>
+    <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:4px 12px 8px">
+      <sc-for list="{{ diffRows }}" as="d" hint-placeholder-count="4">
+        <div style="display:flex;gap:8px;align-items:baseline;padding:8px 0;border-bottom:1px solid rgba(205,212,206,.55)">
+          <div style="flex:1;font-size:13px;color:#171A18;line-height:1.35">{{ d.name }}</div>
+          <div style="width:70px;text-align:left;font-size:12.5px;color:#171A18;direction:ltr">{{ d.a }}</div>
+          <div style="width:70px;text-align:left;font-size:12.5px;color:#6E7A73;direction:ltr">{{ d.b }}</div>
+          <div style="width:62px;text-align:left;font-size:11.5px;{{ d.tagStyle }}">{{ d.tag }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:9px;font-size:11.5px;color:#6E7A73;line-height:1.6">{{ diffNote }}</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isBatch }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המתכון</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">מעקב אצווה</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px">
+    <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">אצווה חדשה</div>
+      <sc-for list="{{ batchFields }}" as="f" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:104px;flex:none;font-size:12.5px;color:#171A18">{{ f.label }}</div>
+          <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.placeholder }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:9px 10px;font-size:13.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+        </div>
+      </sc-for>
+      <div style="margin-top:4px;padding-top:9px;border-top:1px solid #CDD4CE">
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:7px">נקודות בקרה — HACCP</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ ccpRows }}" as="c" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:9px">
+              <button onClick="{{ c.onToggle }}" style="{{ c.boxStyle }}">{{ c.mark }}</button>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;color:#171A18;line-height:1.4">{{ c.label }}</div>
+                <div style="font-size:11px;color:#6E7A73;line-height:1.4">{{ c.limit }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="margin-top:4px;padding-top:9px;border-top:1px solid #CDD4CE">
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:7px">תיעוד מצולם</div>
+        <div style="height:132px;border-radius:11px;overflow:hidden;border:1px solid #CDD4CE">
+          <image-slot id="batch-photo" placeholder="גררו לכאן צילום של האצווה — חיתוך, מרקם או מדיד טמפרטורה" shape="rounded"></image-slot>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:#6E7A73;line-height:1.5">{{ photoNote }}</div>
+      </div>
+      <button onClick="{{ saveBatch }}" style="margin-top:2px;width:100%;min-height:46px;border-radius:11px;border:0;background:#1E6B4C;color:#fff;font-size:14px;font-weight:500;cursor:pointer">רישום האצווה</button>
+      <div style="font-size:11.5px;color:#6E7A73;line-height:1.55">מספר האצווה נכתב גם על התווית, כדי שניתן יהיה לעקוב אחורה ממוצר שיצא לחנות.</div>
+    </div>
+
+    <div style="margin-top:16px;font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">אצוות שנרשמו</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ batchList }}" as="b" hint-placeholder-count="2">
+        <div style="background:#FDFBF6;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px">
+          <div style="display:flex;align-items:baseline;gap:9px">
+            <div style="font-size:14px;font-weight:600;color:#171A18;direction:ltr">{{ b.code }}</div>
+            <div style="flex:1;font-size:12px;color:#6E7A73">{{ b.date }}</div>
+            <button onClick="{{ b.remove }}" style="border:0;background:transparent;color:#9E362C;font-size:15px;cursor:pointer;min-width:40px;min-height:40px">×</button>
+          </div>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:7px">
+            <div style="{{ b.haccpStyle }}">{{ b.haccp }}</div>
+            <div style="font-size:11.5px;color:#6E7A73">{{ b.ccpSummary }}</div>
+          </div>
+          <div style="margin-top:6px;font-size:12.5px;color:#171A18;line-height:1.55">{{ b.detail }}</div>
+          <sc-if value="{{ b.alert }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:6px;font-size:12px;color:#9E362C;line-height:1.5">{{ b.alert }}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLearn }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המתכון</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">מצב לימוד</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:22px;font-weight:600;color:#171A18;line-height:1.2">{{ rName }}</div>
+    <div style="margin-top:5px;font-size:12px;color:#A56A0E;line-height:1.5">הסבר מקצועי, לא נוסחה מאושרת. המספרים מחושבים מהמתכון שלך.</div>
+
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+      <sc-for list="{{ learnCards }}" as="c" hint-placeholder-count="3">
+        <div style="background:#FDFBF6;border:1px solid #CDD4CE;border-radius:14px;padding:13px 14px">
+          <div style="font-family:'Frank Ruhl Libre',serif;font-size:18px;font-weight:600;color:#171A18">{{ c.title }}</div>
+          <div style="margin-top:7px;font-size:13.5px;color:#171A18;line-height:1.65;text-wrap:pretty">{{ c.body }}</div>
+          <div style="margin-top:10px;padding:10px 11px;background:#E2EFE8;border-radius:10px;font-size:13px;color:#1E6B4C;line-height:1.6">{{ c.calc }}</div>
+          <div style="margin-top:8px;font-size:12.5px;color:#6E7A73;line-height:1.55">{{ c.what }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ hasDrills }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:20px">
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">תרגול על המתכון הזה</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ learnDrills }}" as="d" hint-placeholder-count="2">
+            <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+              <div style="font-size:13.5px;font-weight:500;color:#171A18;line-height:1.5">{{ d.q }}</div>
+              <sc-if value="{{ d.open }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:8px;font-size:13px;color:#1E6B4C;line-height:1.6">{{ d.a }}</div>
+              </sc-if>
+              <button onClick="{{ d.toggle }}" style="margin-top:9px;min-height:40px;padding:0 13px;border-radius:10px;border:1px solid #CDD4CE;background:#FBFBF9;color:#171A18;font-size:12.5px;cursor:pointer">{{ d.btn }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isStock2 }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goList }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המחברת</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">חומרי גלם ומחירים</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 30px">
+    <div style="font-size:12.5px;color:#6E7A73;line-height:1.6">מחיר שמתעדכן כאן נכתב לכל המתכונים שמשתמשים באותו חומר גלם.</div>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ stockRows }}" as="s" hint-placeholder-count="6">
+        <div style="background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:10px 11px">
+          <div style="display:flex;align-items:baseline;gap:9px">
+            <div style="flex:1;font-size:14px;color:#171A18;line-height:1.3">{{ s.name }}</div>
+            <div style="font-size:11px;color:#6E7A73">{{ s.usage }}</div>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:7px;align-items:center">
+            <input value="{{ s.price }}" onChange="{{ s.setPrice }}" placeholder="מחיר" style="width:78px;border:1px solid #CDD4CE;border-radius:9px;padding:8px;font-size:13.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+            <div style="font-size:12px;color:#6E7A73">{{ s.unitLabel }}</div>
+            <div style="flex:1"></div>
+            <button onClick="{{ s.apply }}" style="min-height:40px;padding:0 14px;border-radius:10px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:12.5px;cursor:pointer">עדכון בכל המתכונים</button>
+          </div>
+          <sc-if value="{{ s.warn }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:7px;font-size:11.5px;color:#9E362C;line-height:1.5">{{ s.warn }}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;border-top:1px solid #CDD4CE;background:#FBFBF9;padding:6px 0 26px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:22px;font-weight:600;color:#171A18">יום ייצור</div>
+    <div style="margin-top:9px;display:flex;gap:8px;align-items:center">
+      <div style="font-size:12.5px;color:#6E7A73;flex:none">אספקה בשעה</div>
+      <input value="{{ planTime }}" onChange="{{ setPlanTime }}" placeholder="07:00" style="width:82px;border:1px solid #CDD4CE;border-radius:10px;padding:8px;font-size:13.5px;text-align:center;background:#fff;color:#171A18;outline:0;direction:ltr"/>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:6px">
+        <sc-for list="{{ planTabs }}" as="t" hint-placeholder-count="2">
+          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 24px">
+    <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">מה מייצרים</div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <sc-for list="{{ planPicker }}" as="p" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;background:#fff;border:1px solid #CDD4CE;border-radius:12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13.5px;color:#171A18">{{ p.name }}</div>
+            <div style="font-size:11px;color:#6E7A73;margin-top:2px">{{ p.hint }}</div>
+          </div>
+          <button onClick="{{ p.minus }}" style="min-width:40px;min-height:40px;border-radius:10px;border:1px solid #CDD4CE;background:#FBFBF9;color:#171A18;font-size:16px;cursor:pointer">−</button>
+          <div style="width:42px;text-align:center;font-size:14.5px;font-weight:600;color:#171A18">{{ p.qty }}</div>
+          <button onClick="{{ p.plus }}" style="min-width:40px;min-height:40px;border-radius:10px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:16px;cursor:pointer">+</button>
+        </div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ planIsSchedule }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:20px">
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">{{ planScheduleTitle }}</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ planSchedule }}" as="r" hint-placeholder-count="2">
+            <div style="background:#FDFBF6;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px">
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <div style="font-size:17px;font-weight:600;color:#1E6B4C;direction:ltr">{{ r.start }}</div>
+                <div style="flex:1;font-family:'Frank Ruhl Libre',serif;font-size:17px;font-weight:600;color:#171A18">{{ r.name }}</div>
+              </div>
+              <div style="font-size:11.5px;color:#6E7A73;margin-top:3px">{{ r.meta }}</div>
+              <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px">
+                <sc-for list="{{ r.steps }}" as="s" hint-placeholder-count="3">
+                  <div style="display:flex;gap:9px;font-size:12px;line-height:1.45">
+                    <div style="width:42px;flex:none;color:#A56A0E;direction:ltr">{{ s.at }}</div>
+                    <div style="flex:1;color:#171A18">{{ s.text }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ planIsBuy }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:20px">
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">רשימת רכש מצטברת</div>
+        <div style="background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px">
+          <sc-for list="{{ planBuy }}" as="b" hint-placeholder-count="5">
+            <div style="display:flex;gap:9px;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(205,212,206,.6)">
+              <div style="width:20px;flex:none;color:#CDD4CE;font-size:13px">☐</div>
+              <div style="flex:1;font-size:13.5px;color:#171A18;line-height:1.35">{{ b.name }}</div>
+              <div style="width:72px;text-align:left;font-size:13.5px;font-weight:600;color:#171A18;direction:ltr">{{ b.qty }}</div>
+              <div style="width:58px;text-align:left;font-size:12.5px;color:#6E7A73;direction:ltr">{{ b.cost }}</div>
+            </div>
+          </sc-for>
+          <div style="display:flex;gap:9px;padding:9px 0 2px;font-size:13.5px;font-weight:600;color:#171A18">
+            <div style="flex:1">עלות סחורה ליום</div>
+            <div style="direction:ltr">{{ planBuyTotal }}</div>
+          </div>
+        </div>
+        <div style="margin-top:9px;font-size:11.5px;color:#6E7A73;line-height:1.6">{{ planBuyNote }}</div>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="display:flex;border-top:1px solid #CDD4CE;background:#FBFBF9;padding:6px 0 26px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:60px 20px 12px;background:#FBFBF9;border-bottom:1px solid #CDD4CE">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-family:'Frank Ruhl Libre',serif;font-size:30px;font-weight:600;color:#171A18;line-height:1.1">מחברת מתכונים</div>
+        <div style="font-size:12.5px;color:#6E7A73;margin-top:4px">{{ countLabel }}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onClick="{{ goPaste }}" style="width:44px;height:44px;border-radius:13px;border:1px solid #CDD4CE;background:#fff;color:#1E6B4C;font-size:20px;line-height:1;cursor:pointer">+</button>
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:9px 12px">
+      <span style="color:#6E7A73;font-size:13px">⌕</span>
+      <input value="{{ query }}" onChange="{{ setQuery }}" placeholder="שם, תג או רכיב" style="flex:1;border:0;outline:0;background:transparent;font-size:14.5px;color:#171A18"/>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:7px;overflow-x:auto;padding-bottom:2px">
+      <sc-for list="{{ catChips }}" as="c" hint-placeholder-count="4">
+        <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 40px;display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ list }}" as="r" hint-placeholder-count="4">
+      <div onClick="{{ r.onClick }}" style="display:flex;gap:12px;background:#FDFBF6;border:1px solid #CDD4CE;border-radius:14px;padding:12px 13px;cursor:pointer;box-shadow:0 1px 2px rgba(23,26,24,.04)">
+        <div style="width:62px;height:62px;flex:none;border-radius:11px;overflow:hidden">
+          <image-slot id="{{ r.slotId }}" src="{{ r.img }}" shape="rect" placeholder="תמונה"></image-slot>
+        </div>
+        <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+          <div style="font-family:'Frank Ruhl Libre',serif;font-size:19.5px;font-weight:600;color:#171A18;line-height:1.25">{{ r.name }}</div>
+          <div style="font-size:11px;color:#6E7A73;white-space:nowrap">{{ r.category }}</div>
+        </div>
+        <div style="margin-top:6px;font-size:12.5px;color:#6E7A73">{{ r.yieldLabel }}</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ r.badges }}" as="b" hint-placeholder-count="0">
+            <span style="{{ b.style }}">{{ b.label }}</span>
+          </sc-for>
+        </div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button onClick="{{ doExport }}" style="flex:1;padding:11px;border-radius:11px;border:1px solid #CDD4CE;background:#FBFBF9;color:#171A18;font-size:13px;cursor:pointer">ייצוא גיבוי JSON</button>
+      <button onClick="{{ goPaste }}" style="flex:1;padding:11px;border-radius:11px;border:1px solid #CDD4CE;background:#FBFBF9;color:#171A18;font-size:13px;cursor:pointer">ייבוא / הדבקה</button>
+    </div>
+    <sc-if value="{{ pro }}" hint-placeholder-val="{{ true }}">
+    <button onClick="{{ goStock }}" style="width:100%;min-height:46px;border-radius:11px;border:1px solid #CDD4CE;background:#FBFBF9;color:#171A18;font-size:13px;cursor:pointer">חומרי גלם ועדכון מחירים</button>
+    </sc-if>
+  </div>
+  <div style="display:flex;border-top:1px solid #CDD4CE;background:#FBFBF9;padding:6px 0 26px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+      <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isRecipe }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FDFBF6;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;background:#FBFBF9;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goList }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המחברת</button>
+    <div style="flex:1"></div>
+    <button onClick="{{ openShare }}" style="padding:0 14px;min-height:44px;border-radius:11px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:12.5px;cursor:pointer">שיתוף</button>
+    <button onClick="{{ goKitchen }}" style="padding:0 14px;min-height:44px;border-radius:11px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:12.5px;cursor:pointer">התחל הכנה</button>
+    <button onClick="{{ goEdit }}" style="padding:0 16px;min-height:44px;border-radius:11px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:12.5px;cursor:pointer">עריכה</button>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;border-right:3px solid #C4A99B">
+    <div style="padding:20px 18px 46px">
+      <div style="height:150px;border-radius:14px;overflow:hidden;margin-bottom:16px">
+        <image-slot id="{{ heroSlotId }}" src="{{ heroImg }}" shape="rect" placeholder="גררו לכאן תמונה של המתכון"></image-slot>
+      </div>
+      <div style="font-family:'Frank Ruhl Libre',serif;font-size:29px;font-weight:600;color:#171A18;line-height:1.15;text-wrap:pretty">{{ rName }}</div>
+      <div style="margin-top:7px;font-size:12.5px;color:#6E7A73">{{ rMeta }}</div>
+      <sc-if value="{{ rVersionNote }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:8px;font-size:12px;color:#A56A0E">גרסה של {{ rParentName }} · {{ rVersionNote }}</div>
+      </sc-if>
+
+      <div style="margin-top:16px;background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px">
+        <div style="font-size:11.5px;color:#6E7A73;margin-bottom:8px">כמה להכין</div>
+        <div style="display:flex;gap:6px">
+          <sc-for list="{{ scaleTabs }}" as="t" hint-placeholder-count="4">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ scaleNeedsInput }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:9px;display:flex;gap:7px;align-items:center">
+            <input value="{{ scaleVal }}" onChange="{{ setScaleVal }}" placeholder="{{ scalePlaceholder }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:8px 10px;font-size:14px;background:#fff;color:#171A18;outline:0"/>
+            <sc-if value="{{ isStock }}" hint-placeholder-val="{{ false }}">
+              <select value="{{ scaleIng }}" onChange="{{ setScaleIng }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:8px;font-size:13px;background:#fff;color:#171A18">
+                <sc-for list="{{ ingOptions }}" as="o" hint-placeholder-count="3">
+                  <option value="{{ o.id }}">{{ o.name }}</option>
+                </sc-for>
+              </select>
+            </sc-if>
+          </div>
+        </sc-if>
+        <div style="margin-top:9px;display:flex;align-items:center;gap:10px">
+          <div style="flex:1;font-size:12px;color:#1E6B4C;line-height:1.45">{{ scaleSummary }}</div>
+          <button onClick="{{ goOrder }}" style="flex:none;min-height:44px;padding:0 13px;border-radius:11px;border:1px solid #1E6B4C;background:#fff;color:#1E6B4C;font-size:12.5px;cursor:pointer">דף הזמנה</button>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasPan }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px">
+          <div style="display:flex;align-items:baseline;gap:9px">
+            <div style="font-size:11.5px;color:#6E7A73;flex:1">תבנית</div>
+            <div style="font-size:12.5px;color:#171A18">{{ panRecipeLabel }}</div>
+          </div>
+          <div style="margin-top:9px;display:flex;gap:7px;align-items:center">
+            <div style="font-size:12px;color:#6E7A73;flex:none">התבנית שלי</div>
+            <select value="{{ panMine }}" onChange="{{ setPanMine }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:8px;font-size:13px;background:#fff;color:#171A18">
+              <sc-for list="{{ panOptions }}" as="o" hint-placeholder-count="3">
+                <option value="{{ o.id }}">{{ o.label }}</option>
+              </sc-for>
+            </select>
+          </div>
+          <sc-if value="{{ panSuggestion }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:9px;display:flex;align-items:center;gap:9px">
+              <div style="flex:1;font-size:12px;color:#1E6B4C;line-height:1.5">{{ panSuggestion }}</div>
+              <button onClick="{{ applyPan }}" style="flex:none;min-height:44px;padding:0 13px;border-radius:11px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:12.5px;cursor:pointer">התאמה</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <div style="margin-top:22px;display:flex;align-items:center;gap:9px">
+        <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18;letter-spacing:.02em;flex:1">רכיבים</div>
+        <div style="display:flex;gap:5px">
+          <sc-for list="{{ viewTabs }}" as="v" hint-placeholder-count="3">
+            <button onClick="{{ v.onClick }}" style="{{ v.style }}">{{ v.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <sc-if value="{{ viewNote }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:8px;padding:9px 11px;background:#E2EFE8;border-radius:11px;font-size:11.5px;color:#1E6B4C;line-height:1.55">{{ viewNote }}</div>
+      </sc-if>
+      <div style="margin-top:9px;display:flex;flex-direction:column">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <button onClick="{{ r.convert }}" style="display:flex;gap:12px;padding:8px 0;border:0;border-bottom:1px solid rgba(205,212,206,.6);background:transparent;text-align:right;cursor:pointer;width:100%">
+            <div style="width:74px;flex:none;text-align:left;direction:ltr">
+              <div style="font-size:14.5px;font-weight:600;color:#171A18">{{ r.qtyLabel }}</div>
+              <sc-if value="{{ r.gramHint }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:11px;color:#A56A0E;margin-top:1px">{{ r.gramHint }}</div>
+              </sc-if>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14.5px;color:#171A18;line-height:1.35">{{ r.name }}</div>
+              <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:11.5px;color:#6E7A73;margin-top:2px">{{ r.note }}</div>
+              </sc-if>
+            </div>
+            <div style="flex:none;font-size:11px;color:#C4A99B;align-self:center">המר</div>
+          </button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ convertSaveBar }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;display:flex;align-items:center;gap:9px;padding:11px 12px;background:#fff;border:1px solid #1E6B4C;border-radius:12px">
+          <div style="flex:1;font-size:12px;color:#171A18;line-height:1.5">{{ convertSaveBar }}</div>
+          <button onClick="{{ saveConverted }}" style="flex:none;min-height:44px;padding:0 13px;border-radius:11px;border:0;background:#1E6B4C;color:#fff;font-size:12.5px;cursor:pointer">שמירה כגרסה</button>
+        </div>
+      </sc-if>
+
+      <div style="margin-top:24px;font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18">אופן ההכנה</div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:16px">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="5">
+          <div style="display:flex;gap:12px">
+            <div style="width:30px;flex:none;font-family:'Frank Ruhl Libre',serif;font-size:26px;font-weight:500;color:#C4A99B;line-height:1">{{ s.num }}</div>
+            <div style="flex:1">
+              <div style="font-size:14.5px;color:#171A18;line-height:1.5;text-wrap:pretty">{{ s.text }}</div>
+              <sc-if value="{{ s.meta }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:11.5px;color:#6E7A73;margin-top:3px">{{ s.meta }}</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ rNotes }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:24px;background:#E2EFE8;border-radius:12px;padding:12px 13px;font-size:13px;color:#171A18;line-height:1.55">{{ rNotes }}</div>
+      </sc-if>
+
+      <div style="margin-top:22px;display:flex;flex-direction:column;gap:9px">
+        <sc-for list="{{ fields }}" as="f" hint-placeholder-count="5">
+          <div style="display:flex;gap:10px;font-size:13px">
+            <div style="width:74px;flex:none;color:#6E7A73">{{ f.label }}</div>
+            <div style="flex:1;color:#171A18;line-height:1.45">{{ f.value }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:14px;padding:11px 12px;border:1px dashed #C4A99B;border-radius:12px;font-size:13px;color:#171A18">
+        <span style="color:#6E7A73">מכיל: </span>{{ allergens }}
+      </div>
+
+      <sc-if value="{{ hasIssues }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:24px">
+          <div style="font-family:'Frank Ruhl Libre',serif;font-size:15px;font-weight:600;color:#171A18">אם משהו משתבש</div>
+          <div style="margin-top:9px;display:flex;flex-direction:column;gap:11px">
+            <sc-for list="{{ issues }}" as="i" hint-placeholder-count="2">
+              <div style="border-right:2px solid #9E362C;padding-right:10px">
+                <div style="font-size:13.5px;color:#9E362C">{{ i.p }}</div>
+                <div style="font-size:13px;color:#171A18;margin-top:3px;line-height:1.45">{{ i.s }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="margin-top:22px;background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+        <div style="display:flex;align-items:baseline;gap:9px">
+          <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;flex:1">הערות אישיות</div>
+          <div style="font-size:10.5px;color:#1E6B4C">פרטי לגמרי</div>
+        </div>
+        <textarea value="{{ privNote }}" onChange="{{ setPrivNote }}" placeholder="אצלי בתנור 32 דקות. בפעם הבאה להוריד 10 גרם סוכר." style="margin-top:8px;width:100%;height:72px;border:1px solid #CDD4CE;border-radius:11px;padding:10px;font-size:13.5px;line-height:1.55;background:#fff;color:#171A18;outline:0;resize:none"></textarea>
+        <div style="margin-top:6px;font-size:11px;color:#6E7A73;line-height:1.55">ההערות האישיות לא נכנסות לדף ההזמנה, לתווית ולשיתוף, ואף אחד אחר לא רואה אותן.</div>
+      </div>
+
+      <div style="margin-top:12px;background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+        <div style="display:flex;align-items:baseline;gap:9px">
+          <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;flex:1">היסטוריית גרסאות</div>
+          <div style="font-size:12px;color:#171A18">{{ verCurrent }}</div>
+        </div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ verList }}" as="v" hint-placeholder-count="2">
+            <div style="display:flex;gap:10px">
+              <div style="width:30px;flex:none;font-size:13px;font-weight:600;color:#1E6B4C;direction:ltr;text-align:right">{{ v.tag }}</div>
+              <div style="flex:1;border-right:2px solid #CDD4CE;padding-right:10px">
+                <div style="font-size:12.5px;color:#171A18;line-height:1.45">{{ v.what }}</div>
+                <div style="font-size:11px;color:#6E7A73;margin-top:2px">{{ v.when }}</div>
+              </div>
+              <sc-if value="{{ v.canRestore }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ v.restore }}" style="flex:none;min-height:40px;padding:0 11px;border-radius:10px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:11.5px;cursor:pointer">שחזור</button>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ verEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:8px;font-size:12px;color:#6E7A73;line-height:1.6">זו הגרסה הראשונה. כל שמירה של שינוי תיצור כאן גרסה חדשה עם מה שהשתנה.</div>
+        </sc-if>
+      </div>
+
+      <button onClick="{{ goLearn }}" style="margin-top:20px;width:100%;min-height:48px;border-radius:12px;border:1px solid #C4A99B;background:#fff;color:#A56A0E;font-size:14px;cursor:pointer">מצב לימוד — למה המתכון הזה עובד</button>
+      <sc-if value="{{ pro }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ toggleProd }}" style="margin-top:12px;width:100%;padding:13px;border-radius:12px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:14px;font-weight:500;cursor:pointer">{{ prodBtn }}</button>
+
+      <sc-if value="{{ showProd }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{ prodBlocks }}" as="b" hint-placeholder-count="3">
+            <div style="background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+              <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">{{ b.title }}</div>
+              <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ b.items }}" as="it" hint-placeholder-count="3">
+                  <div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px">
+                    <span style="color:#6E7A73">{{ it.k }}</span>
+                    <span style="{{ it.style }}">{{ it.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+
+          <div style="background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+            <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">טבלת רכיבים</div>
+            <div style="margin-top:8px;display:flex;gap:8px;font-size:10.5px;color:#6E7A73;border-bottom:1px solid #CDD4CE;padding-bottom:5px">
+              <div style="flex:1">רכיב</div><div style="width:56px;text-align:left">גרם</div>
+              <div style="width:48px;text-align:left">% אופה</div><div style="width:52px;text-align:left">עלות</div>
+            </div>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+              <div style="display:flex;gap:8px;font-size:12.5px;color:#171A18;padding:6px 0;border-bottom:1px solid rgba(205,212,206,.45)">
+                <div style="flex:1;line-height:1.3">{{ r.name }}</div>
+                <div style="width:56px;text-align:left;direction:ltr">{{ r.grams }}</div>
+                <div style="width:48px;text-align:left;direction:ltr;color:#6E7A73">{{ r.pct }}</div>
+                <div style="width:52px;text-align:left;direction:ltr">{{ r.cost }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ hasTrials }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+              <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">יומן ניסויים</div>
+              <div style="margin-top:8px;display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ trials }}" as="t" hint-placeholder-count="2">
+                  <div>
+                    <div style="font-size:11px;color:#A56A0E">{{ t.date }}</div>
+                    <div style="font-size:13px;color:#171A18;line-height:1.45;margin-top:2px">{{ t.note }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <button onClick="{{ goDiff }}" style="width:100%;min-height:46px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:13.5px;cursor:pointer">השוואה לגרסה אחרת</button>
+          <button onClick="{{ goBatch }}" style="width:100%;min-height:46px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:13.5px;cursor:pointer">מעקב אצווה וטמפרטורות</button>
+          <button onClick="{{ goLabel }}" style="width:100%;padding:12px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:13.5px;cursor:pointer">תווית מוצר להדבקה</button>
+        </div>
+      </sc-if>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isKitchen }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#171A18;color:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 18px 10px;display:flex;align-items:center;gap:12px">
+    <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#E2EFE8;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px">← יציאה</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:rgba(251,251,249,.55)">{{ kProgress }}</div>
+  </div>
+  <div style="padding:0 18px 12px">
+    <div style="display:flex;gap:3px">
+      <sc-for list="{{ kSegments }}" as="s" hint-placeholder-count="5">
+        <button onClick="{{ s.onClick }}" style="{{ s.style }}"></button>
+      </sc-for>
+    </div>
+    <div style="margin-top:7px;display:flex;align-items:baseline;gap:9px">
+      <div style="flex:1;font-size:11.5px;color:rgba(251,251,249,.5)">{{ kDoneLabel }}</div>
+      <div style="font-size:11.5px;color:#E2EFE8">{{ rName }}</div>
+    </div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 22px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:54px;font-weight:500;color:#C4A99B;line-height:1">{{ kNum }}</div>
+    <div style="margin-top:14px;font-size:25px;line-height:1.4;color:#FBFBF9;text-wrap:pretty">{{ kText }}</div>
+    <sc-if value="{{ kMeta }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:16px;font-size:15px;color:#E2EFE8">{{ kMeta }}</div>
+    </sc-if>
+    <sc-if value="{{ kHasTimer }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ kAddTimer }}" style="margin-top:24px;align-self:flex-start;min-height:48px;padding:0 20px;border-radius:13px;border:1px solid rgba(226,239,232,.35);background:transparent;color:#E2EFE8;font-size:15px;cursor:pointer">{{ kTimerBtn }}</button>
+    </sc-if>
+    <sc-if value="{{ hasTimers }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ timers }}" as="t" hint-placeholder-count="2">
+          <div style="{{ t.style }}">
+            <div style="{{ t.clockStyle }}">{{ t.clock }}</div>
+            <div style="flex:1;font-size:12.5px;color:rgba(251,251,249,.8);line-height:1.4">{{ t.label }}</div>
+            <button onClick="{{ t.onToggle }}" style="min-height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(226,239,232,.3);background:transparent;color:#E2EFE8;font-size:12.5px;cursor:pointer">{{ t.toggleLabel }}</button>
+            <button onClick="{{ t.onDrop }}" style="min-width:40px;min-height:40px;border:0;background:transparent;color:rgba(251,251,249,.5);font-size:16px;cursor:pointer">×</button>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+  <div style="padding:16px 18px 42px;display:flex;flex-direction:column;gap:9px">
+    <button onClick="{{ kToggleDone }}" style="{{ kDoneStyle }}">{{ kDoneBtn }}</button>
+    <div style="display:flex;gap:10px">
+      <button onClick="{{ kPrev }}" style="flex:1;min-height:52px;border-radius:14px;border:1px solid rgba(226,239,232,.3);background:transparent;color:#E2EFE8;font-size:15px;cursor:pointer">הקודם</button>
+      <button onClick="{{ kNext }}" style="flex:2;min-height:52px;border-radius:14px;border:0;background:#1E6B4C;color:#fff;font-size:15px;font-weight:500;cursor:pointer">{{ kNextLabel }}</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLabel }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#E9ECE8;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;display:flex;align-items:center;gap:10px;background:#FBFBF9;border-bottom:1px solid #CDD4CE">
+    <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המתכון</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">תווית מוצר</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:22px 18px 40px">
+    <div style="background:#fff;border:1px solid #171A18;border-radius:4px;padding:16px 16px 14px">
+      <div style="font-family:'Frank Ruhl Libre',serif;font-size:21px;font-weight:600;color:#171A18">{{ rName }}</div>
+      <div style="margin-top:10px;font-size:11.5px;color:#171A18;line-height:1.6"><span style="font-weight:600">רכיבים: </span>{{ labelIng }}</div>
+      <div style="margin-top:9px;font-size:11.5px;color:#171A18;line-height:1.6"><span style="font-weight:600">מכיל: </span>{{ allergens }}</div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid #CDD4CE;display:flex;justify-content:space-between;font-size:11px;color:#6E7A73">
+        <span>{{ labelWeight }}</span><span>{{ labelShelf }}</span>
+      </div>
+      <sc-if value="{{ labelBatch }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:5px;font-size:10.5px;color:#6E7A73">{{ labelBatch }}</div>
+      </sc-if>
+      <sc-if value="{{ labelHaccp }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:5px;display:flex;align-items:center;gap:6px">
+          <div style="{{ labelHaccpStyle }}">{{ labelHaccp }}</div>
+          <div style="font-size:10px;color:#6E7A73">{{ labelHaccpNote }}</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;color:#6E7A73;line-height:1.6">הרכב יורד בסדר משקל, מגולגל גם מתוך מתכוני בסיס. בדיקה מול דרישות הסימון היא באחריות היצרן.</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPaste }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:10px">
+    <button onClick="{{ goList }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המחברת</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">הדבקת מתכון</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 16px 30px">
+    <button onClick="{{ newRecipe }}" style="width:100%;min-height:50px;border-radius:13px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:14.5px;font-weight:500;cursor:pointer">כתיבת מתכון חדש מאפס</button>
+    <div style="margin-top:16px;font-size:11.5px;color:#6E7A73;letter-spacing:.03em">או הדבקה של מתכון קיים</div>
+    <div style="margin-top:6px;font-size:13px;color:#6E7A73;line-height:1.6">הדביקו מתכון בטקסט חופשי. התוצאה תיפתח במסך העריכה לאישור ולא תישמר לבד.</div>
+    <textarea value="{{ pasteText }}" onChange="{{ setPasteText }}" placeholder="500 גרם קמח&#10;2 כוסות חלב&#10;לשים 8 דקות ולאפות ב־180 מעלות 25 דקות" style="margin-top:12px;width:100%;height:250px;border:1px solid #CDD4CE;border-radius:13px;padding:12px;font-size:14px;line-height:1.6;background:#fff;color:#171A18;outline:0;resize:none"></textarea>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+      <button onClick="{{ parseSmart }}" style="width:100%;padding:13px;border-radius:12px;border:0;background:#1E6B4C;color:#fff;font-size:14.5px;font-weight:500;cursor:pointer">{{ smartBtn }}</button>
+      <button onClick="{{ parseLocal }}" style="width:100%;padding:13px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:14.5px;cursor:pointer">פענוח מקומי, בלי אינטרנט</button>
+    </div>
+    <sc-if value="{{ pasteMsg }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:12px;padding:11px 12px;border-radius:11px;background:rgba(158,54,44,.08);color:#9E362C;font-size:12.5px;line-height:1.5">{{ pasteMsg }}</div>
+    </sc-if>
+    <div style="margin-top:18px;font-size:11.5px;color:#6E7A73;line-height:1.7">פענוח חכם דורש אינטרנט והוא ניחוש — חובה לבדוק את התוצאה. מחירים לא מיובאים ולא מנוחשים לעולם.</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLocked }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;padding:0 34px;text-align:center">
+  <div style="font-family:'Frank Ruhl Libre',serif;font-size:24px;font-weight:600;color:#171A18">נוסחה מאושרת לייצור</div>
+  <div style="font-size:14px;color:#6E7A73;line-height:1.6">{{ rName }} חסום לעריכה. ביטול הנעילה משנה נוסחה שמיוצרת בפועל.</div>
+  <button onClick="{{ unlock }}" style="padding:13px 22px;border-radius:12px;border:1px solid #A56A0E;background:#fff;color:#A56A0E;font-size:14px;cursor:pointer">ביטול נעילה ועריכה</button>
+  <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer">חזרה למתכון</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#FBFBF9;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div style="padding:58px 16px 10px;border-bottom:1px solid #CDD4CE;display:flex;align-items:baseline;gap:10px">
+    <div style="font-family:'Frank Ruhl Libre',serif;font-size:19px;font-weight:600;color:#171A18">{{ editTitle }}</div>
+    <div style="flex:1"></div>
+    <div style="font-size:12px;color:#6E7A73">{{ draftSummary }}</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:18px">
+    <sc-for list="{{ editSections }}" as="sec" hint-placeholder-count="3">
+      <div>
+        <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">{{ sec.title }}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ sec.fields }}" as="f" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="width:104px;flex:none;font-size:12.5px;color:#171A18">{{ f.label }}</div>
+              <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">
+                <select value="{{ f.value }}" onChange="{{ f.onChange }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:8px;font-size:13.5px;background:#fff;color:#171A18">
+                  <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="3">
+                    <option value="{{ o }}">{{ o }}</option>
+                  </sc-for>
+                </select>
+              </sc-if>
+              <sc-if value="{{ f.isToggle }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ f.onToggle }}" style="{{ f.toggleStyle }}">{{ f.toggleLabel }}</button>
+              </sc-if>
+              <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ true }}">
+                <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.placeholder }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:8px 10px;font-size:13.5px;background:#fff;color:#171A18;outline:0"/>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">רכיבים</div>
+      <div style="margin-bottom:8px;padding:9px 11px;background:#E2EFE8;border-radius:11px;font-size:11.5px;color:#1E6B4C;line-height:1.55">כוס, כף וכפית נתמכות ומומרות לגרם אוטומטית — אבל במטבח מקצועי שוקלים. נפח משתנה לפי אופן המילוי ויכול לסטות עד 20%.</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ draftIngs }}" as="ing" hint-placeholder-count="4">
+          <div style="background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:9px 10px">
+            <div style="display:flex;gap:7px;align-items:center">
+              <input value="{{ ing.name }}" onChange="{{ ing.setName }}" placeholder="שם הרכיב" style="flex:1;border:0;outline:0;font-size:14px;color:#171A18;background:transparent"/>
+              <button onClick="{{ ing.remove }}" style="border:0;background:transparent;color:#9E362C;font-size:17px;cursor:pointer;min-width:44px;min-height:44px">×</button>
+            </div>
+            <div style="margin-top:7px;display:flex;gap:6px">
+              <input value="{{ ing.qty }}" onChange="{{ ing.setQty }}" placeholder="כמות" style="width:66px;border:1px solid #CDD4CE;border-radius:9px;padding:6px 8px;font-size:13px;background:#FBFBF9;color:#171A18;outline:0"/>
+              <select value="{{ ing.unit }}" onChange="{{ ing.setUnit }}" style="width:72px;border:1px solid #CDD4CE;border-radius:9px;padding:6px;font-size:12.5px;background:#FBFBF9;color:#171A18">
+                <sc-for list="{{ unitOptions }}" as="u" hint-placeholder-count="5">
+                  <option value="{{ u }}">{{ u }}</option>
+                </sc-for>
+              </select>
+              <input value="{{ ing.price }}" onChange="{{ ing.setPrice }}" placeholder="מחיר" style="width:62px;border:1px solid #CDD4CE;border-radius:9px;padding:6px 8px;font-size:13px;background:#FBFBF9;color:#171A18;outline:0"/>
+              <select value="{{ ing.priceUnit }}" onChange="{{ ing.setPriceUnit }}" style="flex:1;border:1px solid #CDD4CE;border-radius:9px;padding:6px;font-size:12.5px;background:#FBFBF9;color:#171A18">
+                <option value="ק&quot;ג">לק"ג</option>
+                <option value="ליטר">לליטר</option>
+              </select>
+            </div>
+            <div style="margin-top:7px;display:flex;gap:6px">
+              <button onClick="{{ ing.toggleFlour }}" style="{{ ing.flourStyle }}">קמח</button>
+              <button onClick="{{ ing.toggleLiquid }}" style="{{ ing.liquidStyle }}">נוזל</button>
+              <input value="{{ ing.waterPct }}" onChange="{{ ing.setWaterPct }}" placeholder="% מים" style="width:64px;border:1px solid #CDD4CE;border-radius:9px;padding:6px 8px;font-size:12.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+              <input value="{{ ing.note }}" onChange="{{ ing.setNote }}" placeholder="הערה" style="flex:1;border:1px solid #CDD4CE;border-radius:9px;padding:6px 8px;font-size:12.5px;background:#FBFBF9;color:#6E7A73;outline:0"/>
+            </div>
+          </div>
+        </sc-for>
+        <button onClick="{{ addIng }}" style="padding:10px;border-radius:11px;border:1px dashed #CDD4CE;background:transparent;color:#1E6B4C;font-size:13px;cursor:pointer">הוספת רכיב</button>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">שלבים</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ draftSteps }}" as="s" hint-placeholder-count="3">
+          <div style="background:#fff;border:1px solid #CDD4CE;border-radius:12px;padding:9px 10px">
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <div style="font-family:'Frank Ruhl Libre',serif;font-size:19px;color:#C4A99B;line-height:1.2">{{ s.num }}</div>
+              <textarea value="{{ s.text }}" onChange="{{ s.setText }}" placeholder="תיאור השלב" style="flex:1;border:0;outline:0;font-size:13.5px;line-height:1.5;color:#171A18;background:transparent;resize:none;height:52px"></textarea>
+              <button onClick="{{ s.remove }}" style="border:0;background:transparent;color:#9E362C;font-size:17px;cursor:pointer;min-width:44px;min-height:44px">×</button>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <input value="{{ s.temp }}" onChange="{{ s.setTemp }}" placeholder="טמפ'" style="width:70px;border:1px solid #CDD4CE;border-radius:9px;padding:6px 8px;font-size:12.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+              <input value="{{ s.minutes }}" onChange="{{ s.setMinutes }}" placeholder="דקות" style="width:70px;border:1px solid #CDD4CE;border-radius:9px;padding:6px 8px;font-size:12.5px;background:#FBFBF9;color:#171A18;outline:0"/>
+            </div>
+          </div>
+        </sc-for>
+        <button onClick="{{ addStep }}" style="padding:10px;border-radius:11px;border:1px dashed #CDD4CE;background:transparent;color:#1E6B4C;font-size:13px;cursor:pointer">הוספת שלב</button>
+      </div>
+    </div>
+  </div>
+  <div style="padding:11px 16px 34px;border-top:1px solid #CDD4CE;background:#FBFBF9;display:flex;gap:10px">
+    <button onClick="{{ cancelEdit }}" style="flex:1;padding:14px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:14.5px;cursor:pointer">ביטול</button>
+    <button onClick="{{ saveEdit }}" style="flex:2;padding:14px;border-radius:12px;border:0;background:#1E6B4C;color:#fff;font-size:14.5px;font-weight:500;cursor:pointer">שמירה</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ err }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;bottom:44px;right:16px;left:16px;background:#171A18;color:#FBFBF9;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;z-index:80;display:flex;gap:10px;align-items:center">
+  <div style="flex:1">{{ err }}</div>
+  <button onClick="{{ clearErr }}" style="border:0;background:transparent;color:#E2EFE8;font-size:15px;cursor:pointer">×</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ convOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:92;background:rgba(23,26,24,.42);display:flex;align-items:flex-end">
+  <div style="width:100%;background:#FBFBF9;border-radius:22px 22px 0 0;padding:16px 18px 38px;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;max-height:92%;overflow-y:auto;font-variant-numeric:tabular-nums">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-family:'Frank Ruhl Libre',serif;font-size:20px;font-weight:600;color:#171A18">המרת יחידה</div>
+        <div style="font-size:12.5px;color:#6E7A73;margin-top:2px">{{ convName }}</div>
+      </div>
+      <button onClick="{{ closeConv }}" style="border:0;background:transparent;color:#6E7A73;font-size:20px;cursor:pointer;min-width:44px;min-height:44px">×</button>
+    </div>
+
+    <div style="margin-top:12px;background:#fff;border:1px solid #CDD4CE;border-radius:13px;padding:12px 13px">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <sc-for list="{{ convFrom }}" as="f" hint-placeholder-count="3">
+          <div style="display:flex;gap:10px;align-items:baseline">
+            <div style="width:96px;flex:none;font-size:12px;color:#6E7A73">{{ f.k }}</div>
+            <div style="flex:1;font-size:13.5px;color:#171A18;line-height:1.4">{{ f.v }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;font-size:11.5px;color:#6E7A73;letter-spacing:.03em;margin-bottom:8px">להמיר אל</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      <sc-for list="{{ convTargets }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.he }}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ convOk }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:14px;background:#fff;border:1px solid #1E6B4C;border-radius:13px;padding:14px 14px 13px">
+        <div style="font-size:11.5px;color:#6E7A73">התוצאה</div>
+        <div style="margin-top:4px;font-family:'Frank Ruhl Libre',serif;font-size:28px;font-weight:600;color:#171A18;direction:rtl">{{ convResult }}</div>
+        <div style="margin-top:9px;display:flex;align-items:center;gap:8px">
+          <div style="{{ convBadgeStyle }}">{{ convBadge }}</div>
+          <div style="flex:1;font-size:11.5px;color:#6E7A73;line-height:1.5">{{ convWhy }}</div>
+        </div>
+        <sc-if value="{{ convToolNote }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:7px;font-size:11px;color:#6E7A73">{{ convToolNote }}</div>
+        </sc-if>
+      </div>
+      <button onClick="{{ convCalib }}" style="margin-top:10px;width:100%;min-height:46px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#1E6B4C;font-size:13px;cursor:pointer">לכייל את הרכיב הזה אצלי במטבח</button>
+    </sc-if>
+    <sc-if value="{{ convFail }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:14px;padding:13px 13px;border:1px dashed #9E362C;border-radius:13px">
+        <div style="font-size:13px;color:#9E362C;line-height:1.6">{{ convFail }}</div>
+        <button onClick="{{ convCalib }}" style="margin-top:10px;width:100%;min-height:46px;border-radius:11px;border:1px solid #1E6B4C;background:#E2EFE8;color:#1E6B4C;font-size:13px;cursor:pointer">הוספת כיול אישי</button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ shareOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:90;background:rgba(23,26,24,.42);display:flex;align-items:flex-end">
+  <div style="width:100%;background:#FBFBF9;border-radius:22px 22px 0 0;padding:16px 18px 40px;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;max-height:92%;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-family:'Frank Ruhl Libre',serif;font-size:20px;font-weight:600;color:#171A18">שיתוף מתכון</div>
+      <div style="flex:1"></div>
+      <button onClick="{{ closeShare }}" style="border:0;background:transparent;color:#6E7A73;font-size:20px;cursor:pointer;min-width:44px;min-height:44px">×</button>
+    </div>
+    <div style="font-size:12.5px;color:#6E7A73;line-height:1.55">{{ shareSubtitle }}</div>
+
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:7px">
+      <sc-for list="{{ shareModes }}" as="m" hint-placeholder-count="2">
+        <button onClick="{{ m.onClick }}" style="{{ m.style }}">
+          <div style="font-size:14px;font-weight:500">{{ m.title }}</div>
+          <div style="font-size:11.5px;margin-top:3px;opacity:.75;line-height:1.45">{{ m.desc }}</div>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:16px;font-size:11.5px;color:#6E7A73;letter-spacing:.03em">אל מי לשלוח</div>
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+      <sc-for list="{{ contacts }}" as="c" hint-placeholder-count="4">
+        <button onClick="{{ c.onClick }}" style="{{ c.style }}">
+          <div style="width:34px;height:34px;border-radius:999px;background:#E2EFE8;color:#1E6B4C;display:flex;align-items:center;justify-content:center;font-size:13.5px;flex:none">{{ c.initial }}</div>
+          <div style="flex:1;text-align:right">
+            <div style="font-size:14px;color:#171A18">{{ c.name }}</div>
+            <div style="font-size:11.5px;color:#6E7A73;margin-top:1px">{{ c.role }}</div>
+          </div>
+          <div style="font-size:13px;color:#1E6B4C">{{ c.mark }}</div>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;background:#fff;border:1px solid #CDD4CE;border-radius:12px">
+      <div style="flex:1">
+        <div style="font-size:13.5px;color:#171A18">לשלוח כולל עלויות ותמחור</div>
+        <div style="font-size:11.5px;color:#6E7A73;margin-top:2px">כבוי = רק המתכון, בלי נתוני ייצור</div>
+      </div>
+      <button onClick="{{ toggleShareCosts }}" style="{{ shareCostsStyle }}">{{ shareCostsLabel }}</button>
+    </div>
+
+    <button onClick="{{ doShare }}" style="margin-top:14px;width:100%;min-height:50px;border-radius:13px;border:0;background:#1E6B4C;color:#fff;font-size:15px;font-weight:500;cursor:pointer">{{ shareCta }}</button>
+    <sc-if value="{{ shareNote }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:11px;padding:11px 12px;border-radius:11px;background:#E2EFE8;color:#1E6B4C;font-size:12.5px;line-height:1.55">{{ shareNote }}</div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isOrder }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;background:#E9ECE8;font-family:'Heebo','Assistant','Arial Hebrew',system-ui,sans-serif;font-variant-numeric:tabular-nums">
+  <div class="noprint" style="padding:58px 16px 10px;background:#FBFBF9;border-bottom:1px solid #CDD4CE;display:flex;align-items:center;gap:8px">
+    <button onClick="{{ backRecipe }}" style="border:0;background:transparent;color:#1E6B4C;font-size:14px;cursor:pointer;padding:0 6px;min-height:44px;white-space:nowrap;flex:none">← המתכון</button>
+    <div style="flex:1"></div>
+    <div style="font-size:12.5px;color:#6E7A73">דף הזמנה</div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:14px 14px 30px">
+    <div class="noprint" style="background:#FBFBF9;border:1px solid #CDD4CE;border-radius:13px;padding:11px 12px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11.5px;color:#6E7A73;letter-spacing:.03em">פרטי ההזמנה</div>
+      <sc-for list="{{ orderFields }}" as="f" hint-placeholder-count="3">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="width:88px;flex:none;font-size:12.5px;color:#171A18">{{ f.label }}</div>
+          <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.placeholder }}" style="flex:1;border:1px solid #CDD4CE;border-radius:10px;padding:9px 10px;font-size:13.5px;background:#fff;color:#171A18;outline:0"/>
+        </div>
+      </sc-for>
+      <div style="font-size:11.5px;color:#6E7A73;line-height:1.5">הכמויות בדף נלקחות מהתאמת "כמה להכין" שבמתכון: {{ orderScaleLabel }}</div>
+    </div>
+
+    <div id="orderSheet" style="margin-top:12px;background:#fff;border:1px solid #CDD4CE;border-radius:6px;padding:18px 18px 20px;color:#171A18">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:2px solid #171A18;padding-bottom:9px">
+        <div>
+          <div style="font-family:'Frank Ruhl Libre',serif;font-size:20px;font-weight:600;line-height:1.15">{{ rName }}</div>
+          <div style="font-size:11.5px;color:#6E7A73;margin-top:3px">דף הזמנה לייצור</div>
+        </div>
+        <div style="text-align:left;font-size:11px;color:#6E7A73;line-height:1.6">
+          <div>{{ orderNoLabel }}</div>
+          <div>{{ orderDate }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:11px;display:flex;flex-wrap:wrap;gap:9px">
+        <sc-for list="{{ orderStats }}" as="s" hint-placeholder-count="4">
+          <div style="min-width:88px;border:1px solid #CDD4CE;border-radius:5px;padding:7px 9px">
+            <div style="font-size:10px;color:#6E7A73">{{ s.k }}</div>
+            <div style="font-size:14.5px;font-weight:600;margin-top:2px">{{ s.v }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:14px;font-family:'Frank Ruhl Libre',serif;font-size:14px;font-weight:600">רכיבים לשקילה</div>
+      <div style="margin-top:6px;display:flex;gap:8px;font-size:10px;color:#6E7A73;border-bottom:1px solid #171A18;padding-bottom:4px">
+        <div style="width:22px;flex:none">✓</div><div style="flex:1">רכיב</div>
+        <div style="width:70px;text-align:left">כמות</div><div style="width:46px;text-align:left">{{ orderPctHeader }}</div>
+      </div>
+      <sc-for list="{{ orderRows }}" as="r" hint-placeholder-count="6">
+        <div style="display:flex;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px solid #CDD4CE">
+          <div style="width:22px;flex:none;color:#CDD4CE">☐</div>
+          <div style="flex:1;line-height:1.35">{{ r.name }}<span style="color:#6E7A73">{{ r.noteSuffix }}</span></div>
+          <div style="width:70px;text-align:left;font-weight:600;direction:ltr">{{ r.qty }}</div>
+          <div style="width:46px;text-align:left;color:#6E7A73;direction:ltr">{{ r.pct }}</div>
+        </div>
+      </sc-for>
+      <div style="display:flex;gap:8px;font-size:12.5px;padding:7px 0;font-weight:600">
+        <div style="width:22px;flex:none"></div><div style="flex:1">סך הכל בצק או תערובת</div>
+        <div style="width:70px;text-align:left;direction:ltr">{{ orderTotal }}</div><div style="width:46px"></div>
+      </div>
+
+      <div style="margin-top:12px;font-family:'Frank Ruhl Libre',serif;font-size:14px;font-weight:600">סדר עבודה</div>
+      <div style="margin-top:6px;display:flex;flex-direction:column;gap:7px">
+        <sc-for list="{{ orderSteps }}" as="s" hint-placeholder-count="5">
+          <div style="display:flex;gap:9px;font-size:12px;line-height:1.5">
+            <div style="width:15px;flex:none;color:#6E7A73">{{ s.num }}</div>
+            <div style="flex:1">{{ s.text }}<span style="color:#6E7A73">{{ s.metaSuffix }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ orderCostLine }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:12px;padding-top:8px;border-top:1px solid #CDD4CE;font-size:12px;color:#171A18">{{ orderCostLine }}</div>
+      </sc-if>
+      <div style="margin-top:8px;font-size:11px;color:#6E7A73;line-height:1.6">מכיל: {{ allergens }}</div>
+      <div style="margin-top:12px;display:flex;gap:16px;font-size:10.5px;color:#6E7A73">
+        <div style="flex:1;border-top:1px solid #171A18;padding-top:4px">שקל</div>
+        <div style="flex:1;border-top:1px solid #171A18;padding-top:4px">אפה</div>
+        <div style="flex:1;border-top:1px solid #171A18;padding-top:4px">אישר</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="noprint" style="padding:11px 14px 34px;border-top:1px solid #CDD4CE;background:#FBFBF9;display:flex;gap:9px">
+    <button onClick="{{ openShare }}" style="flex:1;min-height:48px;border-radius:12px;border:1px solid #CDD4CE;background:#fff;color:#171A18;font-size:14px;cursor:pointer">שליחה לאיש קשר</button>
+    <button onClick="{{ doPrint }}" style="flex:2;min-height:48px;border-radius:12px;border:0;background:#1E6B4C;color:#fff;font-size:14.5px;font-weight:500;cursor:pointer">שמירה כ־PDF או הדפסה</button>
+  </div>
+</div>
+</sc-if>
+
+</x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:940},&quot;showCostOnCards&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;התנהגות&quot;},&quot;openProduction&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;התנהגות&quot;}}">
+class Component extends DCLogic {
+  state = { ready: false, screen: 'home', recipes: [], cur: null, query: '', cat: 'הכל',
+    scaleMode: 'recipe', scaleVal: '', scaleIng: '', showProd: false, skin: 'notebook',
+    draft: null, pasteText: '', kStep: 0, err: '',
+    prefs: null, onbStep: 0, view: 'orig', panMine: 'same', kDone: {},
+    myNotes: {}, groupPerms: {}, gid: null, gItem: null, convIng: null, convTo: null };
+
+  async componentDidMount() {
+    const wait = async (key) => {
+      for (let i = 0; i < 80; i++) {
+        if (window[key]) return window[key];
+        await new Promise(res => setTimeout(res, 60));
+      }
+      throw new Error('הטעינה נכשלה: ' + key);
+    };
+    const eng = await wait('PN_ENGINE'), data = await wait('PN_DATA');
+    await wait('PN_MEASURE'); await wait('PN_GROUPS');
+    this.eng = eng; this.CATS = data.CATEGORIES; this.CONTACTS = data.CONTACTS;
+    let recipes = data.RECIPES, prefs = null, myNotes = {}, groupPerms = {};
+    try {
+      const raw = window.storage && await window.storage.getItem('pastry-notebook-v1');
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && p.recipes && p.recipes.length) recipes = p.recipes;
+        if (p && p.prefs) prefs = p.prefs;
+        if (p && p.myNotes) myNotes = p.myNotes;
+        if (p && p.groupPerms) groupPerms = p.groupPerms;
+      }
+    } catch (e) { /* טעינה נכשלה — ממשיכים בברירת מחדל */ }
+    const first = !prefs || !prefs.done;
+    this.setState({ recipes: recipes.map(r => this.migrate(r)), prefs: prefs || window.PN_MEASURE.defaultPrefs('pro'),
+      myNotes, groupPerms, simple: prefs ? !prefs.pro : false,
+      screen: first ? 'onboarding' : 'home', onbStep: 0, ready: true });
+  }
+
+  CCPS = [
+    { id: 'core', label: 'טמפ\' ליבה נמדדה ותועדה', limit: 'מעל 75°C באפייה, או לפי הנוהל של המוצר' },
+    { id: 'chill', label: 'קירור מהיר הושלם', limit: 'מתחת ל־5°C בתוך 4 שעות מסוף האפייה' },
+    { id: 'clean', label: 'משטחים וכלים נוקו לפני העבודה', limit: 'לפי נוהל הניקיון של המטבח' },
+    { id: 'alrg', label: 'הפרדת אלרגנים נשמרה', limit: 'כלים נפרדים או ניקוי מלא בין מוצרים' },
+  ];
+
+  haccpOf(b) {
+    const done = this.CCPS.filter(c => (b.ccp || {})[c.id]).length;
+    const chillBad = Number(b.chillTemp) > 5;
+    const full = done === this.CCPS.length && !chillBad;
+    const chip = (bg, fg) => 'flex:none;padding:2px 8px;border-radius:999px;font-size:10.5px;background:' + bg + ';color:' + fg;
+    if (full) return { done, he: 'HACCP תקין', style: chip('#E2EFE8', '#1E6B4C') };
+    if (chillBad) return { done, he: 'חריגה', style: chip('#F6E3E0', '#9E362C') };
+    if (done === 0) return { done, he: 'לא תועד', style: chip('#EDEFEC', '#6E7A73') };
+    return { done, he: 'חלקי', style: chip('#F6EBD6', '#A56A0E') };
+  }
+
+  migrate(r) {
+    return Object.assign({ tags: [], ingredients: [], steps: [], issues: [], trials: [],
+      manualAllergens: [], notes: '', privateNotes: '', versions: [], pan: null, savedFrom: null,
+      shelfLife: '', storage: '', freezing: '', thawing: '',
+      equipment: '', yieldUnits: 0, unitWeight: 0, targetFC: 0 }, r);
+  }
+
+  async persistAll(o) {
+    const S = this.state;
+    const payload = {
+      recipes: o && o.recipes ? o.recipes : S.recipes,
+      prefs: o && o.prefs ? o.prefs : S.prefs,
+      myNotes: o && o.myNotes ? o.myNotes : (S.myNotes || {}),
+      groupPerms: o && o.groupPerms ? o.groupPerms : (S.groupPerms || {}),
+      saved: Date.now(),
+    };
+    try {
+      if (window.storage) await window.storage.setItem('pastry-notebook-v1', JSON.stringify(payload), { shared: false });
+      this.setState(s => (s.err || '').startsWith('השמירה נכשלה') ? { err: '' } : {});
+    } catch (e) { this.setState({ err: 'השמירה נכשלה: ' + (e && e.message || 'שגיאה לא ידועה') }); }
+  }
+
+  persist(recipes) { return this.persistAll({ recipes }); }
+
+  setPrefs(patch) {
+    const prefs = Object.assign({}, this.state.prefs, patch);
+    const next = { prefs };
+    if (patch.pro !== undefined) next.simple = !patch.pro;
+    this.setState(next);
+    this.persistAll({ prefs });
+  }
+
+  toggleUnit(id) {
+    const P = this.state.prefs || {};
+    const units = (P.units || []).includes(id) ? P.units.filter(x => x !== id) : (P.units || []).concat([id]);
+    this.setPrefs({ units, touchedUnits: true });
+  }
+
+  setTool(tool, ml) {
+    const tools = Object.assign({}, (this.state.prefs || {}).tools, { [tool]: ml });
+    this.setPrefs({ tools });
+  }
+
+  // גרסאות: כל שמירה של מתכון קיים דוחפת תצלום של הגרסה הקודמת
+  versionDiff(oldR, newR) {
+    const e = this.eng, bits = [];
+    if ((oldR.name || '') !== (newR.name || '')) bits.push('שם השתנה');
+    const om = {}, nm = {};
+    (oldR.ingredients || []).forEach(i => { om[i.name] = Number(i.qty) || 0; });
+    (newR.ingredients || []).forEach(i => { nm[i.name] = Number(i.qty) || 0; });
+    const names = [...new Set(Object.keys(om).concat(Object.keys(nm)))];
+    const added = names.filter(n => om[n] == null && nm[n] != null);
+    const gone = names.filter(n => nm[n] == null && om[n] != null);
+    const moved = names.filter(n => om[n] != null && nm[n] != null && om[n] !== nm[n]);
+    if (added.length) bits.push('נוסף ' + added.join(', '));
+    if (gone.length) bits.push('הוסר ' + gone.join(', '));
+    if (moved.length) bits.push('שונתה כמות: ' + moved.slice(0, 3).join(', '));
+    if ((oldR.steps || []).length !== (newR.steps || []).length) bits.push('מספר השלבים שונה');
+    if (!bits.length && e) {
+      const a = e.compute(oldR, this.state.recipes, 1), b = e.compute(newR, this.state.recipes, 1);
+      if (Math.abs(a.actualYield - b.actualYield) > 1) bits.push('התשואה השתנתה');
+    }
+    return bits.length ? bits.join(' · ') : 'שינויים קלים';
+  }
+
+  pushVersion(oldR, newR) {
+    const vs = (oldR.versions || []).slice();
+    vs.push({ tag: 'V' + (vs.length + 1), at: new Date().toISOString().slice(0, 10),
+      what: this.versionDiff(oldR, newR), snapshot: Object.assign({}, oldR, { versions: undefined }) });
+    return vs;
+  }
+
+  img(r) {
+    const known = ['ganache', 'brioche', 'croissant', 'pastrycream', 'brioche-choc'];
+    if (known.includes(r.id)) return 'images/r-' + r.id + '.png';
+    const i = Math.max(0, (this.CATS || []).indexOf(r.category));
+    return 'images/cat-' + i + '.png';
+  }
+
+  cur() { return this.state.recipes.find(r => r.id === this.state.cur); }
+
+  factor(r, c0) {
+    const { scaleMode, scaleVal, scaleIng } = this.state;
+    const v = parseFloat(scaleVal);
+    if (scaleMode === 'recipe' || !v || v <= 0) return 1;
+    if (scaleMode === 'units') return c0.unitsActual ? v / c0.unitsActual : 1;
+    if (scaleMode === 'weight') return c0.actualYield ? v / c0.actualYield : 1;
+    if (scaleMode === 'stock') {
+      const row = c0.rows.find(x => x.ing.id === scaleIng) || c0.rows[0];
+      return row && row.g ? v / row.g : 1;
+    }
+    return 1;
+  }
+
+  newDraft(extra) {
+    return Object.assign(this.migrate({ id: 'r' + Date.now(), name: '', category: 'אחר',
+      createdAt: new Date().toISOString().slice(0, 10) }),
+      { yieldUnits: '', unitWeight: '', targetFC: '' }, extra || {});
+  }
+
+  doParseLocal = async () => {
+    const p = window.PN_PARSER;
+    const t = this.state.pasteText.trim();
+    if (!t || !p) return this.setState({ pasteMsg: t ? 'מנוע הפענוח לא נטען' : 'אין טקסט לפענוח' });
+    const res = p.parseLocal(t);
+    if (!res.ingredients.length && !res.steps.length) return this.setState({ pasteMsg: 'לא זוהו רכיבים או שלבים' });
+    const first = t.split('\n')[0].trim();
+    const name = first.length < 45 ? first : '';
+    const steps = name ? res.steps.filter(s => s.text.trim() !== name) : res.steps;
+    this.setState({ screen: 'edit', pasteMsg: '', isNew: true,
+      draft: this.newDraft({ name, ingredients: res.ingredients, steps }) });
+  };
+
+  doParseSmart = async () => {
+    const p = window.PN_PARSER;
+    const t = this.state.pasteText.trim();
+    if (!t || !p) return this.setState({ pasteMsg: t ? 'מנוע הפענוח לא נטען' : 'אין טקסט לפענוח' });
+    this.setState({ smartBusy: true, pasteMsg: '' });
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000,
+          messages: [{ role: 'user', content: p.SMART_PROMPT(t, this.CATS) }] }),
+      });
+      if (!r.ok) throw new Error('שרת החזיר ' + r.status);
+      const j = await r.json();
+      const txt = (j.content || []).map(x => x.text).join('');
+      const obj = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1));
+      (obj.ingredients || []).forEach((x, i) => { x.id = 'a' + i; delete x.price; });
+      (obj.steps || []).forEach((x, i) => { x.id = 'b' + i; x.tempUnit = 'C'; });
+      this.setState({ smartBusy: false, screen: 'edit', isNew: true, draft: this.newDraft(obj) });
+    } catch (err) {
+      this.setState({ smartBusy: false, pasteMsg: 'הפענוח החכם נכשל: ' + (err && err.message || 'שגיאה') + '. אפשר להשתמש בפענוח המקומי.' });
+    }
+  };
+
+  startEdit(force) {
+    const r = this.state.recipes.find(x => x.id === this.state.cur);
+    if (!r) return;
+    if (r.locked && !force) return this.setState({ screen: 'edit', draft: null });
+    const d = Object.assign({}, r, { locked: force ? false : r.locked,
+      tagsText: (r.tags || []).join(', '), allergensText: (r.manualAllergens || []).join(', ') });
+    this.setState({ screen: 'edit', draft: d, isNew: false });
+  }
+
+  save = () => {
+    const d = Object.assign({}, this.state.draft);
+    if (!(d.name || '').trim()) return this.setState({ err: 'למתכון חייב להיות שם' });
+    d.tags = (d.tagsText || '').split(',').map(s => s.trim()).filter(Boolean);
+    d.manualAllergens = (d.allergensText || '').split(',').map(s => s.trim()).filter(Boolean);
+    delete d.tagsText; delete d.allergensText;
+    ['yieldUnits', 'unitWeight', 'yieldActual', 'weightBefore', 'weightAfter', 'targetFC', 'ddt', 'flourTemp', 'roomTemp', 'friction']
+      .forEach(k => { d[k] = d[k] === '' || d[k] == null ? (k === 'yieldActual' ? '' : 0) : Number(d[k]); });
+    (d.ingredients || []).forEach(i => { i.qty = Number(i.qty) || 0; if (i.price !== '' && i.price != null) i.price = Number(i.price); });
+    const prev = this.state.recipes.find(x => x.id === d.id);
+    if (prev) d.versions = this.pushVersion(prev, d);
+    const recipes = prev ? this.state.recipes.map(x => x.id === d.id ? d : x) : this.state.recipes.concat([d]);
+    this.setState({ recipes, draft: null, isNew: false, screen: 'recipe', cur: d.id });
+    this.persist(recipes);
+  };
+
+  ensureTick() {
+    if (this.tick) return;
+    this.tick = setInterval(() => this.setState(s => ({
+      timers: (s.timers || []).map(t => t.running && t.left > 0 ? Object.assign({}, t, { left: t.left - 1 }) : t),
+    })), 1000);
+  }
+
+  addTimer(minutes, label) {
+    const t = { id: 't' + Date.now(), label, left: Math.round(minutes * 60), total: Math.round(minutes * 60), running: true };
+    this.setState(s => ({ timers: (s.timers || []).concat([t]) }));
+    this.ensureTick();
+  }
+
+  patchTimer(id, patch) {
+    this.setState(s => ({ timers: (s.timers || []).map(t => t.id === id ? Object.assign({}, t, patch) : t) }));
+  }
+
+  dropTimer(id) {
+    this.setState(s => ({ timers: (s.timers || []).filter(t => t.id !== id) }));
+  }
+
+  componentWillUnmount() { clearInterval(this.tick); }
+
+  go = (screen, cur) => this.setState(s => ({ screen, cur: cur === undefined ? s.cur : cur, showProd: false,
+    kStep: 0, kDone: screen === 'kitchen' ? {} : s.kDone, view: cur === undefined ? s.view : 'orig',
+    panMine: cur === undefined ? s.panMine : 'same', convIng: null, timerOn: false, timerLeft: null }));
+
+  PANS = [
+    { id: 'same', label: 'כמו במתכון', pan: null },
+    { id: 'r18', label: 'Ø18 ס"מ', pan: { kind: 'round', diameter: 18, height: 6 } },
+    { id: 'r20', label: 'Ø20 ס"מ', pan: { kind: 'round', diameter: 20, height: 6 } },
+    { id: 'r22', label: 'Ø22 ס"מ', pan: { kind: 'round', diameter: 22, height: 6 } },
+    { id: 'r24', label: 'Ø24 ס"מ', pan: { kind: 'round', diameter: 24, height: 6 } },
+    { id: 'r26', label: 'Ø26 ס"מ', pan: { kind: 'round', diameter: 26, height: 6 } },
+    { id: 'x2030', label: '20×30 ס"מ', pan: { kind: 'rect', width: 20, length: 30, height: 5 } },
+    { id: 'x2540', label: '25×40 ס"מ', pan: { kind: 'rect', width: 25, length: 40, height: 5 } },
+    { id: 'gn11', label: 'GN 1/1', pan: { kind: 'gn', gn: '1/1', height: 6 } },
+    { id: 'gn12', label: 'GN 1/2', pan: { kind: 'gn', gn: '1/2', height: 6 } },
+  ];
+
+  // המרת כמות בגרם למדידה ביתית קריאה, לפי כלי המדידה של המשתמש
+  homeLabel(ing, grams) {
+    const M = window.PN_MEASURE, P = this.state.prefs;
+    if (!M) return null;
+    for (const u of ['cup', 'tbsp', 'tsp']) {
+      const res = M.convert({ name: ing.name, qty: grams, unit: 'g', unitWeight: ing.unitWeight, gPer100: ing.gPer100 }, u, P);
+      if (!res.ok) return null;
+      if (res.value >= 0.24 || u === 'tsp') return res;
+    }
+    return null;
+  }
+
+  saveConverted = () => {
+    const S = this.state, e = this.eng, M = window.PN_MEASURE;
+    const r = S.recipes.find(x => x.id === S.cur);
+    if (!r || !e || !M) return;
+    const c = e.compute(r, S.recipes, 1);
+    const toG = S.view === 'g';
+    const ings = (r.ingredients || []).map(ing => {
+      const row = c.rows.find(x => x.ing.id === ing.id);
+      if (!row || ing.subId) return Object.assign({}, ing);
+      if (toG) return Object.assign({}, ing, { qty: Math.round(row.g), unit: 'גרם' });
+      const h = this.homeLabel(ing, row.g);
+      if (!h) return Object.assign({}, ing);
+      const u = M.unit(h.text.includes('כוס') ? 'cup' : h.text.includes('כפית') ? 'tsp' : 'tbsp');
+      return Object.assign({}, ing, { qty: Math.round(h.value * 4) / 4, unit: u.he });
+    });
+    const copy = Object.assign({}, r, { id: 'r' + Date.now(), ingredients: ings, versions: [],
+      versionOf: r.id, versionNote: toG ? 'גרסה בגרמים' : 'גרסה במדידות ביתיות',
+      name: r.name + (toG ? ' — בגרמים' : ' — מדידות ביתיות') });
+    const recipes = S.recipes.concat([copy]);
+    this.setState({ recipes, cur: copy.id, view: 'orig', err: 'נשמרה גרסה: ' + copy.name });
+    this.persistAll({ recipes });
+  };
+
+  setPrivNote = (ev) => {
+    const v = ev.target.value, S = this.state;
+    const recipes = S.recipes.map(x => x.id === S.cur ? Object.assign({}, x, { privateNotes: v }) : x);
+    this.setState({ recipes });
+    clearTimeout(this._nt);
+    this._nt = setTimeout(() => this.persistAll({ recipes }), 700);
+  };
+
+  renderVals() {
+    const e = this.eng, S = this.state;
+    const badge = (label, bg, col) => ({ label, style: 'font-size:10.5px;padding:3px 8px;border-radius:999px;background:' + bg + ';color:' + col });
+    const list = S.recipes.filter(r => {
+      if (S.cat !== 'הכל' && r.category !== S.cat) return false;
+      const q = S.query.trim();
+      if (!q) return true;
+      return (r.name + ' ' + (r.tags || []).join(' ') + ' ' + (r.ingredients || []).map(i => i.name).join(' ')).includes(q);
+    }).map(r => {
+      const badges = [];
+      if (r.isSub) badges.push(badge('מתכון בסיס', '#E2EFE8', '#1E6B4C'));
+      if (r.locked) badges.push(badge('נוסחה מאושרת', 'rgba(165,106,14,.12)', '#A56A0E'));
+      if (r.versionOf) badges.push(badge('גרסה', 'rgba(23,26,24,.06)', '#6E7A73'));
+      (r.tags || []).forEach(t => badges.push(badge(t, 'transparent', '#6E7A73')));
+      let y = r.yieldUnits ? r.yieldUnits + ' יח\' · ' + r.unitWeight + ' גר\' ליחידה'
+        : (r.yieldActual ? e.fmtG(Number(r.yieldActual)) : '—');
+      if (this.props.showCostOnCards && e) {
+        const cc = e.compute(r, S.recipes, 1);
+        y += '  ·  ' + (cc.costPerUnit ? e.nis(cc.costPerUnit) + ' ליחידה' : e.nis(cc.costPerKg) + ' לק"ג');
+      }
+      return { id: r.id, name: r.name, category: r.category, yieldLabel: y, badges, slotId: 'r-' + r.id, img: this.img(r),
+        onClick: () => this.go('recipe', r.id) };
+    });
+    const cats = ['הכל'].concat(this.CATS || []);
+    const catChips = cats.map(c => ({ label: c, onClick: () => this.setState({ cat: c }),
+      style: 'flex:none;min-height:44px;padding:0 14px;border-radius:999px;font-size:12.5px;cursor:pointer;border:1px solid ' +
+        (S.cat === c ? '#1E6B4C' : '#CDD4CE') + ';background:' + (S.cat === c ? '#1E6B4C' : '#fff') +
+        ';color:' + (S.cat === c ? '#fff' : '#6E7A73') }));
+    const R = {};
+    const rec = S.recipes.find(x => x.id === S.cur);
+    if (S.screen === 'diff' && rec && e) {
+      const others = S.recipes.filter(x => x.id !== rec.id);
+      const otherId = S.diffOther && others.some(x => x.id === S.diffOther) ? S.diffOther
+        : (others.find(x => x.id === rec.versionOf || x.versionOf === rec.id) || others[0] || {}).id;
+      const other = S.recipes.find(x => x.id === otherId);
+      R.diffOptions = others.map(x => ({ id: x.id, name: x.name }));
+      R.diffOther = otherId; R.diffOtherName = (other || {}).name || '—';
+      R.setDiffOther = ev => this.setState({ diffOther: ev.target.value });
+      if (other) {
+        const ca = e.compute(rec, S.recipes, 1), cb = e.compute(other, S.recipes, 1);
+        const stat = (k, va, vb, fmtf, better) => {
+          const d = va - vb;
+          const txt = !isFinite(d) || Math.abs(d) < 0.05 ? '—' : (d > 0 ? '+' : '') + (Math.abs(d) >= 10 ? Math.round(d) : Math.round(d * 10) / 10);
+          const col = txt === '—' ? ';color:#6E7A73' : (better === 'down' ? (d < 0 ? ';color:#1E6B4C' : ';color:#9E362C')
+            : better === 'up' ? (d > 0 ? ';color:#1E6B4C' : ';color:#9E362C') : ';color:#6E7A73');
+          return { k, a: fmtf(va), b: fmtf(vb), delta: txt, deltaColor: col };
+        };
+        const pct = v => v.toFixed(1) + '%';
+        R.diffStats = [
+          stat('הידרציה', ca.hydration, cb.hydration, pct),
+          stat('מים בפועל', ca.trueHydration, cb.trueHydration, pct),
+          stat('תשואה בגרם', ca.actualYield, cb.actualYield, v => Math.round(v)),
+          stat('פחת אפייה', ca.bakeLoss, cb.bakeLoss, pct, 'down'),
+          stat('עלות ליחידה', ca.costPerUnit, cb.costPerUnit, v => e.nis(v), 'down'),
+          stat('עלות לק"ג', ca.costPerKg, cb.costPerKg, v => e.nis(v), 'down'),
+        ];
+        const map = (c) => { const m = {}; c.rows.forEach(x => { m[x.ing.name] = x; }); return m; };
+        const ma = map(ca), mb = map(cb);
+        const names = [...new Set(Object.keys(ma).concat(Object.keys(mb)))];
+        R.diffRows = names.map(n => {
+          const a = ma[n], b = mb[n];
+          const ga = a ? a.g : 0, gb = b ? b.g : 0;
+          if (Math.abs(ga - gb) < 0.5) return null;
+          const tag = !b ? 'חדש' : !a ? 'הוסר' : (ga > gb ? 'עלה' : 'ירד');
+          const col = tag === 'חדש' ? 'color:#1E6B4C' : tag === 'הוסר' ? 'color:#9E362C' : 'color:#A56A0E';
+          return { name: n, a: a ? e.fmtG(ga) : '—', b: b ? e.fmtG(gb) : '—', tag, tagStyle: col };
+        }).filter(Boolean);
+        R.diffNote = rec.versionNote ? 'תיאור הגרסה: ' + rec.versionNote
+          : 'השוואה בכמויות המקוריות של שני המתכונים, בלי התאמת אצווה.';
+      }
+    }
+    if (S.screen === 'batch' && rec) {
+      const b = S.batchDraft || {};
+      const setB = k => ev => this.setState(s => ({ batchDraft: Object.assign({}, s.batchDraft, { [k]: ev.target.value }) }));
+      R.batchFields = [['מספר אצווה', 'code', 'אוטומטי לפי תאריך'], ['תאריך ייצור', 'date', 'למשל 14.9'],
+        ['טמפ\' ליבה סופית', 'coreTemp', '°C'], ['טמפ\' קירור', 'chillTemp', '°C'],
+        ['משקל אצווה בגרם', 'weight', ''], ['אחראי', 'by', 'שם']]
+        .map(([label, k, ph]) => ({ label, placeholder: ph, value: b[k] || '', onChange: setB(k) }));
+      const ccps = this.CCPS;
+      const checked = b.ccp || {};
+      R.ccpRows = ccps.map(c => {
+        const on = !!checked[c.id];
+        return { label: c.label, limit: c.limit, mark: on ? '✓' : '',
+          boxStyle: 'flex:none;width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:14px;line-height:1;' +
+            'display:flex;align-items:center;justify-content:center;border:1px solid ' +
+            (on ? '#1E6B4C' : '#CDD4CE') + ';background:' + (on ? '#1E6B4C' : '#fff') + ';color:#fff',
+          onToggle: () => this.setState(s => ({ batchDraft: Object.assign({}, s.batchDraft,
+            { ccp: Object.assign({}, (s.batchDraft || {}).ccp, { [c.id]: !on }) }) })) };
+      });
+      R.photoNote = 'הצילום נשמר על המכשיר בלבד ומשויך לאצווה. העלאה לשרת — REQUIRES BACKEND.';
+      R.batchList = (rec.batches || []).slice().reverse().map(x => ({
+        code: x.code, date: x.date || '',
+        detail: [x.weight ? 'משקל ' + x.weight + ' גר\'' : null, x.coreTemp ? 'ליבה ' + x.coreTemp + '°C' : null,
+          x.chillTemp ? 'קירור ' + x.chillTemp + '°C' : null, x.by ? 'אחראי ' + x.by : null].filter(Boolean).join('  ·  '),
+        haccp: this.haccpOf(x).he, haccpStyle: this.haccpOf(x).style,
+        ccpSummary: this.haccpOf(x).done + ' מתוך ' + ccps.length + ' נקודות בקרה' +
+          (x.photo ? '  ·  עם צילום' : ''),
+        alert: Number(x.chillTemp) > 5 ? 'טמפרטורת הקירור מעל 5 מעלות — לבדוק את שרשרת הקור.' : '',
+        remove: () => {
+          const recipes = S.recipes.map(y => y.id === rec.id
+            ? Object.assign({}, y, { batches: (y.batches || []).filter(z => z.code !== x.code) }) : y);
+          this.setState({ recipes }); this.persist(recipes);
+        },
+      }));
+      R.saveBatch = () => {
+        const d = new Date();
+        const code = (b.code || '').trim() ||
+          ('L' + String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') +
+            String(d.getDate()).padStart(2, '0') + '-' + String((rec.batches || []).length + 1).padStart(2, '0'));
+        const slot = document.getElementById('batch-photo');
+        const photo = slot && (slot.getAttribute('src') || slot.value) ? true : false;
+        const rowB = Object.assign({}, b, { code, date: b.date || d.toLocaleDateString('he-IL'),
+          ccp: Object.assign({}, b.ccp), photo });
+        const recipes = S.recipes.map(y => y.id === rec.id
+          ? Object.assign({}, y, { batches: (y.batches || []).concat([rowB]) }) : y);
+        this.setState({ recipes, batchDraft: {}, err: 'אצווה ' + code + ' נרשמה' });
+        this.persist(recipes);
+      };
+    }
+    if (S.screen === 'learn' && rec && e && window.PN_LEARN && this.lastC) {
+      const c = this.lastC;
+      const hideCost = x => !(S.simple && /מחיר|פוד קוסט|עלות/.test(x));
+      R.learnCards = window.PN_LEARN.cards(c, rec).filter(x => !(S.simple && x.id === 'cost'));
+      const open = S.drillOpen || {};
+      R.learnDrills = window.PN_LEARN.drills(c, rec, e, S.recipes).filter(d => hideCost(d.q + ' ' + d.a)).map((d, i) => ({
+        q: d.q, a: d.a, open: !!open[i], btn: open[i] ? 'סגירה' : 'הצגת התשובה',
+        toggle: () => this.setState(s => ({ drillOpen: Object.assign({}, s.drillOpen, { [i]: !(s.drillOpen || {})[i] }) })),
+      }));
+      R.hasDrills = R.learnDrills.length > 0;
+    }
+    if (S.screen === 'stock' && e) {
+      const byName = {};
+      S.recipes.forEach(x => (x.ingredients || []).forEach(i => {
+        if (i.subId) return;
+        byName[i.name] = byName[i.name] || { name: i.name, price: i.price, priceUnit: i.priceUnit || 'ק"ג', uses: 0, prices: [] };
+        byName[i.name].uses++;
+        if (i.price != null && i.price !== '') byName[i.name].prices.push(Number(i.price));
+      }));
+      R.stockRows = Object.values(byName).sort((a, b) => b.uses - a.uses).map(s => {
+        const uniq = [...new Set(s.prices)];
+        const draftPrice = (S.stockDraft || {})[s.name];
+        return {
+          name: s.name, unitLabel: 'ש"ח ל' + (s.priceUnit === 'ליטר' ? 'ליטר' : 'ק"ג'),
+          usage: s.uses === 1 ? 'מתכון אחד' : s.uses + ' מתכונים',
+          price: draftPrice != null ? draftPrice : (uniq.length === 1 ? uniq[0] : (uniq[0] == null ? '' : uniq[0])),
+          warn: uniq.length > 1 ? 'מחירים שונים במתכונים שונים: ' + uniq.join(' / ') + ' — עדכון יאחד אותם.'
+            : (uniq.length === 0 ? 'אין מחיר מוזן, כל חישובי העלות של הרכיב הזה מציגים אפס.' : ''),
+          setPrice: ev => this.setState(st => ({ stockDraft: Object.assign({}, st.stockDraft, { [s.name]: ev.target.value }) })),
+          apply: () => {
+            const v = (S.stockDraft || {})[s.name];
+            const num = Number(v);
+            if (v === '' || v == null || !isFinite(num)) return this.setState({ err: 'הזינו מחיר תקין לפני העדכון' });
+            const recipes = S.recipes.map(x => Object.assign({}, x, {
+              ingredients: (x.ingredients || []).map(i => i.name === s.name && !i.subId
+                ? Object.assign({}, i, { price: num, priceUnit: i.priceUnit || s.priceUnit }) : i),
+            }));
+            this.setState({ recipes, err: 'המחיר של ' + s.name + ' עודכן ב־' + s.uses + ' מתכונים' });
+            this.persist(recipes);
+          },
+        };
+      });
+    }
+    if (S.screen === 'plan' && e) {
+      const qtys = S.planQty || {};
+      const bump = (id, d) => this.setState(s => {
+        const q = Object.assign({}, s.planQty);
+        q[id] = Math.max(0, (q[id] || 0) + d);
+        return { planQty: q };
+      });
+      R.planPicker = S.recipes.map(x => {
+        const c1 = e.compute(x, S.recipes, 1);
+        const unit = c1.unitsActual ? Math.round(c1.unitsActual) + ' יח\' לאצווה' : e.fmtG(c1.actualYield) + ' לאצווה';
+        return { name: x.name, hint: x.category + '  ·  ' + unit, qty: qtys[x.id] || 0,
+          plus: () => bump(x.id, 1), minus: () => bump(x.id, -1) };
+      });
+      const chosen = S.recipes.filter(x => (qtys[x.id] || 0) > 0);
+      const [hh, mm] = (S.planTime || '07:00').split(':');
+      const endMin = (Number(hh) || 7) * 60 + (Number(mm) || 0);
+      const clock = (m) => {
+        let v = ((m % 1440) + 1440) % 1440;
+        return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0');
+      };
+      R.planSchedule = chosen.map(x => {
+        const batches = qtys[x.id];
+        const total = (x.steps || []).reduce((a, s) => a + (Number(s.minutes) || 0), 0);
+        const start = endMin - total;
+        let t = start;
+        const steps = (x.steps || []).map((s, i) => {
+          const at = (t < 0 ? '−' : '') + clock(t); t += Number(s.minutes) || 0;
+          return { at, text: (i + 1) + '. ' + s.text.slice(0, 96) };
+        });
+        const c1 = e.compute(x, S.recipes, batches);
+        const dayTag = start < 0 ? (start < -1440 ? 'לפני יומיים ' : 'אתמול ') : '';
+        return { name: x.name, start: dayTag + clock(start), startAbs: start, steps,
+          meta: batches + (batches === 1 ? ' אצווה' : ' אצוות') + '  ·  ' +
+            (c1.unitsActual ? Math.round(c1.unitsActual) + ' יחידות' : e.fmtG(c1.actualYield)) +
+            '  ·  ' + Math.floor(total / 60) + ' שע\' ' + (total % 60) + ' דק\'' };
+      }).sort((a, b) => a.startAbs - b.startAbs);
+      R.planScheduleTitle = chosen.length ? 'חישוב לאחור מאספקה ב־' + clock(endMin) : 'בחרו מתכונים כדי לראות לוח זמנים';
+      const agg = {};
+      let totalCost = 0;
+      chosen.forEach(x => {
+        const c1 = e.compute(x, S.recipes, qtys[x.id]);
+        c1.rows.forEach(row => {
+          const k = row.ing.subId ? 'sub:' + row.ing.subId : row.ing.name;
+          const name = row.ing.subId ? row.ing.name + ' (מתכון בסיס)' : row.ing.name;
+          agg[k] = agg[k] || { name, g: 0, cost: 0 };
+          agg[k].g += row.g; agg[k].cost += row.cost; totalCost += row.cost;
+        });
+      });
+      R.planBuy = Object.values(agg).sort((a, b) => b.g - a.g)
+        .map(x => ({ name: x.name, qty: e.fmtG(x.g), cost: x.cost ? e.nis(x.cost) : '—' }));
+      R.planBuyTotal = e.nis(totalCost);
+      R.planBuyNote = chosen.length
+        ? 'מתכוני בסיס מופיעים כשורה אחת. רכיב בלי מחיר מוזן מוצג בלי עלות ולא נספר בסך.'
+        : 'בחרו מתכונים וכמויות למעלה.';
+    }
+    if (S.screen === 'home' && e) {
+      const last = S.recipes.find(x => x.id === (S.cur || (S.recipes[1] || S.recipes[0] || {}).id)) || S.recipes[0];
+      if (last) {
+        const lc = e.compute(last, S.recipes, 1);
+        R.lastName = last.name;
+        R.lastMeta = last.category + '  ·  ' + (lc.unitsActual ? Math.round(lc.unitsActual) + ' יחידות' : e.fmtG(lc.actualYield));
+        R.openLast = () => this.go('recipe', last.id);
+        R.lastImg = this.img(last);
+      }
+      R.todayLabel = new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' });
+      R.catTiles = (this.CATS || []).map((c, i) => {
+        const n = S.recipes.filter(x => x.category === c).length;
+        return { name: c, slotId: 'cat-' + i, img: 'images/cat-' + i + '.png',
+          count: n === 0 ? 'ריק' : n === 1 ? 'מתכון אחד' : n + ' מתכונים',
+          onClick: () => this.setState({ screen: 'list', cat: c, query: '' }) };
+      });
+      R.subCards = S.recipes.filter(x => x.isSub).map((x, i) => {
+        const sc = e.compute(x, S.recipes, 1);
+        return { name: x.name, slotId: 'sub-' + i, img: this.img(x),
+          meta: e.fmtG(sc.actualYield) + '  ·  ' + e.nis(sc.costPerKg) + ' לק"ג',
+          onClick: () => this.go('recipe', x.id) };
+      });
+    }
+    const r = S.recipes.find(x => x.id === S.cur);
+    if (r && e) {
+      const c0 = e.compute(r, S.recipes, 1);
+      const f = this.factor(r, c0);
+      const c = f === 1 ? c0 : e.compute(r, S.recipes, f);
+      this.lastC = c; this.lastR = r;
+      const totalMin = (r.steps || []).reduce((a, s) => a + (Number(s.minutes) || 0), 0);
+      const hrs = totalMin >= 60 ? Math.floor(totalMin / 60) + ' שע\'' + (totalMin % 60 ? ' ' + (totalMin % 60) + ' דק\'' : '') : totalMin + ' דק\'';
+      R.rName = r.name; R.heroSlotId = 'hero-' + r.id; R.heroImg = this.img(r);
+      R.rMeta = [c.unitsActual ? Math.round(c.unitsActual) + ' יחידות' : e.fmtG(c.actualYield),
+        r.unitWeight ? r.unitWeight + ' גר\' ליחידה' : null, totalMin ? hrs + ' עבודה ואפייה' : null]
+        .filter(Boolean).join('  ·  ');
+      R.rVersionNote = r.versionNote || '';
+      R.rParentName = (S.recipes.find(x => x.id === r.versionOf) || {}).name || '';
+      R.rNotes = r.notes || '';
+      const volQty = (ing, g) => {
+        const per = e.cupGrams(ing) / (ing.unit === 'כוס' ? 1 : ing.unit === 'כף' ? 16 : 48);
+        const n = per ? g / per : 0;
+        const round = Math.abs(n - Math.round(n)) < 0.08 ? String(Math.round(n)) : (Math.round(n * 4) / 4).toString();
+        const many = Number(round) > 1;
+        const word = ing.unit === 'כוס' ? (many ? 'כוסות' : 'כוס')
+          : ing.unit === 'כף' ? (many ? 'כפות' : 'כף') : (many ? 'כפיות' : 'כפית');
+        return round + ' ' + word;
+      };
+      const origLabel = (row) => row.ing.subId ? e.fmtG(row.g)
+        : (e.VOL_UNITS.includes(row.ing.unit) ? volQty(row.ing, row.g)
+          : (row.ing.unit === "יח'" ? Math.round(row.g / (Number(row.ing.unitWeight) || 1)) + " יח'" : e.fmtG(row.g)));
+      const viewLabel = (row) => {
+        if (S.view === 'g' || row.ing.subId) return e.fmtG(row.g);
+        if (S.view === 'home') {
+          const h = this.homeLabel(row.ing, row.g);
+          return h ? h.text : e.fmtG(row.g);
+        }
+        return origLabel(row);
+      };
+      R.rows = c.rows.map(row => ({
+        qtyLabel: viewLabel(row),
+        gramHint: S.view === 'g' ? '' : (S.view === 'home'
+          ? (this.homeLabel(row.ing, row.g) ? e.fmtG(row.g) : 'נשקל בגרם, אין נתון אמין')
+          : (e.VOL_UNITS.includes(row.ing.unit) ? e.fmtG(row.g) : '')),
+        convert: () => this.setState({ convIng: { id: row.ing.id, name: row.ing.name, qty: row.g, unit: 'גרם',
+          origQty: row.ing.qty, origUnit: row.ing.unit, unitWeight: row.ing.unitWeight, gPer100: row.ing.gPer100,
+          sub: !!row.ing.subId }, convTo: null }),
+        name: row.ing.name, note: row.ing.note || '',
+        grams: Math.round(row.g), pct: c.flour ? row.bakerPct.toFixed(0) + '%' : '—',
+        cost: row.cost ? e.nis(row.cost) : '—',
+      }));
+      R.steps = (r.steps || []).map((s, i) => ({
+        num: i + 1, text: s.text,
+        meta: [s.temp ? s.temp + '°C' : null, s.minutes ? s.minutes + ' דקות' : null].filter(Boolean).join('  ·  '),
+      }));
+      R.fields = [['ציוד', r.equipment], ['חיי מדף', r.shelfLife], ['אחסון', r.storage],
+        ['הקפאה', r.freezing], ['הפשרה', r.thawing]].filter(x => x[1]).map(x => ({ label: x[0], value: x[1] }));
+      R.allergens = c.allergens.length ? c.allergens.join(' · ') : 'לא זוהו אלרגנים';
+      R.issues = r.issues || []; R.hasIssues = (r.issues || []).length > 0;
+      R.trials = r.trials || []; R.hasTrials = (r.trials || []).length > 0;
+      const warn = c.unitsWarn ? ';color:#9E362C' : '';
+      const cell = (k, v, st) => ({ k, v, style: 'color:#171A18;font-weight:500' + (st || '') });
+      R.prodBlocks = [
+        { title: 'תשואה ופחת', items: [
+          cell('תשואה תאורטית', e.fmtG(c.theoretical)),
+          cell('תשואה מעשית', e.fmtG(c.actualYield)),
+          cell('פחת ייצור', c.prodLoss.toFixed(1) + '%'),
+          cell('פחת אפייה', c.bakeLoss.toFixed(1) + '%'),
+          cell('משקל לשקילה ליחידה', c.scaleWeight ? e.fmtG(c.scaleWeight) : '—'),
+          cell('יחידות בפועל', c.unitsActual ? c.unitsActual.toFixed(1) : '—', warn),
+        ] },
+        { title: 'עלות ותמחור', items: [
+          cell('עלות כוללת', e.nis(c.cost)),
+          cell('עלות ליחידה', c.costPerUnit ? e.nis(c.costPerUnit) : '—'),
+          cell('עלות לק"ג', e.nis(c.costPerKg)),
+          cell('יעד פוד קוסט', (r.targetFC || 0) + '%'),
+          cell('מחיר מכירה לפני מע"מ', c.price ? e.nis(c.price) : '—', ';color:#1E6B4C'),
+        ] },
+      ];
+      if (c.flour) R.prodBlocks.push({ title: 'נוסחה', items: [
+        cell('סך קמח', e.fmtG(c.flour)), cell('סך נוזלים', e.fmtG(c.liquid)),
+        cell('הידרציה', c.hydration.toFixed(1) + '%'),
+        cell('הידרציה נטו, מים בפועל', c.trueHydration.toFixed(1) + '%'),
+      ].concat(c.waterTemp != null ? [cell('טמפ\' מים מחושבת', Math.round(c.waterTemp) + '°C', ';color:#1E6B4C')] : []) });
+      R.scaleSummary = (f === 1 ? 'כמו במתכון' : 'מקדם ×' + f.toFixed(2)) + ' · ' +
+        e.fmtG(c.actualYield) + (c.unitsActual ? ' · ' + Math.round(c.unitsActual) + ' יחידות' : '') +
+        (c.unitsWarn ? '  ⚠ חריגה מעל 5% מהיעד' : '');
+      R.ingOptions = c.rows.map(x => ({ id: x.ing.id, name: x.ing.name }));
+    }
+    if (r && e && this.lastC) {
+      const c = this.lastC;
+      const steps = r.steps || [];
+      const k = Math.min(S.kStep, Math.max(0, steps.length - 1));
+      const st = steps[k] || { text: '' };
+      R.kNum = k + 1; R.kText = st.text;
+      R.kProgress = 'שלב ' + (k + 1) + ' מתוך ' + steps.length;
+      R.kMeta = [st.temp ? st.temp + '°C' : null, st.minutes ? st.minutes + ' דקות' : null].filter(Boolean).join('  ·  ');
+      R.kHasTimer = !!Number(st.minutes);
+      R.kTimerBtn = 'הפעלת טיימר ' + (Number(st.minutes) || 0) + ' דק\'';
+      R.kAddTimer = () => this.addTimer(Number(st.minutes) || 0, (k + 1) + '. ' + st.text.slice(0, 26));
+      R.kPrev = () => this.setState(s => ({ kStep: Math.max(0, s.kStep - 1) }));
+      R.kNext = () => this.setState(s => ({ kStep: Math.min(steps.length - 1, s.kStep + 1) }));
+      const mmss = (n) => Math.floor(Math.max(0, n) / 60) + ':' + String(Math.max(0, n) % 60).padStart(2, '0');
+      R.timers = (S.timers || []).map(t => ({
+        label: t.label, clock: mmss(t.left), done: t.left <= 0,
+        style: 'display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;border:1px solid ' +
+          (t.left <= 0 ? '#9E362C' : 'rgba(226,239,232,.3)') + ';background:' +
+          (t.left <= 0 ? 'rgba(158,54,44,.22)' : 'rgba(251,251,249,.07)'),
+        clockStyle: 'font-size:22px;font-weight:300;direction:ltr;color:' + (t.left <= 0 ? '#F2C6C1' : '#FBFBF9'),
+        toggleLabel: t.left <= 0 ? 'סיום' : (t.running ? 'עצירה' : 'המשך'),
+        onToggle: () => t.left <= 0 ? this.dropTimer(t.id) : this.patchTimer(t.id, { running: !t.running }),
+        onDrop: () => this.dropTimer(t.id),
+      }));
+      R.hasTimers = (S.timers || []).length > 0;
+      const sorted = c.rows.slice().sort((a, b) => b.g - a.g);
+      R.labelIng = sorted.map(x => x.ing.name + ' ' + (c.totalG ? (x.g / c.totalG * 100).toFixed(1) : 0) + '%').join(', ');
+      R.labelWeight = r.unitWeight ? 'משקל נטו ' + r.unitWeight + ' גר\'' : 'משקל נטו ' + e.fmtG(c.actualYield);
+      R.labelShelf = r.shelfLife || '';
+      const lastB = (r.batches || [])[(r.batches || []).length - 1];
+      R.labelBatch = lastB ? 'אצווה ' + lastB.code + (lastB.date ? ' · יוצר ב־' + lastB.date : '') : '';
+      if (lastB) {
+        const h = this.haccpOf(lastB);
+        R.labelHaccp = h.he; R.labelHaccpStyle = h.style;
+        R.labelHaccpNote = h.done === this.CCPS.length && h.he === 'HACCP תקין'
+          ? 'כל נקודות הבקרה תועדו לאצווה הזאת'
+          : 'לפני הדפסה יש להשלים את התיעוד במעקב האצווה';
+      } else { R.labelHaccp = ''; R.labelHaccpNote = ''; }
+    }
+    const d = S.draft;
+    if (d) {
+      const set = (k) => (ev) => this.setState(s => ({ draft: Object.assign({}, s.draft, { [k]: ev.target.value }) }));
+      const txt = (label, k, ph) => ({ label, value: d[k] == null ? '' : d[k], onChange: set(k), isText: true, placeholder: ph || '' });
+      const tgl = (label, k) => ({ label, isToggle: true, toggleLabel: d[k] ? 'כן' : 'לא',
+        onToggle: () => this.setState(s => ({ draft: Object.assign({}, s.draft, { [k]: !s.draft[k] }) })),
+        toggleStyle: 'flex:1;min-height:44px;border-radius:10px;font-size:13px;cursor:pointer;border:1px solid ' +
+          (d[k] ? '#1E6B4C' : '#CDD4CE') + ';background:' + (d[k] ? '#E2EFE8' : '#fff') + ';color:' + (d[k] ? '#1E6B4C' : '#6E7A73') });
+      R.editSections = [
+        { title: 'פרטי המתכון', fields: [
+          txt('שם', 'name', 'שם המתכון'),
+          { label: 'קטגוריה', isSelect: true, value: d.category, options: this.CATS || [], onChange: set('category') },
+          txt('תגיות', 'tagsText', 'מופרדות בפסיק'),
+          tgl('מתכון בסיס', 'isSub'),
+        ] },
+        { title: 'תשואה ופחת', fields: [
+          txt('יחידות יעד', 'yieldUnits'), txt('משקל יחידה בגרם', 'unitWeight'),
+          txt('תשואה מעשית', 'yieldActual', 'ריק = תאורטית'),
+          txt('מדגם לפני אפייה', 'weightBefore'), txt('מדגם אחרי אפייה', 'weightAfter'),
+        ] },
+        { title: 'בצק ועלות', fields: [tgl('מצב בצק', 'doughMode')].concat(d.doughMode
+          ? [txt('טמפ\' בצק רצויה', 'ddt'), txt('טמפ\' קמח', 'flourTemp'), txt('טמפ\' חלל', 'roomTemp'), txt('חיכוך מיקסר', 'friction')]
+          : []).concat([txt('יעד פוד קוסט %', 'targetFC')]) },
+        { title: 'אחסון ואלרגנים', fields: [
+          txt('חיי מדף', 'shelfLife'), txt('אחסון', 'storage'), txt('הקפאה', 'freezing'),
+          txt('הפשרה', 'thawing'), txt('ציוד', 'equipment'), txt('הערות', 'notes'),
+          txt('אלרגנים ידניים', 'allergensText', 'מופרדים בפסיק'),
+        ] },
+      ];
+      const upIng = (i, patch) => this.setState(s => {
+        const ings = s.draft.ingredients.slice();
+        ings[i] = Object.assign({}, ings[i], patch);
+        return { draft: Object.assign({}, s.draft, { ingredients: ings }) };
+      });
+      const chip = (on) => 'min-height:44px;padding:0 13px;border-radius:10px;font-size:12px;cursor:pointer;border:1px solid ' +
+        (on ? '#1E6B4C' : '#CDD4CE') + ';background:' + (on ? '#E2EFE8' : '#FBFBF9') + ';color:' + (on ? '#1E6B4C' : '#6E7A73');
+      R.draftIngs = (d.ingredients || []).map((ing, i) => ({
+        name: ing.name || '', qty: ing.qty == null ? '' : ing.qty, unit: ing.unit || 'גרם',
+        price: ing.price == null ? '' : ing.price, priceUnit: ing.priceUnit || 'ק"ג', note: ing.note || '',
+        setName: ev => upIng(i, { name: ev.target.value }), setQty: ev => upIng(i, { qty: ev.target.value }),
+        setUnit: ev => upIng(i, { unit: ev.target.value }), setPrice: ev => upIng(i, { price: ev.target.value }),
+        setPriceUnit: ev => upIng(i, { priceUnit: ev.target.value }), setNote: ev => upIng(i, { note: ev.target.value }),
+        waterPct: ing.waterPct == null ? '' : ing.waterPct, setWaterPct: ev => upIng(i, { waterPct: ev.target.value }),
+        toggleFlour: () => upIng(i, { flour: !ing.flour }), toggleLiquid: () => upIng(i, { liquid: !ing.liquid }),
+        flourStyle: chip(ing.flour), liquidStyle: chip(ing.liquid),
+        remove: () => this.setState(s => ({ draft: Object.assign({}, s.draft,
+          { ingredients: s.draft.ingredients.filter((_, j) => j !== i) }) })),
+      }));
+      const upStep = (i, patch) => this.setState(s => {
+        const st = s.draft.steps.slice();
+        st[i] = Object.assign({}, st[i], patch);
+        return { draft: Object.assign({}, s.draft, { steps: st }) };
+      });
+      R.draftSteps = (d.steps || []).map((st, i) => ({
+        num: i + 1, text: st.text || '', temp: st.temp || '', minutes: st.minutes || '',
+        setText: ev => upStep(i, { text: ev.target.value }), setTemp: ev => upStep(i, { temp: ev.target.value }),
+        setMinutes: ev => upStep(i, { minutes: ev.target.value }),
+        remove: () => this.setState(s => ({ draft: Object.assign({}, s.draft,
+          { steps: s.draft.steps.filter((_, j) => j !== i) }) })),
+      }));
+      R.editTitle = S.isNew ? 'מתכון חדש' : 'עריכת מתכון';
+      const ni = (d.ingredients || []).length, ns = (d.steps || []).length;
+      R.draftSummary = (ni === 1 ? 'רכיב אחד' : ni + ' רכיבים') + ' · ' + (ns === 1 ? 'שלב אחד' : ns + ' שלבים');
+    }
+    if (S.screen === 'order' && r && this.lastC) {
+      const c = this.lastC;
+      const setO = k => ev => this.setState(s => ({ order: Object.assign({}, s.order, { [k]: ev.target.value }) }));
+      const o = S.order || {};
+      R.orderFields = [['שם הלקוח', 'client', 'למשל דנה לוי'], ['מספר הזמנה', 'no', 'אוטומטי'],
+        ['תאריך אספקה', 'date', 'למשל 18.9'], ['הערה ללקוח', 'note', '']]
+        .map(([label, k, ph]) => ({ label, placeholder: ph, value: o[k] || '', onChange: setO(k) }));
+      R.orderNoLabel = 'הזמנה ' + (o.no || ('#' + String(Date.now()).slice(-5))) + (o.client ? ' · ' + o.client : '');
+      R.orderDate = o.date ? 'לאספקה ' + o.date : new Date().toLocaleDateString('he-IL');
+      R.orderScaleLabel = R.scaleSummary || '';
+      R.orderStats = [
+        { k: 'יחידות להפקה', v: c.unitsActual ? Math.round(c.unitsActual) : '—' },
+        { k: 'משקל לשקילה ליחידה', v: c.scaleWeight ? e.fmtG(c.scaleWeight) : '—' },
+        { k: 'תשואה', v: e.fmtG(c.actualYield) },
+      ].concat(S.simple ? [] : [{ k: 'פחת אפייה', v: c.bakeLoss.toFixed(1) + '%' }]);
+      R.orderRows = c.rows.map(x => ({ name: x.ing.name, noteSuffix: x.ing.note ? '  ·  ' + x.ing.note : '',
+        qty: e.fmtG(x.g), pct: (c.flour && !S.simple) ? x.bakerPct.toFixed(0) + '%' : '' }));
+      R.orderTotal = e.fmtG(c.totalG);
+      R.orderPctHeader = (c.flour && !S.simple) ? '% אופה' : '';
+      R.orderSteps = (r.steps || []).map((st, i) => ({ num: i + 1, text: st.text,
+        metaSuffix: [st.temp ? st.temp + '°C' : null, st.minutes ? st.minutes + ' דק\'' : null].filter(Boolean).length
+          ? '  ·  ' + [st.temp ? st.temp + '°C' : null, st.minutes ? st.minutes + ' דק\'' : null].filter(Boolean).join(' · ') : '' }));
+      R.orderCostLine = (c.cost && !S.simple) ? 'עלות חומרי גלם להזמנה ' + e.nis(c.cost) +
+        (c.costPerUnit ? '  ·  ' + e.nis(c.costPerUnit) + ' ליחידה' : '') +
+        (c.price ? '  ·  מחיר מכירה מוצע ' + e.nis(c.price) + ' ליחידה לפני מע"מ' : '') : '';
+    }
+    if (S.shareOpen && r) {
+      const mode = S.shareMode || 'once';
+      const modes = [
+        ['once', 'שיתוף חד פעמי', 'הנמען רואה את המתכון פעם אחת ומקבל עותק לקריאה. אין הרשאת עריכה והמתכון לא נכנס למחברת שלו.'],
+        ['copy', 'שליחת עותק למחברת', 'הנמען מקבל עותק מלא שנשמר במחברת שלו וניתן לעריכה אצלו. אצלכם הנוסחה לא משתנה.'],
+      ];
+      R.shareModes = modes.map(([k, title, desc]) => ({ title, desc,
+        onClick: () => this.setState({ shareMode: k, shareNote: '' }),
+        style: 'width:100%;text-align:right;padding:12px 13px;border-radius:13px;cursor:pointer;border:1px solid ' +
+          (mode === k ? '#1E6B4C' : '#CDD4CE') + ';background:' + (mode === k ? '#E2EFE8' : '#fff') +
+          ';color:' + (mode === k ? '#1E6B4C' : '#171A18') }));
+      const picked = S.shareTo || [];
+      R.contacts = (this.CONTACTS || []).map(c => ({
+        name: c.name, role: c.role, initial: c.name.trim()[0], mark: picked.includes(c.id) ? 'נבחר' : '',
+        onClick: () => this.setState(s => ({ shareNote: '',
+          shareTo: (s.shareTo || []).includes(c.id) ? s.shareTo.filter(x => x !== c.id) : (s.shareTo || []).concat([c.id]) })),
+        style: 'display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:12px;cursor:pointer;border:1px solid ' +
+          (picked.includes(c.id) ? '#1E6B4C' : '#CDD4CE') + ';background:' + (picked.includes(c.id) ? '#E2EFE8' : '#fff'),
+      }));
+      R.shareSubtitle = r.name + ' · ' + (S.scaleMode === 'recipe' ? 'בכמויות המקוריות' : 'בכמויות המותאמות שעל המסך');
+      R.shareCta = picked.length ? 'שליחה ל־' + picked.length + (picked.length === 1 ? ' נמען' : ' נמענים') : 'בחרו נמען';
+      R.shareCostsLabel = S.shareCosts ? 'כולל' : 'ללא';
+      R.shareCostsStyle = 'min-height:44px;padding:0 14px;border-radius:10px;font-size:13px;cursor:pointer;border:1px solid ' +
+        (S.shareCosts ? '#1E6B4C' : '#CDD4CE') + ';background:' + (S.shareCosts ? '#E2EFE8' : '#FBFBF9') +
+        ';color:' + (S.shareCosts ? '#1E6B4C' : '#6E7A73');
+      R.shareNote = S.shareNote || '';
+    }
+    // ── העדפות מדידה, כלי מדידה וכיול אישי ─────────────────────
+    const M = window.PN_MEASURE, GG = window.PN_GROUPS, P = S.prefs || {};
+    const pill = (on) => 'min-height:44px;padding:0 13px;border-radius:10px;font-size:12.5px;cursor:pointer;border:1px solid ' +
+      (on ? '#1E6B4C' : '#CDD4CE') + ';background:' + (on ? '#E2EFE8' : '#fff') + ';color:' + (on ? '#1E6B4C' : '#6E7A73');
+    const card = (on) => 'width:100%;text-align:right;padding:13px 14px;border-radius:13px;cursor:pointer;border:1px solid ' +
+      (on ? '#1E6B4C' : '#CDD4CE') + ';background:' + (on ? '#E2EFE8' : '#fff') + ';color:' + (on ? '#1E6B4C' : '#171A18');
+    const roleChip = (rank) => 'flex:none;padding:4px 9px;border-radius:999px;font-size:11px;border:1px solid ' +
+      (rank > 1 ? '#1E6B4C' : '#CDD4CE') + ';color:' + (rank > 1 ? '#1E6B4C' : '#6E7A73') +
+      ';background:' + (rank > 1 ? '#E2EFE8' : '#fff');
+
+    if (M) {
+      R.onbProfiles = M.PROFILES.map(p => ({ he: p.he, desc: p.desc, style: card(P.profile === p.id),
+        onClick: () => this.setPrefs(Object.assign({ profile: p.id, pro: p.pro },
+          P.touchedUnits ? {} : { units: p.units.slice() })) }));
+      R.onbUnitGroups = M.UNIT_GROUPS.map(g => ({ he: g.he, units: g.ids.map(id => {
+        const u = M.unit(id) || {}, on = (P.units || []).includes(id);
+        return { he: u.he || id, onClick: () => this.toggleUnit(id), style: pill(on) };
+      }) }));
+      R.toolRows = [['cup', 'כוס'], ['tbsp', 'כף'], ['tsp', 'כפית']].map(([t, label]) => ({
+        label: label + ' — כרגע ' + Math.round(M.toolMl(P, t)) + ' מ"ל',
+        options: (M.TOOL_OPTIONS[t] || []).map(o => ({ he: o.he, onClick: () => this.setTool(t, o.ml),
+          style: card(Math.abs(M.toolMl(P, t) - o.ml) < 0.06) + ';min-height:46px;font-size:13px' })),
+      }));
+      const onbT = ['איך נוח לכם לעבוד?', 'איך נוח לכם למדוד במתכונים?', 'מה גודל כלי המדידה שלכם?'];
+      const onbS = ['שלוש שאלות קצרות, ואז המחברת מותאמת לדרך העבודה שלכם.',
+        'אפשר לבחור יותר מיחידה אחת. זו ברירת מחדל, לא הגבלה — בכל מתכון אפשר להזין כל יחידה.',
+        'כוס אינה מידה אחת בעולם. בחרו את הכלים שבאמת נמצאים אצלכם, וכל ההמרות יחושבו לפיהם.'];
+      const st = Math.max(0, Math.min(2, S.onbStep || 0));
+      R.onbTitle = onbT[st]; R.onbSub = onbS[st];
+      R.onbIsProfile = st === 0; R.onbIsUnits = st === 1; R.onbIsTools = st === 2;
+      R.onbDots = [0, 1, 2].map(i => ({ style: 'height:4px;flex:1;border-radius:999px;background:' +
+        (i <= st ? '#1E6B4C' : '#CDD4CE') }));
+      R.onbCanBack = st > 0;
+      R.onbBack = () => this.setState({ onbStep: Math.max(0, st - 1) });
+      R.onbNextLabel = st < 2 ? 'המשך' : 'סיום, לפתוח את המחברת';
+      R.onbNext = () => {
+        if (st < 2) return this.setState({ onbStep: st + 1 });
+        this.setPrefs({ done: true });
+        this.setState({ screen: 'home', onbStep: 0 });
+      };
+      R.resetOnb = () => { this.setPrefs({ done: false }); this.setState({ screen: 'onboarding', onbStep: 0 }); };
+
+      R.calibName = S.calibName || ''; R.calibTool = S.calibTool || 'cup'; R.calibGrams = S.calibGrams || '';
+      R.setCalibName = ev => this.setState({ calibName: ev.target.value });
+      R.setCalibTool = ev => this.setState({ calibTool: ev.target.value });
+      R.setCalibGrams = ev => this.setState({ calibGrams: ev.target.value });
+      R.addCalib = () => {
+        const name = (S.calibName || '').trim(), grams = Number(S.calibGrams), tool = S.calibTool || 'cup';
+        if (!name) return this.setState({ err: 'צריך שם חומר גלם לכיול' });
+        if (!grams) return this.setState({ err: 'צריך משקל בגרם' });
+        const calib = (P.calib || []).filter(c => !(c.name === name && c.tool === tool))
+          .concat([{ name, tool, grams, at: 'המטבח שלי' }]);
+        this.setPrefs({ calib });
+        this.setState({ calibName: '', calibGrams: '' });
+      };
+      R.calibList = (P.calib || []).map((c, i) => ({ name: c.name,
+        detail: M.labelTool(c.tool) + ' אחת = ' + c.grams + ' גרם · כלי של ' + Math.round(M.toolMl(P, c.tool)) + ' מ"ל',
+        remove: () => this.setPrefs({ calib: (P.calib || []).filter((_, j) => j !== i) }) }));
+      R.calibEmpty = !(P.calib || []).length;
+    }
+
+    // ── גלית המרת יחידה לרכיב בודד ─────────────────────────────
+    if (M && S.convIng) {
+      const ci = S.convIng;
+      const ing = { name: ci.name, qty: ci.qty, unit: ci.unit, unitWeight: ci.unitWeight, gPer100: ci.gPer100 };
+      const fromTool = ci.origUnit && M.unit(ci.origUnit) ? M.unit(ci.origUnit).tool : null;
+      R.convOpen = true; R.convName = ci.name;
+      R.closeConv = () => this.setState({ convIng: null, convTo: null });
+      R.convFrom = [
+        { k: 'כפי שכתוב במתכון', v: (ci.origQty !== '' && ci.origQty != null) ? ci.origQty + ' ' + ci.origUnit : '—' },
+        { k: 'בכמות המוצגת כרגע', v: e ? e.fmtG(ci.qty) : ci.qty + ' גרם' },
+        { k: 'כלי המדידה', v: fromTool
+          ? M.labelTool(fromTool) + ' אחת = ' + Math.round(M.toolMl(P, fromTool)) + ' מ"ל לפי ההגדרות שלכם'
+          : 'הרכיב נמדד במשקל, בלי תלות בכלי' },
+      ];
+      R.convTargets = ['g', 'kg', 'ml', 'l', 'cup', 'tbsp', 'tsp', 'oz', 'floz'].map(t => ({
+        he: (M.unit(t) || {}).he || t, onClick: () => this.setState({ convTo: t }), style: pill(S.convTo === t) }));
+      const res = S.convTo ? M.convert(ing, S.convTo, P) : null;
+      R.convOk = !!(res && res.ok);
+      R.convFail = (res && !res.ok) ? res.why : '';
+      if (res && res.ok) {
+        R.convResult = res.text;
+        R.convBadge = res.sourceHe || '';
+        R.convBadgeStyle = 'flex:none;padding:4px 9px;border-radius:999px;font-size:11px;background:#fff;border:1px solid ' +
+          (res.sourceColor || '#6E7A73') + ';color:' + (res.sourceColor || '#6E7A73');
+        R.convWhy = res.why || '';
+        R.convToolNote = res.toolNote || '';
+      }
+      R.convCalib = () => this.setState({ convIng: null, convTo: null, screen: 'tools',
+        calibName: ci.name, calibTool: 'cup', calibGrams: '' });
+    }
+
+    // ── תצוגת יחידות, הערות אישיות, גרסאות ותבנית ──────────────
+    if (r && e) {
+      const vw = S.view || 'orig';
+      R.viewTabs = [['orig', 'כמו במתכון'], ['g', 'גרמים'], ['home', 'ביתי']].map(([v, label]) => ({ label,
+        onClick: () => this.setState({ view: v }),
+        style: 'min-height:40px;padding:0 9px;border-radius:9px;font-size:11px;cursor:pointer;border:1px solid ' +
+          (vw === v ? '#1E6B4C' : '#CDD4CE') + ';background:' + (vw === v ? '#1E6B4C' : '#fff') +
+          ';color:' + (vw === v ? '#fff' : '#6E7A73') }));
+      R.viewNote = vw === 'g' ? 'תצוגה בגרמים. המתכון המקורי לא השתנה.'
+        : vw === 'home' ? 'תצוגה בכלי המדידה שלכם. רכיב שאין לו נתון אמין נשאר בגרמים ומסומן ככזה.' : '';
+      R.convertSaveBar = vw === 'orig' ? '' : 'התצוגה הזאת אינה שומרת דבר. אפשר לשמור אותה כגרסה נפרדת במחברת.';
+      R.privNote = r.privateNotes || '';
+      const vs = r.versions || [];
+      R.verCurrent = 'V' + (vs.length + 1) + ' · נוכחית';
+      R.verEmpty = !vs.length;
+      R.verList = vs.slice().reverse().map(v => ({ tag: v.tag, what: v.what, when: v.at,
+        canRestore: !r.locked && !!v.snapshot,
+        restore: () => {
+          const snap = Object.assign({}, v.snapshot, { id: r.id, versions: this.pushVersion(r, v.snapshot) });
+          const recipes = S.recipes.map(x => x.id === r.id ? snap : x);
+          this.setState({ recipes, err: 'שוחזרה ' + v.tag + '. הגרסה שהייתה נשמרה בהיסטוריה.' });
+          this.persist(recipes);
+        } }));
+      const pan = r.pan;
+      R.hasPan = !!(pan && pan.kind && pan.kind !== 'none');
+      if (R.hasPan) {
+        R.panRecipeLabel = M ? M.panLabel(pan) : '';
+        const opts = [{ id: 'same', label: 'כמו במתכון · ' + (M ? M.panLabel(pan) : ''), pan: null }]
+          .concat([18, 20, 22, 24, 26, 28].map(d => ({ id: 'r' + d, label: 'Ø' + d + ' ס"מ',
+            pan: { kind: 'round', diameter: d, height: pan.height } })))
+          .concat([{ id: 'x20x30', label: '20×30 ס"מ', pan: { kind: 'rect', width: 20, length: 30, height: pan.height } },
+            { id: 'x30x40', label: '30×40 ס"מ', pan: { kind: 'rect', width: 30, length: 40, height: pan.height } },
+            { id: 'gn11', label: 'GN 1/1', pan: { kind: 'gn', gn: '1/1', height: pan.height } }]);
+        R.panOptions = opts.map(o => ({ id: o.id, label: o.label }));
+        R.panMine = S.panMine || 'same';
+        R.setPanMine = ev => this.setState({ panMine: ev.target.value });
+        const mine = (opts.find(o => o.id === (S.panMine || 'same')) || {}).pan;
+        const pf = mine && M ? M.panFactor(pan, mine) : null;
+        if (pf && Math.abs(pf.factor - 1) > 0.02) {
+          R.panSuggestion = 'התבנית שלכם גדולה פי ' + pf.factor.toFixed(2) + ' ' +
+            (pf.byVolume ? 'בנפח' : 'בשטח') + '. מומלץ להכפיל את כל הכמויות במקדם הזה.';
+          R.applyPan = () => {
+            const c0 = e.compute(r, S.recipes, 1);
+            this.setState({ scaleMode: 'weight', scaleVal: String(Math.round(c0.actualYield * pf.factor)),
+              err: 'הכמויות הותאמו לתבנית שלכם. המתכון המקורי לא השתנה.' });
+          };
+        } else { R.panSuggestion = ''; R.applyPan = () => {}; }
+      }
+    }
+
+    // ── Cook Mode: סימון שלב כהושלם והתקדמות ───────────────────
+    if (r && e && this.lastC) {
+      const steps = r.steps || [];
+      const k = Math.min(S.kStep, Math.max(0, steps.length - 1));
+      const done = S.kDone || {};
+      const key = r.id + ':' + k;
+      const nDone = steps.filter((_, i) => done[r.id + ':' + i]).length;
+      R.kSegments = steps.map((_, i) => ({ onClick: () => this.setState({ kStep: i }),
+        style: 'flex:1;height:5px;border:0;padding:0;border-radius:999px;cursor:pointer;background:' +
+          (done[r.id + ':' + i] ? '#1E6B4C' : i === k ? '#E2EFE8' : 'rgba(251,251,249,.18)') }));
+      R.kDoneLabel = nDone + ' מתוך ' + steps.length + ' שלבים הושלמו';
+      R.kDoneBtn = done[key] ? 'השלב הזה סומן כהושלם · לבטל' : 'סימון השלב כהושלם';
+      R.kDoneStyle = 'width:100%;min-height:50px;border-radius:14px;font-size:14.5px;cursor:pointer;border:1px solid ' +
+        (done[key] ? '#1E6B4C' : 'rgba(226,239,232,.35)') + ';background:' + (done[key] ? '#1E6B4C' : 'transparent') +
+        ';color:' + (done[key] ? '#fff' : '#E2EFE8');
+      R.kToggleDone = () => this.setState(s => {
+        const nd = Object.assign({}, s.kDone);
+        if (nd[key]) delete nd[key]; else nd[key] = true;
+        const last = k >= steps.length - 1;
+        return { kDone: nd, kStep: (!s.kDone[key] && !last) ? k + 1 : k };
+      });
+      R.kNextLabel = k >= steps.length - 1 ? 'סיום ההכנה' : 'הבא';
+    }
+
+    // ── קבוצות: Mock בלבד. REQUIRES BACKEND ────────────────────
+    if (GG) {
+      const permsOf = (gid, it) => Object.assign({}, GG.PERM_DEFAULT, it.perms || {},
+        (S.groupPerms || {})[gid + ':' + it.id] || {});
+      R.groupsSub = GG.GROUPS.length + ' קבוצות פרטיות · המחברת האישית שלכם נשארת פרטית';
+      R.groupList = GG.GROUPS.map(g => {
+        const cn = GG.counts(g), role = GG.ROLES[g.myRole] || GG.ROLES.member;
+        return { name: g.name, kind: g.kind, role: role.he, roleStyle: roleChip(role.rank),
+          counts: cn.lessons + ' שיעורים · ' + cn.items + ' מתכונים',
+          members: g.membersCount + ' חברים',
+          onClick: () => this.setState({ screen: 'group', gid: g.id }) };
+      });
+      R.joinMethods = GG.JOIN_METHODS.map(([, he, desc]) => ({ he, desc }));
+      R.joinCode = S.joinCode || '';
+      R.setJoinCode = ev => this.setState({ joinCode: ev.target.value });
+      R.doJoin = () => this.setState({ err: (S.joinCode || '').trim()
+        ? 'נשלחה בקשת הצטרפות בקוד ' + S.joinCode.trim() + '. במערכת אמיתית מנהל הקבוצה צריך לאשר אותה.'
+        : 'צריך קוד קבוצה' });
+
+      const g = GG.group(S.gid);
+      if (g) {
+        const role = GG.ROLES[g.myRole] || GG.ROLES.member, cn = GG.counts(g);
+        R.gName = g.name; R.gRole = role.he; R.gRoleStyle = roleChip(role.rank);
+        R.gMeta = g.kind + ' · ' + g.membersCount + ' חברים · ' + cn.items + ' מתכונים · מדריך: ' + g.instructor;
+        R.gNote = g.note;
+        R.gCanManage = GG.can(g, 'perms');
+        const pend = GG.PENDING.filter(p => p.groupId === g.id);
+        R.gHasPending = R.gCanManage && pend.length > 0;
+        R.gPending = pend.map(p => ({ name: p.name, via: p.via, at: p.at, state: 'ממתין' }));
+        R.gCourses = (g.courses || []).map(c => ({ name: c.name, lessons: c.lessons.map(l => ({
+          name: l.name, date: l.date, summary: l.summary,
+          dateStyle: 'flex:none;font-size:11px;padding:3px 8px;border-radius:999px;background:' +
+            (l.done ? '#E2EFE8' : '#fff') + ';border:1px solid ' + (l.done ? '#1E6B4C' : '#CDD4CE') +
+            ';color:' + (l.done ? '#1E6B4C' : '#6E7A73'),
+          items: l.items.map(it => {
+            const pm = permsOf(g.id, it);
+            return { name: it.name,
+              permSummary: [pm.save ? 'ניתן לשמור למחברת' : 'צפייה בלבד', pm.print ? 'הדפסה' : null,
+                pm.download ? 'הורדה' : null].filter(Boolean).join(' · '),
+              onClick: () => this.setState({ screen: 'groupRecipe', gid: g.id, gItem: it.id }) };
+          }) })) }));
+        R.permItems = [];
+        (g.courses || []).forEach(c => c.lessons.forEach(l => l.items.forEach(it => {
+          const pm = permsOf(g.id, it);
+          R.permItems.push({ name: it.name, where: c.name + ' · ' + l.name,
+            perms: GG.PERM_LABELS.map(([key, label, desc]) => ({ label, desc,
+              state: pm[key] ? 'מותר' : 'חסום',
+              style: 'flex:none;min-height:40px;padding:0 12px;border-radius:10px;font-size:12px;cursor:pointer;border:1px solid ' +
+                (pm[key] ? '#1E6B4C' : '#CDD4CE') + ';background:' + (pm[key] ? '#E2EFE8' : '#fff') +
+                ';color:' + (pm[key] ? '#1E6B4C' : '#6E7A73'),
+              toggle: () => {
+                const k2 = g.id + ':' + it.id;
+                const cur = Object.assign({}, GG.PERM_DEFAULT, it.perms || {}, (S.groupPerms || {})[k2] || {});
+                const groupPerms = Object.assign({}, S.groupPerms, { [k2]: Object.assign({}, cur, { [key]: !cur[key] }) });
+                this.setState({ groupPerms });
+                this.persistAll({ groupPerms });
+              } })) });
+        })));
+
+        const found = GG.item(g.id, S.gItem);
+        if (found) {
+          const it = found.item, pm = permsOf(g.id, it);
+          const src = S.recipes.find(x => x.id === it.recipeId);
+          R.grLessonShort = found.lesson.name.split('—')[0].trim();
+          R.grName = it.name;
+          R.grMeta = g.name + ' · ' + found.course.name + ' · ' + found.lesson.name;
+          R.grPerms = GG.PERM_LABELS.map(([key, label]) => ({ label,
+            icon: pm[key] ? '✓' : '—', iconStyle: 'color:' + (pm[key] ? '#1E6B4C' : '#C4A99B'),
+            textStyle: 'color:' + (pm[key] ? '#171A18' : '#6E7A73') }));
+          R.grPermNote = 'ההרשאות נקבעות על ידי המדריך. הן חלות על המתכון של הקבוצה, לא על עותק אישי שיצרתם.';
+          if (src && e) {
+            const cg = e.compute(src, S.recipes, 1);
+            R.grRows = cg.rows.map(row => ({ qty: e.fmtG(row.g), name: row.ing.name }));
+            R.grSteps = (src.steps || []).map((s2, i) => ({ num: i + 1, text: s2.text }));
+          } else { R.grRows = []; R.grSteps = []; }
+          const nk = g.id + ':' + it.id;
+          R.grNote = (S.myNotes || {})[nk] || '';
+          R.setGrNote = ev => {
+            const myNotes = Object.assign({}, S.myNotes, { [nk]: ev.target.value });
+            this.setState({ myNotes });
+            clearTimeout(this._gnt);
+            this._gnt = setTimeout(() => this.persistAll({ myNotes: this.state.myNotes }), 400);
+          };
+          R.grCanSave = !!pm.save; R.grCannotSave = !pm.save;
+          R.grSaveLabel = 'שמירת עותק למחברת שלי';
+          R.saveToNotebook = () => {
+            if (!pm.save || !src) return this.setState({ err: 'המדריך לא אישר שמירה של המתכון הזה' });
+            const already = S.recipes.find(x => x.savedFrom === nk);
+            if (already) return this.setState({ screen: 'recipe', cur: already.id,
+              err: 'העותק הזה כבר קיים במחברת שלכם' });
+            const copy = Object.assign({}, src, {
+              id: 'my-' + it.recipeId + '-' + Date.now().toString(36),
+              name: it.name + ' — העותק שלי', locked: false, savedFrom: nk,
+              privateNotes: (S.myNotes || {})[nk] || '', versions: [], trials: [], batches: [],
+              versionNote: 'עותק אישי מהקבוצה ' + g.name });
+            const recipes = S.recipes.concat([this.migrate(copy)]);
+            this.setState({ recipes, screen: 'recipe', cur: copy.id, view: 'orig', showProd: false,
+              err: 'נוצר עותק אישי במחברת שלכם. המתכון של הקבוצה לא השתנה.' });
+            this.persist(recipes);
+          };
+        }
+      }
+    }
+
+    // ── ניווט: עוד, הגדרות, כלי מדידה ──────────────────────────
+    R.moreSub = (P.profile === 'home' ? 'מצב ביתי' : P.profile === 'study' ? 'מצב לימוד' : 'מצב מקצועי') +
+      ' · אפשר לשנות בהגדרות';
+    R.moreGroups = [
+      { title: 'עבודה', items: [
+        { label: 'יום ייצור', desc: 'בחירת מתכונים וכמויות, ולוח זמנים אחורה משעת ההגשה', onClick: () => this.setState({ screen: 'plan' }) },
+        { label: 'רכש ומלאי', desc: 'סיכום חומרי גלם לפי מתכונים, ועדכון מחירים במקום אחד', onClick: () => this.setState({ screen: 'stock' }) },
+      ] },
+      { title: 'המדידות שלי', items: [
+        { label: 'כלי המדידה שלי', desc: 'גודל כוס, כף וכפית, oz מול fl oz, וכיול אישי לחומרי גלם', onClick: () => this.setState({ screen: 'tools' }) },
+        { label: 'הגדרות', desc: 'פרופיל, יחידות מועדפות, שפה ופרטיות', onClick: () => this.setState({ screen: 'settings' }) },
+      ] },
+    ];
+
+    const tabOf = (sc) => ['groups', 'group', 'groupRecipe', 'perms'].includes(sc) ? 'groups'
+      : ['more', 'settings', 'tools', 'plan', 'stock'].includes(sc) ? 'more' : sc;
+    const tabs = [['recipe', 'כמו במתכון'], ['units', 'יחידות'], ['weight', 'משקל'], ['stock', 'לפי מלאי']];
+    return Object.assign(R, {
+      deviceW: 402, deviceH: 874,
+      isHome: S.screen === 'home',
+      goNotebook: () => this.setState({ screen: 'list', cat: 'הכל' }),
+      isStock2: S.screen === 'stock',
+      isLearn: S.screen === 'learn' && !!r, goLearn: () => this.setState({ screen: 'learn' }),
+      isBatch: S.screen === 'batch' && !!r, goBatch: () => this.setState({ screen: 'batch' }),
+      isDiff: S.screen === 'diff' && !!r, goDiff: () => this.setState({ screen: 'diff' }),
+      simple: !!S.simple, pro: !S.simple,
+      toggleSimple: () => this.setState(s => ({ simple: !s.simple, showProd: false })),
+      simpleLabel: S.simple ? 'מצב פשוט' : 'מצב מקצועי',
+      simpleStyle: 'min-height:40px;padding:0 12px;border-radius:10px;font-size:12px;cursor:pointer;border:1px solid ' +
+        (S.simple ? '#C4A99B' : '#1E6B4C') + ';background:' + (S.simple ? '#fff' : '#E2EFE8') +
+        ';color:' + (S.simple ? '#6E7A73' : '#1E6B4C'),
+      isPlan: S.screen === 'plan', planTime: S.planTime || '07:00',
+      setPlanTime: ev => this.setState({ planTime: ev.target.value }),
+      planIsSchedule: (S.planView || 'schedule') === 'schedule', planIsBuy: S.planView === 'buy',
+      planTabs: [['schedule', 'לוח זמנים'], ['buy', 'רכש']].map(([k, label]) => ({ label,
+        onClick: () => this.setState({ planView: k }),
+        style: 'min-height:40px;padding:0 12px;border-radius:10px;font-size:12.5px;cursor:pointer;border:1px solid ' +
+          ((S.planView || 'schedule') === k ? '#1E6B4C' : '#CDD4CE') + ';background:' +
+          ((S.planView || 'schedule') === k ? '#1E6B4C' : '#fff') + ';color:' +
+          ((S.planView || 'schedule') === k ? '#fff' : '#6E7A73') })),
+      isOnb: S.screen === 'onboarding',
+      isMore: S.screen === 'more', isSettings: S.screen === 'settings', isTools: S.screen === 'tools',
+      goMore: () => this.setState({ screen: 'more' }),
+      goGroups: () => this.setState({ screen: 'groups', gid: null, gItem: null }),
+      isGroups: S.screen === 'groups',
+      isGroup: S.screen === 'group' && !!(window.PN_GROUPS && window.PN_GROUPS.group(S.gid)),
+      isGroupRecipe: S.screen === 'groupRecipe' && !!(window.PN_GROUPS && window.PN_GROUPS.item(S.gid, S.gItem)),
+      isPerms: S.screen === 'perms' && !!(window.PN_GROUPS && window.PN_GROUPS.group(S.gid)),
+      goPerms: () => this.setState({ screen: 'perms' }),
+      backGroup: () => this.setState({ screen: 'group', gItem: null }),
+      saveConverted: this.saveConverted, setPrivNote: this.setPrivNote,
+      tabs: [['home', 'בית'], ['list', 'מחברת'], ['groups', 'קבוצות'], ['more', 'עוד']]
+        .map(([k, label]) => ({ label,
+        onClick: () => this.setState({ screen: k, shareOpen: false, gid: null, gItem: null }),
+        style: 'flex:1;min-height:44px;border:0;background:transparent;cursor:pointer;font-size:12.5px;color:' +
+          (tabOf(S.screen) === k ? '#1E6B4C' : '#6E7A73') + ';font-weight:' + (tabOf(S.screen) === k ? '600' : '400') })),
+      ready: S.ready, isList: S.screen === 'list', isRecipe: S.screen === 'recipe' && !!r,
+      isKitchen: S.screen === 'kitchen' && !!r, isLabel: S.screen === 'label' && !!r,
+      backRecipe: () => this.go('recipe'),
+      isOrder: S.screen === 'order' && !!r,
+      goOrder: () => this.setState({ screen: 'order' }),
+      doPrint: () => { try { window.print(); } catch (err) { this.setState({ err: 'ההדפסה נכשלה: ' + err.message }); } },
+      shareOpen: !!S.shareOpen, openShare: () => this.setState({ shareOpen: true, shareNote: '' }),
+      closeShare: () => this.setState({ shareOpen: false, shareNote: '', shareTo: [] }),
+      toggleShareCosts: () => this.setState(s => ({ shareCosts: !s.shareCosts })),
+      doShare: () => {
+        const picked = S.shareTo || [];
+        if (!picked.length) return this.setState({ shareNote: '' , err: 'בחרו לפחות נמען אחד' });
+        const names = (this.CONTACTS || []).filter(c => picked.includes(c.id)).map(c => c.name).join(', ');
+        const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+        this.setState({ shareNote: (S.shareMode === 'copy' ? 'העותק נשלח ל־' : 'נשלח שיתוף חד פעמי ל־') + names +
+          ' · קוד ' + code + (S.shareCosts ? ' · כולל עלויות' : ' · בלי עלויות') +
+          '. הקישור נפתח פעם אחת ואז נסגר.', shareTo: [] });
+      },
+      isPaste: S.screen === 'paste', pasteText: S.pasteText, pasteMsg: S.pasteMsg || '',
+      setPasteText: ev => this.setState({ pasteText: ev.target.value }),
+      parseLocal: this.doParseLocal, parseSmart: this.doParseSmart,
+      isEdit: S.screen === 'edit' && !!S.draft, isLocked: S.screen === 'edit' && !S.draft && !!r,
+      unlock: () => this.startEdit(true), err: S.err || '', clearErr: () => this.setState({ err: '' }),
+      unitOptions: ['גרם', 'ק"ג', 'מ"ל', 'ליטר', "יח'", 'כוס', 'כף', 'כפית'],
+      newRecipe: () => this.setState({ screen: 'edit', isNew: true, draft: this.newDraft({
+        ingredients: [{ id: 'i1', name: '', qty: '', unit: 'גרם' }],
+        steps: [{ id: 's1', text: '', temp: '', minutes: '' }] }) }),
+      addIng: () => this.setState(s => ({ draft: Object.assign({}, s.draft,
+        { ingredients: (s.draft.ingredients || []).concat([{ id: 'i' + Date.now(), name: '', qty: '', unit: 'גרם' }]) }) })),
+      addStep: () => this.setState(s => ({ draft: Object.assign({}, s.draft,
+        { steps: (s.draft.steps || []).concat([{ id: 's' + Date.now(), text: '', temp: '', minutes: '' }]) }) })),
+      cancelEdit: () => this.setState({ draft: null, isNew: false, screen: S.cur ? 'recipe' : 'list' }),
+      saveEdit: this.save,
+      smartBtn: S.smartBusy ? 'מפענח…' : 'פענוח חכם',
+      showProd: S.showProd || !!this.props.openProduction,
+      prodBtn: (S.showProd || this.props.openProduction) ? 'סגירת נתוני ייצור' : 'נתוני ייצור ועלויות',
+      toggleProd: () => this.setState(s => ({ showProd: !(s.showProd || this.props.openProduction) })),
+      goList: () => this.go('list'), goEdit: () => this.startEdit(false),
+      goKitchen: () => this.go('kitchen'), goLabel: () => this.go('label'),
+      scaleVal: S.scaleVal, scaleIng: S.scaleIng, isStock: S.scaleMode === 'stock',
+      scaleNeedsInput: S.scaleMode !== 'recipe',
+      scalePlaceholder: S.scaleMode === 'units' ? 'מספר יחידות' : S.scaleMode === 'weight' ? 'משקל סופי בגרם' : 'גרם במלאי',
+      setScaleVal: ev => this.setState({ scaleVal: ev.target.value }),
+      setScaleIng: ev => this.setState({ scaleIng: ev.target.value }),
+      scaleTabs: tabs.map(([m, label]) => ({ label,
+        onClick: () => this.setState({ scaleMode: m, scaleVal: '' }),
+        style: 'flex:1;min-height:44px;padding:4px;border-radius:10px;font-size:11.5px;cursor:pointer;border:1px solid ' +
+          (S.scaleMode === m ? '#1E6B4C' : '#CDD4CE') + ';background:' + (S.scaleMode === m ? '#1E6B4C' : '#fff') +
+          ';color:' + (S.scaleMode === m ? '#fff' : '#6E7A73') })),
+      list, catChips, query: S.query,
+      countLabel: S.recipes.length + ' מתכונים · ' + S.recipes.filter(r => r.isSub).length + ' בסיסים',
+      setQuery: ev => this.setState({ query: ev.target.value }),
+      goPaste: () => this.go('paste'), goStock: () => this.setState({ screen: 'stock' }),
+      doExport: () => this.setState({ err: 'ייצוא JSON — ' + S.recipes.length + ' מתכונים הועתקו לקובץ' }),
+    });
+  }
+}
+</script>
+</body>
+</html>
