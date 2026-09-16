@@ -6,6 +6,7 @@
 // this is filling in a screen rather than redesigning one.
 
 import { useState } from 'react';
+import { toolLabel } from '@recipe-notebook/engine';
 import { useAuth } from '../auth/AuthProvider.js';
 import { useAppData } from '../app/AppDataProvider.js';
 import { NotImplementedScreen } from './NotImplementedScreen.js';
@@ -13,7 +14,8 @@ import styles from './MoreScreen.module.css';
 
 export function MoreScreen() {
   const { status, user, signOut } = useAuth();
-  const { capabilities } = useAppData();
+  const { capabilities, prefs, setCalibrations } = useAppData();
+  const calibrations = prefs.calib ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +66,64 @@ export function MoreScreen() {
           <p className={styles.error} role="alert">
             {error}
           </p>
+        )}
+      </section>
+
+      {/*
+        The calibration list. Added in stage 4 because a calibration is the way
+        out of a partial calculation, and a WRONG one is worse than none: it
+        takes precedence over every table value (§5.1 rank 1) and wears a green
+        "personal" badge while doing it. So it has to be visible and removable.
+      */}
+      <section className={styles.calibSection} aria-label="הכיולים שלי">
+        <h2 className={styles.accountTitle}>כלי המדידה שלי</h2>
+        <p className={styles.note}>
+          כוס <span className="ltr">{prefs.tools?.cup ?? 240}</span> מ&quot;ל · כף{' '}
+          <span className="ltr">{prefs.tools?.tbsp ?? 15}</span> מ&quot;ל · כפית{' '}
+          <span className="ltr">{prefs.tools?.tsp ?? 5}</span> מ&quot;ל
+        </p>
+
+        <h3 className={styles.calibHead}>
+          {calibrations.length === 0
+            ? 'אין כיולים אישיים'
+            : calibrations.length === 1
+              ? 'כיול אישי אחד'
+              : `${calibrations.length} כיולים אישיים`}
+        </h3>
+
+        {calibrations.length === 0 ? (
+          <p className={styles.note}>
+            כיול אישי נמדד מתוך דף המתכון, על רכיב שאין לו נתון צפיפות אמין. הוא
+            מקבל עדיפות על כל נתון בטבלה.
+          </p>
+        ) : (
+          <ul className={styles.calibList}>
+            {calibrations.map((c) => (
+              <li key={`${c.id}-${c.tool}`} className={styles.calibItem}>
+                <span className={styles.calibItemText}>
+                  <span className={styles.calibItemName}>{c.name}</span>
+                  <span className={styles.calibItemDetail}>
+                    {toolLabel(c.tool)} אחת = <span className="ltr">{c.grams}</span> גרם,
+                    נמדד בכלי של <span className="ltr">{c.toolMl}</span> מ&quot;ל
+                    {c.at ? ` · ${c.at}` : ''}
+                    {c.toolMlAssumed && ' · גודל הכלי הונח, כדאי לאמת'}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className={styles.calibRemove}
+                  aria-label={`הסרת הכיול של ${c.name} ב${toolLabel(c.tool)}`}
+                  onClick={() =>
+                    void setCalibrations(
+                      calibrations.filter((x) => !(x.id === c.id && x.tool === c.tool)),
+                    )
+                  }
+                >
+                  הסרה
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 

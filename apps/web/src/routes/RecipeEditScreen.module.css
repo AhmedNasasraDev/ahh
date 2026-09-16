@@ -1,0 +1,515 @@
+/*
+  The recipe editor.
+
+  Only §16 tokens — no new colour, radius or type size. Layout is logical-
+  property only, so RTL comes from <html dir> and nothing needs mirroring when
+  Arabic is added (§15).
+
+  Every interactive control is at least --hit-min (44px) tall. §15 calls that
+  non-negotiable and it is more true here than anywhere else in the app: this
+  is the screen someone uses with flour on their hands.
+
+  Responsiveness (requirement 14): the form is a single column on a phone and
+  becomes two columns from 600px, which is where a tablet in portrait has room
+  for a label and a field side by side. The breakpoint is on the CONTAINER, via
+  the frame widening in AppShell — not on the viewport — so the layout is right
+  whether the app is full-screen on a tablet or in a narrow window.
+*/
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad-card);
+  padding-block: var(--pad-card) 40px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-in-group);
+  padding-inline: var(--pad-card);
+}
+
+.backLink {
+  min-height: var(--hit-compact);
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--c-green);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+}
+
+.screenTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-screen-title);
+  color: var(--c-ink);
+}
+
+.loading {
+  padding: 40px var(--pad-card) 12px;
+  font-size: var(--fs-body);
+  color: var(--c-muted);
+  text-align: center;
+}
+
+/* ── cards ────────────────────────────────────────────────────────────── */
+.card {
+  margin-inline: var(--pad-card);
+  padding: var(--pad-card);
+  border-radius: var(--r-card-lg);
+  background: var(--c-paper);
+  border: 1px solid var(--c-line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  color: var(--c-ink);
+}
+
+.cardHeadRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+}
+
+.countHint {
+  font-size: var(--fs-meta);
+  color: var(--c-muted);
+}
+
+/* ── fields ───────────────────────────────────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  margin-block-end: 4px;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: var(--hit-min);
+  padding: 10px 11px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  font-size: var(--fs-body);
+  color: var(--c-ink);
+}
+.textarea {
+  min-height: 62px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
+  outline: 2px solid var(--c-green);
+  outline-offset: 1px;
+  border-color: var(--c-green);
+}
+
+.hint {
+  margin-block-start: 5px;
+  font-size: var(--fs-meta);
+  color: var(--c-muted);
+  line-height: 1.6;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-in-group);
+  min-height: var(--hit-compact);
+  font-size: var(--fs-secondary);
+  line-height: 1.5;
+  cursor: pointer;
+}
+.checkRow input {
+  margin-block-start: 3px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  accent-color: var(--c-green);
+}
+.checkRow span {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkPair {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block-start: 10px;
+}
+
+/* ── ingredient and step rows ─────────────────────────────────────────── */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ingCard,
+.stepCard {
+  padding: 11px;
+  border-radius: var(--r-card);
+  background: var(--c-white);
+  border: 1px solid var(--c-line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ingHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-in-group);
+}
+
+.ingIndex {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-block-start: 11px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--c-sand);
+  color: var(--c-white);
+  font-size: var(--fs-meta);
+}
+
+.ingName {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowTools {
+  flex: none;
+  display: flex;
+  gap: 2px;
+}
+
+.iconBtn,
+.iconBtnDanger {
+  min-width: var(--hit-compact);
+  min-height: var(--hit-min);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+}
+.iconBtn {
+  color: var(--c-muted);
+}
+.iconBtnDanger {
+  color: var(--c-red);
+  font-size: 19px;
+}
+.iconBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.iconBtn:hover:not(:disabled),
+.iconBtnDanger:hover {
+  background: var(--c-neutral-bg);
+}
+
+.ingGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* What the engine currently makes of this row. */
+.ingResult {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-in-group);
+  min-height: 20px;
+  font-size: var(--fs-secondary);
+  color: var(--c-ink);
+}
+.ingMissing {
+  color: var(--c-red);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.5;
+}
+
+/* The two honest ways out of an unweighable row. */
+.fixRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-in-group);
+}
+.fixBtn,
+.fixBtnGhost {
+  min-height: var(--hit-compact);
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+}
+.fixBtn {
+  border: 1px solid var(--c-green);
+  background: var(--c-green-bg);
+  color: var(--c-green-ink);
+}
+.fixBtnGhost {
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-muted);
+}
+
+.more {
+  border-block-start: 1px dashed var(--c-line);
+  padding-block-start: 10px;
+}
+.moreSummary {
+  min-height: var(--hit-compact);
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-meta-lg);
+  color: var(--c-green);
+  cursor: pointer;
+}
+.more[open] .moreSummary {
+  margin-block-end: 10px;
+}
+
+.addBtn {
+  min-height: var(--hit-min);
+  border: 1px dashed var(--c-line);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-green);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+}
+.addBtn:hover {
+  background: var(--c-green-bg);
+  border-color: var(--c-green);
+}
+
+/* ── the live calculation block (requirement 11) ──────────────────────── */
+.calcFull {
+  padding: 9px 11px;
+  border-radius: var(--r-card);
+  background: var(--c-green-bg);
+  color: var(--c-green-ink);
+  font-size: var(--fs-meta-lg);
+}
+
+.calcPartialBox,
+.calcNoneBox {
+  padding: 11px 13px;
+  border-radius: var(--r-card);
+  line-height: 1.55;
+  border-inline-start: 3px solid currentColor;
+}
+.calcPartialBox {
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+}
+.calcNoneBox {
+  color: var(--c-red);
+  background: var(--c-red-bg);
+}
+.calcNoticeTitle {
+  font-weight: 600;
+  font-size: var(--fs-secondary);
+}
+.calcNoticeBody {
+  font-size: var(--fs-meta-lg);
+}
+.calcNoticeList {
+  margin-block-start: 3px;
+  font-size: var(--fs-meta-lg);
+  opacity: 0.85;
+}
+
+.previewRows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.previewRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+  padding-block: 6px;
+  border-block-end: 1px solid var(--c-line);
+  font-size: var(--fs-secondary);
+}
+.previewRow:last-child {
+  border-block-end: 0;
+}
+.previewRow dt {
+  color: var(--c-muted);
+}
+.previewRow dd {
+  margin: 0;
+  color: var(--c-ink);
+}
+
+.partialChip {
+  display: inline-block;
+  margin-inline-start: 5px;
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+  font-size: 9.5px;
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+  vertical-align: middle;
+}
+
+/* ── disclosure ───────────────────────────────────────────────────────── */
+.disclosure {
+  min-height: var(--hit-min);
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--c-neutral-bg);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+}
+
+.prodFields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── messages ─────────────────────────────────────────────────────────── */
+.errorSlot:focus-visible {
+  outline: 2px solid var(--c-red);
+  outline-offset: 2px;
+}
+
+.errorBox {
+  margin-inline: var(--pad-card);
+  padding: 11px 13px;
+  border-radius: var(--r-card);
+  background: var(--c-red-bg);
+  color: var(--c-red);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.6;
+}
+.errorTitle {
+  font-weight: 600;
+  margin-block-end: 3px;
+}
+
+.blockedBox {
+  margin-inline: var(--pad-card);
+  padding: 11px 13px;
+  border-radius: var(--r-card);
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.6;
+}
+
+/* ── the action bar ───────────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  gap: var(--gap-in-group);
+  padding-inline: var(--pad-card);
+}
+
+.saveBtn {
+  flex: 2;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--c-green);
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: 600;
+}
+.saveBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.cancelBtn {
+  flex: 1;
+  min-height: 48px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  color: var(--c-muted);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+}
+
+/* ── tablet and wider (requirement 14) ───────────────────────────────── */
+/*
+  Container queries rather than media queries: the app lives inside a frame
+  whose width is set by AppShell, so asking the viewport would give the wrong
+  answer when the frame is narrower than the window.
+*/
+@container app (min-width: 600px) {
+  .row2 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ingGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .checkPair {
+    flex-direction: row;
+    gap: 20px;
+  }
+  .previewRows {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0 20px;
+  }
+}
+
+/* Fallback for a browser with no container-query support: the viewport is a
+   close enough proxy, because the frame only widens on a wide viewport. */
+@supports not (container-type: inline-size) {
+  @media (min-width: 700px) {
+    .row2 {
+      grid-template-columns: 1fr 1fr;
+    }
+    .ingGrid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+}
+
+/* The cost side of the completeness notice. Amber rather than red: a missing
+   price is a gap in the pricing data, not a broken calculation. */
+.costNote {
+  padding: 9px 11px;
+  border-radius: var(--r-card);
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.55;
+}

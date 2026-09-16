@@ -227,6 +227,26 @@ export function createSupabaseRepository({
       return saved;
     },
 
+    async deleteRecipe(id: string): Promise<void> {
+      requireOnline('המתכון');
+
+      // The `owner_id` filter is belt-and-braces — RLS already limits this to
+      // the signed-in account — but it also turns "somebody else's id" into a
+      // no-op rather than an error, which is the right shape for a delete.
+      const { error } = await client
+        .from('recipes')
+        .delete()
+        .eq('id', id)
+        .eq('owner_id', userId);
+      if (error) throw new SupabaseRepositoryError('מחיקת המתכון נכשלה', error);
+
+      // Drop the local copy too. Leaving it would make a deleted recipe
+      // reappear the next time the network drops and the mirror answers.
+      await mirror.forgetRecipe(id);
+      const index = await mirror.readRecipeIndex();
+      void mirror.writeRecipeIndex(index.filter((r) => r.id !== id));
+    },
+
     // ── preferences (§1.2) ─────────────────────────────────────────────────
 
     async getPrefs(): Promise<MeasurementPrefs | null> {

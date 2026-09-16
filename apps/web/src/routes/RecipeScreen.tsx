@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   compute,
   formatGrams,
@@ -13,7 +13,9 @@ import {
 import { useAppData } from '../app/AppDataProvider.js';
 import { SourceBadge } from '../components/SourceBadge.js';
 import { ConvertSheet } from '../features/recipe/ConvertSheet.js';
+import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState, type CalcState } from '../features/recipe/completeness.js';
+import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import styles from '../features/recipe/recipe.module.css';
 
 type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
@@ -48,7 +50,15 @@ const PLACEHOLDER: Record<ScaleMode, string> = {
  */
 export function RecipeScreen() {
   const { recipeId } = useParams<{ recipeId: string }>();
-  const { recipes, prefs } = useAppData();
+  const navigate = useNavigate();
+  const {
+    recipes,
+    prefs,
+    capabilities,
+    saveRecipe,
+    deleteRecipe,
+    setCalibrations,
+  } = useAppData();
 
   const [scaleMode, setScaleMode] = useState<ScaleMode>('recipe');
   const [scaleValue, setScaleValue] = useState('');
@@ -56,6 +66,10 @@ export function RecipeScreen() {
   const [view, setView] = useState<ViewMode>('orig');
   const [showProduction, setShowProduction] = useState(false);
   const [convertIngredient, setConvertIngredient] = useState<IngredientLike | null>(null);
+  const [calibrateFor, setCalibrateFor] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionBusy, setActionBusy] = useState<'copy' | 'delete' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const recipe = recipes.find((r) => r.id === recipeId) ?? null;
   const pro = prefs.pro === true;
@@ -100,6 +114,48 @@ export function RecipeScreen() {
    * marks it — the notice above the page says by how much.
    */
   const derived = (value: string): string => (calc.level === 'none' ? '—' : value);
+
+  /**
+   * A figure that is a sum over the ingredients' PRICES.
+   *
+   * Separate from `derived` because the two can disagree: a recipe can be fully
+   * weighed and completely unpriced, and then every weight figure is real while
+   * every cost figure is meaningless. ₪0.00 reads as "this recipe is free".
+   */
+  const priced = (value: string): string =>
+    calc.level === 'none' || calc.costLevel === 'none' ? '—' : value;
+
+  const onDuplicate = async () => {
+    setActionError(null);
+    setActionBusy('copy');
+    try {
+      // §9 / §13a: a copy carries the formula and none of the history. See
+      // features/recipe/duplicate.ts for why each field is or is not inherited.
+      const copy = duplicateRecipe(recipe, {
+        existingNames: recipes.map((r) => String(r.name ?? '')),
+      });
+      const saved = await saveRecipe(copy);
+      navigate(`/recipe/${saved.id}`);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'השכפול נכשל.');
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const onDelete = async () => {
+    setActionError(null);
+    setActionBusy('delete');
+    try {
+      await deleteRecipe(recipe.id);
+      navigate('/notebook', { replace: true });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'המחיקה נכשלה.');
+      setConfirmDelete(false);
+    } finally {
+      setActionBusy(null);
+    }
+  };
 
   const totalMinutes = (recipe.steps ?? []).reduce((a, s) => a + Number(s.minutes ?? 0), 0);
   const timeLabel =
@@ -166,6 +222,78 @@ export function RecipeScreen() {
       </header>
 
       <CalcNotice state={calc} />
+
+      {/* ── stage 4: edit / duplicate / delete ─────────────────────────── */}
+      <div className={styles.actionRow} role="group" aria-label="פעולות על המתכון">
+        <Link
+          to={`/recipe/${recipe.id}/edit`}
+          className={styles.actionBtn}
+          aria-label={`עריכת ${recipe.name}`}
+        >
+          עריכה
+        </Link>
+        <button
+          type="button"
+          className={styles.actionBtn}
+          onClick={() => void onDuplicate()}
+          disabled={actionBusy !== null || !capabilities.canWrite}
+          aria-label={`שכפול ${recipe.name}`}
+        >
+          {actionBusy === 'copy' ? 'משכפל…' : 'שכפול'}
+        </button>
+        <button
+          type="button"
+          className={styles.actionBtnDanger}
+          onClick={() => setConfirmDelete(true)}
+          disabled={actionBusy !== null || !capabilities.canWrite}
+          aria-label={`מחיקת ${recipe.name}`}
+        >
+          מחיקה
+        </button>
+      </div>
+
+      {actionError && (
+        <p className={styles.confirmBox} role="alert">
+          {actionError}
+        </p>
+      )}
+
+      {confirmDelete && (
+        <div
+          className={styles.confirmBox}
+          role="alertdialog"
+          aria-modal="false"
+          aria-label="אישור מחיקת מתכון"
+        >
+          <p className={styles.confirmTitle}>למחוק את &quot;{recipe.name}&quot;?</p>
+          {/* §7 asks for a confirmation. A confirmation that does not say what
+              goes with it is not really one — the child rows are ON DELETE
+              CASCADE, so this is the only place the user learns that. */}
+          <p className={styles.confirmBody}>
+            יימחקו גם הרכיבים, השלבים, התקלות, יומן הניסיונות, האצוות וההיסטוריה
+            של המתכון. אי אפשר לשחזר.
+          </p>
+          <div className={styles.confirmActions}>
+            <button
+              type="button"
+              className={styles.actionBtnDanger}
+              onClick={() => void onDelete()}
+              disabled={actionBusy === 'delete'}
+              aria-label={`אישור מחיקת ${recipe.name}`}
+            >
+              {actionBusy === 'delete' ? 'מוחק…' : 'כן, למחוק'}
+            </button>
+            <button
+              type="button"
+              className={styles.actionBtn}
+              onClick={() => setConfirmDelete(false)}
+              aria-label="ביטול המחיקה"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
 
 
       {/* ── §6 scaling ─────────────────────────────────────────────────── */}
@@ -348,24 +476,40 @@ export function RecipeScreen() {
               ]}
             />
             {pro && (
-              <ProdBlock
-                title="עלות ותמחור"
-                partial={calc.partialFigures}
-                exact={['יעד פוד קוסט']}
-                items={[
-                  ['עלות כוללת', derived(formatNis(computed.cost))],
-                  [
-                    'עלות ליחידה',
-                    computed.costPerUnit ? derived(formatNis(computed.costPerUnit)) : '—',
-                  ],
-                  ['עלות לק"ג', derived(formatNis(computed.costPerKg))],
-                  ['יעד פוד קוסט', `${recipe.targetFC ?? 0}%`],
-                  [
-                    'מחיר מכירה לפני מע"מ',
-                    computed.price ? derived(formatNis(computed.price)) : '—',
-                  ],
-                ]}
-              />
+              <>
+                {calc.costSummary && (
+                  <p
+                    className={
+                      calc.costLevel === 'none' ? styles.calcNoneBox : styles.unresolvedSummary
+                    }
+                    role="status"
+                    aria-label="שלמות התמחור"
+                  >
+                    {calc.costSummary}
+                    {calc.costLevel === 'partial' && calc.unpricedNames.length > 0 && (
+                      <> חסר מחיר עבור: {calc.unpricedNames.join(' · ')}</>
+                    )}
+                  </p>
+                )}
+                <ProdBlock
+                  title="עלות ותמחור"
+                  partial={calc.partialFigures || calc.costLevel === 'partial'}
+                  exact={['יעד פוד קוסט']}
+                  items={[
+                    ['עלות כוללת', priced(formatNis(computed.cost))],
+                    [
+                      'עלות ליחידה',
+                      computed.costPerUnit ? priced(formatNis(computed.costPerUnit)) : '—',
+                    ],
+                    ['עלות לק"ג', priced(formatNis(computed.costPerKg))],
+                    ['יעד פוד קוסט', `${recipe.targetFC ?? 0}%`],
+                    [
+                      'מחיר מכירה לפני מע"מ',
+                      computed.price ? priced(formatNis(computed.price)) : '—',
+                    ],
+                  ]}
+                />
+              </>
             )}
             {computed.flour > 0 && (
               <ProdBlock
@@ -439,7 +583,22 @@ export function RecipeScreen() {
           }
           prefs={prefs}
           onClose={() => setConvertIngredient(null)}
-          onCalibrate={() => setConvertIngredient(null)}
+          onCalibrate={(name) => {
+            setConvertIngredient(null);
+            setCalibrateFor(name);
+          }}
+        />
+      )}
+
+      {calibrateFor !== null && (
+        <CalibrateSheet
+          ingredientName={calibrateFor}
+          prefs={prefs}
+          onClose={() => setCalibrateFor(null)}
+          onSave={(next) => {
+            void setCalibrations(next);
+            setCalibrateFor(null);
+          }}
         />
       )}
     </div>

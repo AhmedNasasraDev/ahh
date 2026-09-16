@@ -237,7 +237,10 @@ const ALL_WEIGHED: Recipe = {
   targetFC: 30,
   ingredients: [
     { id: 'i1', name: 'קמח לבן', qty: 600, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
-    { id: 'i2', name: 'מים', qty: 400, unit: 'גרם', liquid: true },
+    // Priced at 0 on purpose: tap water really is free, and an explicit zero is
+    // a price. An EMPTY price would make the cost partial, which is the
+    // distinction the cost axis exists to keep.
+    { id: 'i2', name: 'מים', qty: 400, unit: 'גרם', liquid: true, price: 0, priceUnit: 'ליטר' },
   ],
   steps: [{ id: 's1', text: 'ללוש ולאפות.', minutes: 40 }],
 };
@@ -332,5 +335,108 @@ describe('requirement 8 — a partial calculation is never shown as a whole one'
     const notice = screen.getByLabelText('שלמות החישוב');
     expect(notice).toHaveTextContent('קקאו');
     expect(notice).toHaveTextContent('אורז');
+  });
+});
+
+
+// ── the cost axis ───────────────────────────────────────────────────────────
+// Found while reading a tablet screenshot of the editor: a fully weighed recipe
+// with no prices showed "עלות כוללת ₪0". Every weight was real, so the mass
+// axis was legitimately complete — but ₪0 reads as "this recipe is free".
+
+/** Fully weighable, and nobody has priced anything. */
+const UNPRICED: Recipe = {
+  id: 'unpriced',
+  name: 'מתכון בלי מחירים',
+  category: 'לחמים ובצקים',
+  yieldUnits: 10,
+  unitWeight: 100,
+  targetFC: 30,
+  ingredients: [
+    { id: 'i1', name: 'קמח לבן', qty: 600, unit: 'גרם', flour: true },
+    { id: 'i2', name: 'מים', qty: 400, unit: 'גרם', liquid: true },
+  ],
+  steps: [],
+};
+
+/** Fully weighable, half priced. */
+const HALF_PRICED: Recipe = {
+  ...UNPRICED,
+  id: 'halfpriced',
+  name: 'מתכון עם חצי מחירים',
+  ingredients: [
+    { id: 'i1', name: 'קמח לבן', qty: 600, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
+    { id: 'i2', name: 'חמאה 82%', qty: 200, unit: 'גרם' },
+  ],
+};
+
+describe('a fully weighed recipe with no prices has no cost, not a cost of zero', () => {
+  it('shows a dash instead of ₪0.00', async () => {
+    const user = userEvent.setup();
+    renderRecipe('unpriced', { recipes: [UNPRICED] });
+    await screen.findByRole('heading', { name: UNPRICED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+
+    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    expect(within(costRow).getByText('—')).toBeInTheDocument();
+    expect(within(costRow).queryByText(/₪/)).not.toBeInTheDocument();
+  });
+
+  it('says outright that no prices were entered', async () => {
+    const user = userEvent.setup();
+    renderRecipe('unpriced', { recipes: [UNPRICED] });
+    await screen.findByRole('heading', { name: UNPRICED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+
+    const notice = screen.getByLabelText('שלמות התמחור');
+    expect(notice).toHaveTextContent('לא הוזנו מחירים לאף רכיב');
+    expect(notice).toHaveTextContent('אפס אינו התשובה');
+  });
+
+  it('still shows the weight figures, which are complete', async () => {
+    const user = userEvent.setup();
+    renderRecipe('unpriced', { recipes: [UNPRICED] });
+    await screen.findByRole('heading', { name: UNPRICED.name! });
+    // The mass axis is independent: it must NOT be dragged down with the cost.
+    expect(screen.queryByLabelText('שלמות החישוב')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+    const yieldRow = screen.getByText('תשואה תאורטית').closest('div')!;
+    expect(within(yieldRow).getByText('1 ק"ג')).toBeInTheDocument();
+  });
+});
+
+describe('a partly priced recipe says so and marks the cost', () => {
+  it('names the ingredient that has no price', async () => {
+    const user = userEvent.setup();
+    renderRecipe('halfpriced', { recipes: [HALF_PRICED] });
+    await screen.findByRole('heading', { name: HALF_PRICED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+
+    const notice = screen.getByLabelText('שלמות התמחור');
+    expect(notice).toHaveTextContent('רכיב אחד');
+    expect(notice).toHaveTextContent('חמאה 82%');
+    expect(notice).toHaveTextContent('נמוכה מהעלות בפועל');
+  });
+
+  it('shows the figure, marked partial — it is real, just incomplete', async () => {
+    const user = userEvent.setup();
+    renderRecipe('halfpriced', { recipes: [HALF_PRICED] });
+    await screen.findByRole('heading', { name: HALF_PRICED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+
+    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    expect(within(costRow).getByText(/₪/)).toBeInTheDocument();
+    expect(within(costRow).getByText('חלקי')).toBeInTheDocument();
+  });
+});
+
+describe('an explicit price of zero is a price', () => {
+  it('does not make the cost partial — tap water really is free', async () => {
+    const user = userEvent.setup();
+    renderRecipe('weighed', { recipes: [ALL_WEIGHED] });
+    await screen.findByRole('heading', { name: ALL_WEIGHED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+    expect(screen.queryByLabelText('שלמות התמחור')).not.toBeInTheDocument();
+    expect(screen.queryByText('חלקי')).not.toBeInTheDocument();
   });
 });

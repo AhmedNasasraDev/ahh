@@ -70,6 +70,11 @@
   /* §15 mobile-first: the prototype was laid out at 402×874. */
   --frame-w: 402px;
   --frame-h: 874px;
+  /* Not from §16 — added in stage 4 for requirement 14 (tablet). §16 specifies
+     the phone frame the prototype was drawn at and says nothing about a tablet,
+     so this is an addition rather than a change to a specified value. */
+  --frame-w-wide: 760px;
+  --frame-h-wide: 1040px;
 }
 
 /* Provenance colours, keyed to the engine's Source union so a badge can never

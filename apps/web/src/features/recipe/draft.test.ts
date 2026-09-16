@@ -1,0 +1,270 @@
+// The draft model.
+//
+// Most of these tests exist for one reason: the form is the place where NULL
+// and 0 are easiest to lose. `mappers.test.ts` proves the row↔domain boundary
+// keeps them apart; this proves the keyboard↔draft boundary does too, so the
+// distinction survives the whole way from a user's finger to a column.
+
+import { describe, expect, it } from 'vitest';
+import { compute, defaultPrefs, type Recipe } from '@recipe-notebook/engine';
+import { recipeToRow, ingredientsToRows } from '../../data/mappers.js';
+import {
+  draftFromRecipe,
+  draftToRecipe,
+  emptyDraft,
+  emptyIngredient,
+  isDirty,
+  moveRow,
+  resetDraftKeys,
+  validateDraft,
+  type RecipeDraft,
+} from './draft.js';
+
+const withIngredients = (
+  rows: Array<Partial<ReturnType<typeof emptyIngredient>>>,
+): RecipeDraft => ({
+  ...emptyDraft(),
+  name: 'מתכון',
+  ingredients: rows.map((r) => ({ ...emptyIngredient(), ...r })),
+});
+
+describe('an empty numeric field stays empty all the way to the column', () => {
+  it('an untouched measured yield becomes SQL NULL, not 0', () => {
+    const draft = { ...emptyDraft(), name: 'לחם' };
+    expect(draft.yieldActual).toBe('');
+    const row = recipeToRow(draftToRecipe(draft), 'owner');
+    expect(row.yield_actual).toBeNull();
+  });
+
+  it('a typed zero becomes 0, because someone measured it', () => {
+    const draft = { ...emptyDraft(), name: 'לחם', yieldActual: '0' };
+    const row = recipeToRow(draftToRecipe(draft), 'owner');
+    expect(row.yield_actual).toBe(0);
+  });
+
+  it('the same holds for an ingredient\'s water percentage', () => {
+    const draft = withIngredients([
+      { name: 'קמח', qty: '500' },
+      { name: 'שמן זית', qty: '50', waterPct: '0' },
+    ]);
+    const rows = ingredientsToRows(draftToRecipe(draft), 'r1');
+    // untouched → the shared water table answers
+    expect(rows[0]!.water_pct).toBeNull();
+    // typed zero → oil really contains no water
+    expect(rows[1]!.water_pct).toBe(0);
+  });
+
+  it('and for a recipe-level density (§5.1 rank 2)', () => {
+    const draft = withIngredients([
+      { name: 'קמח', qty: '2', unit: 'cup' },
+      { name: 'קקאו', qty: '1', unit: 'cup', gPer100: '105' },
+    ]);
+    const rows = ingredientsToRows(draftToRecipe(draft), 'r1');
+    expect(rows[0]!.g_per_100).toBeNull();
+    expect(rows[1]!.g_per_100).toBe(105);
+  });
+
+  it('a field cleared after being filled goes back to NULL', () => {
+    // The regression a `number`-typed input would cause: clearing the box
+    // yields 0 or NaN, and either one is a different answer from "no value".
+    const filled = { ...emptyDraft(), name: 'לחם', yieldActual: '1200' };
+    expect(recipeToRow(draftToRecipe(filled), 'o').yield_actual).toBe(1200);
+    const cleared = { ...filled, yieldActual: '' };
+    expect(recipeToRow(draftToRecipe(cleared), 'o').yield_actual).toBeNull();
+  });
+});
+
+describe('the draft can be handed straight to the engine', () => {
+  // This is what makes the editor's preview and the recipe page agree: there is
+  // no conversion step between them that could drift.
+  const prefs = { ...defaultPrefs('pro'), done: true, tools: { cup: 240, tbsp: 15, tsp: 5 } };
+
+  it('computes from string quantities without a conversion pass', () => {
+    const draft = withIngredients([
+      { name: 'קמח לבן', qty: '500', unit: 'g', flour: true },
+      { name: 'מים', qty: '350', unit: 'g', liquid: true },
+    ]);
+    const recipe = draftToRecipe(draft);
+    const c = compute(recipe, [recipe], { prefs });
+    expect(c.totalG).toBe(850);
+    expect(c.hydration).toBeCloseTo(70, 1);
+  });
+
+  it('reports an unweighable row rather than treating it as zero', () => {
+    const draft = withIngredients([
+      { name: 'קמח לבן', qty: '2', unit: 'cup', flour: true },
+      { name: 'קקאו', qty: '1', unit: 'cup' },
+    ]);
+    const recipe = draftToRecipe(draft);
+    const c = compute(recipe, [recipe], { prefs });
+    expect(c.unresolved.map((u) => u.name)).toEqual(['קקאו']);
+    // and the total is the sum of what COULD be weighed, not a guess
+    expect(c.totalG).toBe(240);
+  });
+
+  it('an empty quantity is not a zero-weight ingredient', () => {
+    const draft = withIngredients([{ name: 'קורט מלח', qty: '' }]);
+    const recipe = draftToRecipe(draft);
+    // The row is kept — it is a real instruction — but it cannot be weighed.
+    expect(recipe.ingredients).toHaveLength(1);
+    const c = compute(recipe, [recipe], { prefs });
+    expect(c.totalG).toBe(0);
+  });
+});
+
+describe('what gets dropped on save', () => {
+  it('drops a row with no name and no quantity', () => {
+    const draft = withIngredients([{ name: 'קמח', qty: '500' }, {}]);
+    expect(draftToRecipe(draft).ingredients).toHaveLength(1);
+  });
+
+  it('keeps a row with a name but no quantity — "קורט מלח" is a real line', () => {
+    const draft = withIngredients([{ name: 'קורט מלח', qty: '' }]);
+    expect(draftToRecipe(draft).ingredients).toHaveLength(1);
+  });
+
+  it('drops an untouched step but keeps one with only a time', () => {
+    const draft: RecipeDraft = {
+      ...emptyDraft(),
+      name: 'x',
+      ingredients: [{ ...emptyIngredient(), name: 'קמח', qty: '1' }],
+      steps: [
+        { key: 'a', text: '', temp: '', minutes: '' },
+        { key: 'b', text: '', temp: '', minutes: '30' },
+      ],
+    };
+    expect(draftToRecipe(draft).steps).toHaveLength(1);
+  });
+
+  it('never writes an optional field the user left alone', () => {
+    const draft = withIngredients([{ name: 'קמח', qty: '500' }]);
+    const ing = draftToRecipe(draft).ingredients![0]!;
+    for (const key of ['waterPct', 'unitWeight', 'gPer100', 'price', 'priceUnit', 'note']) {
+      expect(key in ing).toBe(false);
+    }
+    // and the booleans are absent rather than false
+    expect('flour' in ing).toBe(false);
+    expect('liquid' in ing).toBe(false);
+  });
+});
+
+describe('a round trip through the form changes nothing', () => {
+  it('recipe → draft → recipe preserves the fields that were set', () => {
+    resetDraftKeys();
+    const recipe: Recipe = {
+      id: 'r1',
+      name: 'בריוש',
+      category: 'לחמים',
+      tags: ['חג', 'עשיר'],
+      yieldUnits: 12,
+      unitWeight: 85,
+      targetFC: 28,
+      shelfLife: '3 ימים',
+      storage: 'מקרר',
+      notes: 'לא ללוש יותר מדי',
+      ingredients: [
+        { id: 'i1', name: 'קמח לחם', qty: 1000, unit: 'גרם', flour: true, price: 4.2, priceUnit: 'ק"ג' },
+        { id: 'i2', name: 'חמאה 82%', qty: 250, unit: 'גרם' },
+      ],
+      steps: [{ id: 's1', text: 'ללוש', minutes: 12 }],
+    };
+
+    const back = draftToRecipe(draftFromRecipe(recipe));
+    expect(back.name).toBe('בריוש');
+    expect(back.tags).toEqual(['חג', 'עשיר']);
+    expect(back.ingredients!.map((i) => i.name)).toEqual(['קמח לחם', 'חמאה 82%']);
+    expect(back.ingredients![0]!.flour).toBe(true);
+    expect(back.ingredients![0]!.price).toBe('4.2');
+    expect(back.ingredients![1]!.flour).toBeUndefined();
+    expect(back.steps!.map((s) => s.text)).toEqual(['ללוש']);
+  });
+
+  it('a NULL measured yield survives the round trip as absent', () => {
+    const recipe: Recipe = { id: 'r', name: 'x', ingredients: [], steps: [] };
+    const back = draftToRecipe(draftFromRecipe(recipe));
+    expect(recipeToRow(back, 'o').yield_actual).toBeNull();
+  });
+
+  it('a measured yield of zero survives as zero', () => {
+    const recipe: Recipe = { id: 'r', name: 'x', yieldActual: 0, ingredients: [], steps: [] };
+    const back = draftToRecipe(draftFromRecipe(recipe));
+    expect(recipeToRow(back, 'o').yield_actual).toBe(0);
+  });
+});
+
+describe('validation says what is wrong, and nothing more', () => {
+  it('requires a name', () => {
+    const problems = validateDraft({ ...emptyDraft(), name: '   ' });
+    expect(problems.some((p) => p.field === 'name')).toBe(true);
+  });
+
+  it('requires at least one ingredient', () => {
+    const problems = validateDraft({ ...emptyDraft(), name: 'לחם' });
+    expect(problems.some((p) => p.field === 'ingredients')).toBe(true);
+  });
+
+  it('accepts a recipe in progress — a missing quantity is not an error', () => {
+    const draft = withIngredients([{ name: 'קמח', qty: '' }]);
+    expect(validateDraft(draft)).toEqual([]);
+  });
+
+  it('rejects a quantity that is not a number, and names the ingredient', () => {
+    const draft = withIngredients([{ name: 'קמח לבן', qty: 'הרבה' }]);
+    const problems = validateDraft(draft);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]!.message).toContain('קמח לבן');
+    expect(problems[0]!.message).toContain('אינה מספר');
+  });
+
+  it('points out a quantity with no ingredient name', () => {
+    const draft = withIngredients([{ name: '', qty: '500' }]);
+    const problems = validateDraft(draft);
+    expect(problems.some((p) => p.message.includes('אין שם'))).toBe(true);
+  });
+
+  it('checks the recipe-level numbers too', () => {
+    const draft = { ...withIngredients([{ name: 'קמח', qty: '1' }]), targetFC: 'שלושים' };
+    expect(validateDraft(draft).some((p) => p.field === 'targetFC')).toBe(true);
+  });
+});
+
+describe('reordering', () => {
+  it('moves a row up and down', () => {
+    expect(moveRow(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
+    expect(moveRow(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('is a no-op at either end, rather than dropping the row', () => {
+    expect(moveRow(['a', 'b'], 0, -1)).toEqual(['a', 'b']);
+    expect(moveRow(['a', 'b'], 1, 2)).toEqual(['a', 'b']);
+    expect(moveRow(['a', 'b'], 1, 1)).toEqual(['a', 'b']);
+  });
+
+  it('does not mutate the input', () => {
+    const list = ['a', 'b', 'c'];
+    moveRow(list, 0, 2);
+    expect(list).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('unsaved-changes detection ignores the local row keys', () => {
+  it('sees no change in a freshly loaded draft', () => {
+    const recipe: Recipe = {
+      id: 'r',
+      name: 'x',
+      ingredients: [{ id: 'i', name: 'קמח', qty: 1, unit: 'גרם' }],
+      steps: [],
+    };
+    const a = draftFromRecipe(recipe);
+    const b = draftFromRecipe(recipe);
+    // Different loads produce different row keys. If those counted, the editor
+    // would warn about unsaved changes on a form nobody had touched.
+    expect(a.ingredients[0]!.key).not.toBe(b.ingredients[0]!.key);
+    expect(isDirty(a, b)).toBe(false);
+  });
+
+  it('sees a real edit', () => {
+    const base = emptyDraft();
+    expect(isDirty({ ...base, name: 'חדש' }, base)).toBe(true);
+  });
+});

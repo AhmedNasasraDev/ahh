@@ -44,6 +44,18 @@ export interface AppData {
   setPrefs(patch: Partial<MeasurementPrefs>): Promise<void>;
   setCalibrations(list: readonly Calibration[]): Promise<void>;
   getRecipe(id: string): Recipe | null;
+  /**
+   * Persists a recipe and returns it as the server stored it — with the real
+   * id, which a newly created recipe does not have until now.
+   *
+   * Unlike `setPrefs`, this is NOT optimistic and it does NOT swallow the
+   * failure into the banner. The caller is a form that has to know whether to
+   * navigate away, and a form that navigates away from an unsaved recipe loses
+   * the user's work. So this throws.
+   */
+  saveRecipe(recipe: Recipe): Promise<Recipe>;
+  /** Removes a recipe. Throws on failure, for the same reason. */
+  deleteRecipe(id: string): Promise<void>;
   clearError(): void;
 }
 
@@ -182,6 +194,31 @@ export function AppDataProvider({
     [recipes],
   );
 
+  const saveRecipe = useCallback(
+    async (recipe: Recipe): Promise<Recipe> => {
+      const saved = await repo.saveRecipe(recipe);
+      // Replace by id rather than refetching the notebook: the repository
+      // already re-read the recipe after writing it, so this list is as fresh
+      // as a round trip would make it, for one less round trip.
+      setRecipes((list) => {
+        const without = list.filter((r) => r.id !== saved.id && r.id !== recipe.id);
+        return [...without, saved];
+      });
+      setError(null);
+      return saved;
+    },
+    [repo],
+  );
+
+  const deleteRecipe = useCallback(
+    async (id: string): Promise<void> => {
+      await repo.deleteRecipe(id);
+      setRecipes((list) => list.filter((r) => r.id !== id));
+      setError(null);
+    },
+    [repo],
+  );
+
   const value = useMemo<AppData>(
     () => ({
       ready,
@@ -194,9 +231,23 @@ export function AppDataProvider({
       setPrefs,
       setCalibrations,
       getRecipe,
+      saveRecipe,
+      deleteRecipe,
       clearError: () => setError(null),
     }),
-    [ready, prefs, recipes, categories, caps, error, setPrefs, setCalibrations, getRecipe],
+    [
+      ready,
+      prefs,
+      recipes,
+      categories,
+      caps,
+      error,
+      setPrefs,
+      setCalibrations,
+      getRecipe,
+      saveRecipe,
+      deleteRecipe,
+    ],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

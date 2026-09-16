@@ -531,3 +531,160 @@
   background: var(--c-amber-bg);
   vertical-align: middle;
 }
+
+/* ── personal calibration sheet ───────────────────────────────────────── */
+.calibIntro {
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+  line-height: 1.6;
+}
+
+.calibTool {
+  margin-block-start: 8px;
+  padding: 9px 11px;
+  border-radius: var(--r-card);
+  background: var(--c-green-bg);
+  color: var(--c-green-ink);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.55;
+}
+.calibCustom {
+  opacity: 0.8;
+}
+
+.calibField {
+  margin-block-start: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.calibLabel {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  margin-block-end: 4px;
+}
+.calibInput {
+  padding: 11px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  font-size: var(--fs-body-lg);
+  min-height: var(--hit-min);
+}
+.calibInput:focus-visible {
+  outline: 2px solid var(--c-green);
+  outline-offset: 1px;
+  border-color: var(--c-green);
+}
+
+.calibExisting {
+  margin-block-start: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-card);
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.55;
+}
+.calibError {
+  margin-block-start: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-card);
+  background: var(--c-red-bg);
+  color: var(--c-red);
+  font-size: var(--fs-meta-lg);
+}
+
+.calibRelated {
+  margin-block-start: 18px;
+  padding-block-start: 14px;
+  border-block-start: 1px solid var(--c-line);
+}
+.calibRelatedNote {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.6;
+}
+.calibRelatedList {
+  margin-block-start: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.calibRelatedList li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-in-group);
+}
+.calibRelatedText {
+  flex: 1;
+  font-size: var(--fs-meta-lg);
+  color: var(--c-ink);
+  line-height: 1.55;
+}
+.calibAttachBtn {
+  flex: none;
+  min-height: var(--hit-compact);
+  padding: 0 14px;
+  border: 1px solid var(--c-green);
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-secondary);
+}
+
+/* ── recipe-page actions (edit / duplicate / delete) ──────────────────── */
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-in-group);
+  padding: 0 var(--pad-card);
+}
+.actionBtn,
+.actionBtnDanger {
+  flex: 1 1 auto;
+  min-height: var(--hit-min);
+  padding: 0 16px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+}
+.actionBtn {
+  color: var(--c-ink);
+}
+.actionBtnDanger {
+  color: var(--c-red);
+  border-color: var(--c-red);
+}
+.actionBtn:disabled,
+.actionBtnDanger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The delete confirmation. Deliberately a dialog and not a window.confirm:
+   §7 asks for a confirmation that says what will be lost, and a native confirm
+   cannot name the recipe or list its children. */
+.confirmBox {
+  margin: 0 var(--pad-card);
+  padding: 13px 15px;
+  border-radius: var(--r-card);
+  background: var(--c-red-bg);
+  color: var(--c-red);
+  border-inline-start: 3px solid currentColor;
+}
+.confirmTitle {
+  font-weight: 600;
+  font-size: var(--fs-secondary);
+}
+.confirmBody {
+  margin-block-start: 4px;
+  font-size: var(--fs-meta-lg);
+  line-height: 1.6;
+}
+.confirmActions {
+  margin-block-start: 12px;
+  display: flex;
+  gap: var(--gap-in-group);
+}

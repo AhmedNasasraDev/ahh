@@ -81,6 +81,26 @@ let fake: FakeSupabase;
 const repoFor = (userId: string) =>
   createSupabaseRepository({ client: fake.client as TypedSupabaseClient, userId });
 
+/**
+ * Runs `fn` with the browser reporting no network, then puts it back.
+ *
+ * `navigator.onLine` is an accessor on Navigator.prototype, not an own property
+ * of the instance — so `Object.getOwnPropertyDescriptor(navigator, 'onLine')`
+ * returns undefined, and a restore guarded on that value never runs. The first
+ * version of this leaked `onLine = false` into every test declared after it,
+ * which then failed with "no connection" for no visible reason. The fix is to
+ * delete the own property that defineProperty added, letting the prototype
+ * accessor take over again.
+ */
+async function whileOffline(fn: () => Promise<void>): Promise<void> {
+  Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+  try {
+    await fn();
+  } finally {
+    delete (navigator as unknown as Record<string, unknown>)['onLine'];
+  }
+}
+
 beforeEach(() => {
   resetFakeIds();
   resetMemoryIdb();
@@ -312,17 +332,20 @@ describe('calibrations round-trip with the frozen tool volume (B5)', () => {
 
 describe('when the network is gone', () => {
   it('reports itself unable to write and refuses, rather than losing the edit silently', async () => {
-    const online = Object.getOwnPropertyDescriptor(navigator, 'onLine');
-    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-    try {
+    await whileOffline(async () => {
       const repo = repoFor(USER_A);
       expect(repo.capabilities().canWrite).toBe(false);
       await expect(
         repo.saveRecipe({ id: 'new-5', name: 'משהו', ingredients: [], steps: [] } as unknown as Recipe),
       ).rejects.toBeInstanceOf(WriteNotAllowedError);
-    } finally {
-      if (online) Object.defineProperty(navigator, 'onLine', online);
-    }
+    });
+  });
+
+  it('is online again once that test is over — the guard restores it', () => {
+    // A regression test for the leak itself: without the delete above, every
+    // test declared after the offline one ran against a browser that believed
+    // it had no network.
+    expect(repoFor(USER_A).capabilities().canWrite).toBe(true);
   });
 
   it('serves the notebook from the mirror when the read fails, and says so', async () => {
@@ -339,6 +362,45 @@ describe('when the network is gone', () => {
   it('raises the failure when there is nothing in the mirror either', async () => {
     fake.setFailWith({ message: 'TypeError: Failed to fetch' });
     await expect(repoFor(USER_A).listRecipes()).rejects.toThrow(/טעינת המחברת נכשלה/);
+  });
+});
+
+describe('deleting a recipe (stage 4, requirement 7)', () => {
+  it('removes the recipe and its children', async () => {
+    const repo = repoFor(USER_A);
+    await repo.deleteRecipe('ra1');
+    expect(fake.db['recipes']!.map((r) => r['id'])).toEqual(['rb1']);
+    // ON DELETE CASCADE, emulated by the double the same way the schema does it
+    expect(fake.db['ingredients']!.every((i) => i['recipe_id'] === 'rb1')).toBe(true);
+    expect(fake.db['private_notes']!.every((n) => n['recipe_id'] === 'rb1')).toBe(true);
+  });
+
+  it('is a no-op on another account\'s recipe, not an error', async () => {
+    // RLS makes the row invisible, so the DELETE matches nothing. Reporting a
+    // failure here would tell the caller the id exists, which is itself a leak.
+    await repoFor(USER_A).deleteRecipe('rb1');
+    expect(fake.db['recipes']!.map((r) => r['id']).sort()).toEqual(['ra1', 'rb1']);
+  });
+
+  it('drops the local copy too, so a deleted recipe cannot come back from cache', async () => {
+    const repo = repoFor(USER_A);
+    await repo.listRecipes();
+    await repo.getRecipe('ra1');
+    await repo.deleteRecipe('ra1');
+
+    // With the network gone the mirror is what answers, and it must not serve
+    // a recipe that was deleted.
+    fake.setFailWith({ message: 'TypeError: Failed to fetch' });
+    await expect(repo.listRecipes()).rejects.toThrow(/טעינת המחברת נכשלה/);
+  });
+
+  it('refuses to delete while offline rather than losing track of it', async () => {
+    await whileOffline(async () => {
+      await expect(repoFor(USER_A).deleteRecipe('ra1')).rejects.toBeInstanceOf(
+        WriteNotAllowedError,
+      );
+      expect(fake.db['recipes']).toHaveLength(2);
+    });
   });
 });
 

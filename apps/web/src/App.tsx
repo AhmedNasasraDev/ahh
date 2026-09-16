@@ -7,6 +7,7 @@ import { AppShell } from './shell/AppShell.js';
 import { OnboardingScreen } from './routes/OnboardingScreen.js';
 import { NotebookScreen } from './routes/NotebookScreen.js';
 import { RecipeScreen } from './routes/RecipeScreen.js';
+import { RecipeEditScreen } from './routes/RecipeEditScreen.js';
 import { MoreScreen } from './routes/MoreScreen.js';
 import { NotImplementedScreen } from './routes/NotImplementedScreen.js';
 
@@ -43,6 +44,10 @@ export function App() {
                 }
               >
                 <Route path="/notebook" element={<NotebookScreen />} />
+                {/* `/recipe/new` before `/recipe/:recipeId`, so "new" is not
+                    read as a recipe id. */}
+                <Route path="/recipe/new" element={<RecipeEditScreen />} />
+                <Route path="/recipe/:recipeId/edit" element={<RecipeEditScreen />} />
                 <Route path="/recipe/:recipeId" element={<RecipeScreen />} />
                 <Route path="/home" element={<NotImplementedScreen screen="בית" />} />
                 <Route path="/groups" element={<NotImplementedScreen screen="קבוצות" />} />

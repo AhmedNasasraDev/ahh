@@ -13,7 +13,7 @@ import styles from './NotebookScreen.module.css';
  * a button that lies is worse than a button that is absent.
  */
 export function NotebookScreen() {
-  const { recipes, categories, prefs } = useAppData();
+  const { recipes, categories, prefs, capabilities } = useAppData();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('הכל');
 
@@ -38,11 +38,24 @@ export function NotebookScreen() {
   return (
     <div className={styles.wrap}>
       <header className={styles.head}>
-        <h1 className={styles.title}>מחברת מתכונים</h1>
-        <p className={styles.count}>
-          {recipes.length === 1 ? 'מתכון אחד' : `${recipes.length} מתכונים`}
-          {subCount > 0 && ` · ${subCount === 1 ? 'בסיס אחד' : `${subCount} בסיסים`}`}
-        </p>
+        <div className={styles.headRow}>
+          <div>
+            <h1 className={styles.title}>מחברת מתכונים</h1>
+            <p className={styles.count}>
+              {recipes.length === 1 ? 'מתכון אחד' : `${recipes.length} מתכונים`}
+              {subCount > 0 && ` · ${subCount === 1 ? 'בסיס אחד' : `${subCount} בסיסים`}`}
+            </p>
+          </div>
+          {/*
+            The entry point stage 4 was mainly about. It is rendered even when
+            the repository cannot write, because hiding it would leave a
+            read-only visitor with no explanation of where recipes come from —
+            the editor itself says plainly that saving is unavailable.
+          */}
+          <Link to="/recipe/new" className={styles.newBtn}>
+            + מתכון חדש
+          </Link>
+        </div>
       </header>
 
       <div className={styles.searchRow}>
@@ -74,11 +87,23 @@ export function NotebookScreen() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className={styles.empty}>
-          {query.trim() || category !== 'הכל'
-            ? 'אין מתכון שתואם לחיפוש.'
-            : 'המחברת ריקה.'}
-        </p>
+        query.trim() || category !== 'הכל' ? (
+          <p className={styles.empty}>אין מתכון שתואם לחיפוש.</p>
+        ) : (
+          /* A first-run notebook. Saying only "המחברת ריקה." was the dead end
+             stage 3 ended on: correct, and no help at all. */
+          <div className={styles.emptyState}>
+            <p className={styles.emptyTitle}>המחברת ריקה.</p>
+            <p className={styles.emptyBody}>
+              {capabilities.canWrite
+                ? 'כאן יישמרו המתכונים שלכם — עם כמויות, תשואה, עלות ונוסחת אופה. אפשר להתחיל ממתכון אחד.'
+                : 'אין חיבור לשרת בהתקנה הזאת, ולכן אי אפשר לשמור מתכונים כרגע.'}
+            </p>
+            <Link to="/recipe/new" className={styles.emptyCta}>
+              יצירת המתכון הראשון
+            </Link>
+          </div>
+        )
       ) : (
         <ul className={styles.list}>
           {filtered.map((r) => {

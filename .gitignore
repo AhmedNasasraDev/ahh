@@ -4,3 +4,4 @@ dist/
 # Local Supabase configuration. Never committed - see apps/web/.env.example.
 .env.local
 .env.*.local
+.e2e-shots/

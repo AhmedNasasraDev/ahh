@@ -1,5 +1,13 @@
-/* §15: mobile-first. The prototype was laid out at 402×874, so on a desktop we
- * centre a frame of that width rather than stretching a phone layout. */
+/* §15: mobile-first. The prototype was laid out at 402×874, so a phone gets
+ * exactly that and a desktop gets that frame centred rather than a phone layout
+ * stretched across a monitor.
+ *
+ * Stage-4 requirement 14 added the middle case, which was genuinely missing: on
+ * a tablet the 402px frame left most of the screen empty and squeezed the
+ * recipe editor into one narrow column. From 700px of viewport the frame grows
+ * to --frame-w-wide, which is enough for a label and a field side by side and
+ * still a comfortable measure for reading a recipe. Nothing else changes — same
+ * tokens, same components, same single-column app. */
 
 .outer {
   min-height: 100vh;
@@ -20,6 +28,20 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--c-app-bg);
+
+  /* Screens inside the frame size themselves against the FRAME, not the
+     viewport, because those are different widths on a desktop. */
+  container-type: inline-size;
+  container-name: app;
+}
+
+/* Tablet and up: a wider frame and a taller one, so a tablet is not a large
+   phone. Below this the phone layout is untouched. */
+@media (min-width: 700px) {
+  .frame {
+    max-width: var(--frame-w-wide);
+    max-height: var(--frame-h-wide);
+  }
 }
 
 /* On a real phone the frame is the whole screen, with no rounding or shadow. */

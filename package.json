@@ -12,6 +12,10 @@
     "build": "npm run build --workspace @recipe-notebook/engine && npm run build --workspace @recipe-notebook/web",
     "dev": "npm run dev --workspace @recipe-notebook/web",
     "seed:check": "node supabase/scripts/generate-density-seed.mjs --check",
-    "schema:check": "node supabase/scripts/check-types-against-schema.mjs"
+    "schema:check": "node supabase/scripts/check-types-against-schema.mjs",
+    "e2e:build": "cd apps/web && VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= vite build --outDir dist-demo --emptyOutDir",
+    "e2e": "npm run e2e:build && node apps/web/e2e/stage4.mjs",
+    "roundtrip:emit": "vite-node supabase/scripts/mapper-roundtrip.mts -- --emit",
+    "roundtrip:verify": "vite-node supabase/scripts/mapper-roundtrip.mts -- --verify supabase/tests/mapper-roundtrip.rows.json"
   }
 }

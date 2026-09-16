@@ -35,6 +35,17 @@ export interface RecipeRepository {
   listRecipes(): Promise<Recipe[]>;
   getRecipe(id: string): Promise<Recipe | null>;
   /**
+   * Removes a recipe and everything hanging off it.
+   *
+   * The child tables are ON DELETE CASCADE, so one statement takes the
+   * ingredients, steps, issues, trials, batches, versions and private note with
+   * it. That is deliberate: a recipe whose ingredients had been orphaned would
+   * still compute, and would compute wrongly.
+   *
+   * Rejects with `WriteNotAllowedError` when the repository cannot write.
+   */
+  deleteRecipe(id: string): Promise<void>;
+  /**
    * Persists a recipe. Rejects with `WriteNotAllowedError` when the repository
    * cannot write — callers must surface that, never pretend it worked.
    * (§17 / AC #17: no screen may present a mock action as if it reached a server.)

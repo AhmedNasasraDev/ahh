@@ -150,3 +150,90 @@ describe('a personal calibration is the way out of partial', () => {
     expect(after.level).toBe('full');
   });
 });
+
+
+// ── the cost axis ───────────────────────────────────────────────────────────
+// Separate from the mass axis because the two really do come apart: a recipe
+// can be fully weighed and completely unpriced.
+
+const PRICED: Recipe = {
+  id: 'pr',
+  name: 'עם מחירים',
+  ingredients: [
+    { id: 'i1', name: 'קמח לבן', qty: 500, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
+    { id: 'i2', name: 'חמאה', qty: 200, unit: 'גרם', price: 32, priceUnit: 'ק"ג' },
+  ],
+  steps: [],
+} as unknown as Recipe;
+
+describe('cost completeness', () => {
+  it('is full when every weighable ingredient carries a price', () => {
+    const s = state(PRICED);
+    expect(s.level).toBe('full');
+    expect(s.costLevel).toBe('full');
+    expect(s.costSummary).toBe('');
+  });
+
+  it('is none when nothing is priced, even though every weight is known', () => {
+    const s = state(ALL_WEIGHED);
+    // The two axes are independent, and this is the case that proves it.
+    expect(s.level).toBe('full');
+    expect(s.costLevel).toBe('none');
+    expect(s.costSummary).toContain('לא הוזנו מחירים');
+    expect(s.costSummary).toContain('אפס אינו התשובה');
+  });
+
+  it('is partial when some are priced, and names the ones that are not', () => {
+    const s = state({
+      ...PRICED,
+      ingredients: [
+        { id: 'i1', name: 'קמח לבן', qty: 500, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
+        { id: 'i2', name: 'חמאה', qty: 200, unit: 'גרם' },
+      ],
+    } as unknown as Recipe);
+    expect(s.costLevel).toBe('partial');
+    expect(s.unpricedNames).toEqual(['חמאה']);
+    expect(s.costSummary).toContain('נמוכה מהעלות בפועל');
+  });
+
+  it('treats an explicit zero as a price — free is a price', () => {
+    const s = state({
+      ...PRICED,
+      ingredients: [
+        { id: 'i1', name: 'קמח לבן', qty: 500, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
+        { id: 'i2', name: 'מים', qty: 350, unit: 'גרם', liquid: true, price: 0, priceUnit: 'ליטר' },
+      ],
+    } as unknown as Recipe);
+    expect(s.costLevel).toBe('full');
+  });
+
+  it('reports none when nothing could be weighed, whatever the prices say', () => {
+    const s = state({
+      ...NOTHING_WEIGHED,
+      ingredients: [
+        { id: 'i1', name: 'קקאו', qty: 1, unit: 'כוס', price: 40, priceUnit: 'ק"ג' },
+        { id: 'i2', name: 'אורז', qty: 2, unit: 'כוס', price: 8, priceUnit: 'ק"ג' },
+      ],
+    } as unknown as Recipe);
+    // A price with no weight cannot produce a cost.
+    expect(s.level).toBe('none');
+    expect(s.costLevel).toBe('none');
+  });
+
+  it('ignores an unweighable row when judging the prices', () => {
+    // קקאו cannot be weighed, so it cannot be "missing a price" — the weight is
+    // the blocker, and saying both would double-report the same gap.
+    const s = state({
+      id: 'mix',
+      name: 'מעורב',
+      ingredients: [
+        { id: 'i1', name: 'קמח לבן', qty: 500, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
+        { id: 'i2', name: 'קקאו', qty: 1, unit: 'כוס' },
+      ],
+      steps: [],
+    } as unknown as Recipe);
+    expect(s.level).toBe('partial');
+    expect(s.costLevel).toBe('full');
+    expect(s.unpricedNames).toEqual([]);
+  });
+});

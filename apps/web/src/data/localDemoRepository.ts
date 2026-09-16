@@ -91,6 +91,13 @@ export function createLocalDemoRepository(): Repository {
       throw new WriteNotAllowedError(NO_BACKEND_REASON);
     },
 
+    async deleteRecipe(): Promise<void> {
+      // Refused rather than faked. Silently "deleting" a demo recipe from the
+      // screen and having it reappear on reload is the shape of lie this
+      // repository exists to prevent (B8).
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
     async getPrefs() {
       // Preferences are the one thing that is genuinely local-first: they belong
       // to the device's measuring cups until an account exists to own them.
