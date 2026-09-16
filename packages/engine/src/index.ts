@@ -1,0 +1,116 @@
+// @recipe-notebook/engine — unified calculation engine.
+//
+// One density source, one conversion path, full provenance, stable ingredient
+// identity for calibration. See README.md for the before/after map and
+// CONFLICTS.md for every legacy disagreement this merge surfaced.
+
+export type * from './types.js';
+
+// data — the single source of truth
+export {
+  DENSITY_TABLE,
+  CONFLICT_TOLERANCE_PCT,
+  LEGACY_CUP_ML,
+  KNOWN_DATA_GAPS,
+  densityEntryByKey,
+  gramsPerCup,
+  isKnownDataGap,
+  lookupDensity,
+  type DensityEntry,
+  type LegacySource,
+} from './data/density-table.js';
+export {
+  DENSITY_CONFLICTS,
+  FALLBACK_DIVERGENCES,
+  KNOWN_GAPS,
+  LEGACY_INVENTED_FALLBACKS,
+  SPLIT_TABLE_ERRORS,
+  SUSPECT_TERMS,
+  type DensityConflict,
+  type FallbackDivergence,
+} from './data/density-conflicts.js';
+export {
+  ALLERGEN_TABLE,
+  allergensFor,
+} from './data/allergens.js';
+export {
+  WATER_TABLE,
+  WATER_PCT_FALLBACK,
+  lookupWaterPct,
+} from './data/water.js';
+
+// units and tools
+export {
+  LEGACY_UNIT_NAMES,
+  TOOL_DEFAULTS,
+  TOOL_OPTIONS,
+  UNITS,
+  gPerUnit,
+  mlPerUnit,
+  toolLabel,
+  toolMl,
+  unit,
+  unitGroup,
+  unitId,
+  unitLabel,
+} from './units.js';
+
+// identity, calibration, density
+export {
+  ingredientKeyOf,
+  normalizeName,
+  sameIngredient,
+} from './text.js';
+export {
+  calibrationGPer100,
+  createCalibration,
+  findCalibration,
+  normalizeCalibration,
+  normalizeCalibrations,
+  suggestCalibrations,
+  upsertCalibration,
+  type CalibrationInput,
+} from './calibration.js';
+export { NO_DENSITY_MESSAGE, densityFor } from './density.js';
+
+// provenance
+export {
+  SOURCE_META,
+  buildProvenance,
+  extendProvenance,
+  unavailableProvenance,
+  weakest,
+} from './provenance.js';
+
+// conversion
+export { convert, convertScaled, homeMeasure, toGrams } from './convert.js';
+
+// formatting
+export {
+  formatForUnit,
+  formatGrams,
+  formatNis,
+  round1,
+} from './format.js';
+
+// recipe computation
+export { compute, scaleFactor, waterPctOf } from './compute.js';
+
+// profiles
+export {
+  PROFILES,
+  UNIT_GROUPS,
+  defaultPrefs,
+  preferredUnit,
+  type ProfileDef,
+} from './profiles.js';
+
+// parsing
+export {
+  SMART_PARSE_PROMPT,
+  parseLocal,
+  parseQuantity,
+  parseTemp,
+  parseTime,
+  type ParsedRecipe,
+} from './parse.js';

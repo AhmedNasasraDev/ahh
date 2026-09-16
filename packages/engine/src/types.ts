@@ -1,0 +1,227 @@
+// Shared types for the unified Recipe Notebook engine.
+// Data model names follow RECIPE_NOTEBOOK_IMPLEMENTATION_SPEC.md §1.
+
+/** Where a number came from, and how much we are allowed to trust it. */
+export type Source =
+  | 'exact' //         a fixed ratio inside one unit family (g↔kg, ml↔l, tool↔tool)
+  | 'personal' //      the user's own calibration for this exact ingredient
+  | 'recipe' //        a density typed into the recipe itself (ingredient.gPer100)
+  | 'system' //        a measured, widely accepted table value
+  | 'estimate' //      a value that varies a lot with the ingredient's own form
+  | 'unavailable'; //  no reliable data — we must not print a number
+
+export type Confidence = 'exact' | 'measured' | 'estimated' | 'none';
+
+export type UnitGroup = 'weight' | 'volume' | 'count';
+export type ToolId = 'cup' | 'tbsp' | 'tsp';
+
+export interface UnitDef {
+  id: string;
+  he: string;
+  short?: string;
+  group: UnitGroup;
+  /** grams per unit — weight units only */
+  g?: number;
+  /** millilitres per unit — fixed-size volume units only */
+  ml?: number;
+  /** millilitres come from the user's measuring tool, not from a constant */
+  tool?: ToolId;
+  /** fallback grams per item for count units (always an estimate) */
+  itemG?: number;
+}
+
+/** One step in how a number was produced. Kept so the UI can never mislabel it. */
+export interface ProvenanceStep {
+  from: string;
+  to: string;
+  source: Source;
+  /** grams per 100 ml used for this step, when a density was involved */
+  gPer100?: number;
+  /** density table key, when a table row was involved */
+  densityKey?: string;
+  note?: string;
+}
+
+/** The full audit trail behind a displayed value. */
+export interface Provenance {
+  /** weakest link of the whole chain — this is what the badge must show */
+  source: Source;
+  confidence: Confidence;
+  /** true only when no density or item-weight estimate was involved anywhere */
+  exact: boolean;
+  label: string;
+  color: string;
+  why: string;
+  chain: ProvenanceStep[];
+  /** e.g. "כוס = 250 מ\"ל לפי ההגדרות שלך" */
+  toolNote?: string;
+  /** true when any step needs professional review (see CONFLICTS.md) */
+  needsReview: boolean;
+}
+
+export interface Calibration {
+  id?: string;
+  /** stable ingredient identity, when the host app has one */
+  ingredientKey?: string;
+  /** the ingredient name as the user typed it at calibration time */
+  name: string;
+  tool: ToolId;
+  /**
+   * B5: the volume of the tool AT CALIBRATION TIME, in millilitres.
+   * Frozen on purpose — changing prefs.tools later must not rewrite history.
+   */
+  toolMl: number;
+  grams: number;
+  at?: string;
+  /** set when toolMl had to be assumed while migrating a legacy record */
+  toolMlAssumed?: boolean;
+}
+
+export interface MeasurementPrefs {
+  profile?: 'home' | 'pro' | 'study';
+  units?: string[];
+  touchedUnits?: boolean;
+  tools?: Partial<Record<ToolId, number>>;
+  calib?: Calibration[];
+  pro?: boolean;
+  done?: boolean;
+}
+
+/** The subset of an ingredient the conversion layer needs. */
+export interface IngredientLike {
+  id?: string;
+  ingredientKey?: string;
+  name?: string;
+  qty?: number | string;
+  unit?: string;
+  unitWeight?: number | string;
+  gPer100?: number | string;
+  waterPct?: number | string;
+  flour?: boolean;
+  liquid?: boolean;
+  price?: number | string;
+  priceUnit?: string;
+  subId?: string | null;
+  countSubFormula?: boolean;
+  note?: string;
+  density?: number | string;
+}
+
+export interface DensityHit {
+  gPer100: number;
+  source: Source;
+  densityKey?: string;
+  note: string;
+  needsReview: boolean;
+}
+
+export interface ConversionOk {
+  ok: true;
+  /** numeric result in the target unit */
+  value: number;
+  /** result formatted for the target unit */
+  text: string;
+  /** grams equivalent, when it could be established */
+  grams: number | null;
+  /** what the recipe itself says — never overwritten by scaling or display */
+  original: { qty: number; unit: string; label: string };
+  provenance: Provenance;
+}
+
+export interface ConversionFail {
+  ok: false;
+  why: string;
+  original: { qty: number; unit: string; label: string };
+  provenance: Provenance;
+}
+
+export type ConversionResult = ConversionOk | ConversionFail;
+
+export interface GramsResult {
+  /** null means: no reliable data. Callers must not substitute a number. */
+  grams: number | null;
+  provenance: Provenance;
+}
+
+export interface Step {
+  id?: string;
+  text?: string;
+  temp?: string | number;
+  tempUnit?: string;
+  minutes?: string | number;
+}
+
+export interface Recipe {
+  id: string;
+  name?: string;
+  category?: string;
+  tags?: string[];
+  isSub?: boolean;
+  locked?: boolean;
+  yieldUnits?: number | string;
+  unitWeight?: number | string;
+  yieldActual?: number | string;
+  weightBefore?: number | string;
+  weightAfter?: number | string;
+  doughMode?: boolean;
+  ddt?: number | string;
+  flourTemp?: number | string;
+  roomTemp?: number | string;
+  friction?: number | string;
+  targetFC?: number | string;
+  ingredients?: IngredientLike[];
+  steps?: Step[];
+  manualAllergens?: string[];
+  [k: string]: unknown;
+}
+
+export interface ComputedRow {
+  ing: IngredientLike;
+  /** null when the ingredient could not be resolved to a weight */
+  g: number | null;
+  provenance: Provenance;
+  cost: number;
+  bakerPct: number;
+  sub: Computed | null;
+}
+
+export interface Unresolved {
+  ingredientId?: string;
+  name: string;
+  unit: string;
+  reason: string;
+}
+
+export interface Computed {
+  rows: ComputedRow[];
+  totalG: number;
+  theoretical: number;
+  actualYield: number;
+  prodLoss: number;
+  bakeLoss: number;
+  scaleWeight: number;
+  unitsActual: number;
+  unitsWarn: boolean;
+  cost: number;
+  costPerUnit: number;
+  costPerKg: number;
+  price: number;
+  flour: number;
+  liquid: number;
+  water: number;
+  hydration: number;
+  trueHydration: number;
+  waterTemp: number | null;
+  allergens: string[];
+  factor: number;
+  /** ingredients whose weight could not be established — never silently zero */
+  unresolved: Unresolved[];
+  /** non-fatal notes, e.g. a per-litre price with no known density */
+  warnings: string[];
+  error?: string;
+}
+
+export interface ComputeOptions {
+  factor?: number;
+  prefs?: MeasurementPrefs;
+}
