@@ -1,0 +1,60 @@
+import { NavLink, useLocation } from 'react-router-dom';
+import styles from './TabBar.module.css';
+
+/**
+ * §2: four tabs — בית · מחברת · קבוצות · עוד — and `tabOf()`, which maps a deep
+ * screen back to the tab it belongs to.
+ *
+ * Only מחברת is implemented in this stage. The other three are shown as
+ * explicitly pending rather than as working links: a tab that silently does
+ * nothing is the shape of dishonesty that AC #17 rules out.
+ */
+interface TabDef {
+  to: string;
+  label: string;
+  /** which screens count as inside this tab (§2 tabOf) */
+  owns: string[];
+  ready: boolean;
+}
+
+const TABS: readonly TabDef[] = [
+  { to: '/home', label: 'בית', owns: ['/home'], ready: false },
+  { to: '/notebook', label: 'מחברת', owns: ['/notebook', '/recipe'], ready: true },
+  { to: '/groups', label: 'קבוצות', owns: ['/groups', '/group', '/perms'], ready: false },
+  { to: '/more', label: 'עוד', owns: ['/more', '/settings', '/tools', '/plan', '/stock'], ready: false },
+];
+
+/** §2 tabOf(): a deep screen highlights the tab that owns it. */
+export function tabOf(pathname: string): string {
+  const hit = TABS.find((t) => t.owns.some((p) => pathname === p || pathname.startsWith(`${p}/`)));
+  return hit?.to ?? '/notebook';
+}
+
+export function TabBar() {
+  const { pathname } = useLocation();
+  const current = tabOf(pathname);
+
+  return (
+    <nav className={styles.bar} aria-label="ניווט ראשי">
+      {TABS.map((tab) => (
+        <NavLink
+          key={tab.to}
+          to={tab.to}
+          className={[
+            styles.tab,
+            current === tab.to ? styles.active : '',
+            tab.ready ? '' : styles.pending,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          aria-current={current === tab.to ? 'page' : undefined}
+        >
+          <span>{tab.label}</span>
+          {!tab.ready && <span className={styles.pendingHint}>בהכנה</span>}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+export { TABS as TAB_DEFS };

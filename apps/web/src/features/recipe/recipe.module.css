@@ -1,0 +1,486 @@
+/* The recipe page and its conversion sheet. Tokens only — no raw hex here. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+  padding: 12px var(--pad-card) 28px;
+  background: var(--c-app-bg);
+}
+
+.topBar {
+  display: flex;
+}
+
+.backLink {
+  min-height: var(--hit-compact);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--fs-body);
+  color: var(--c-muted);
+  text-decoration: none;
+}
+
+.missing {
+  padding: 32px var(--pad-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+  font-size: var(--fs-body);
+  color: var(--c-muted);
+}
+
+.header {
+  padding-block: 4px;
+}
+.title {
+  font-size: var(--fs-recipe-title);
+}
+.meta {
+  margin-top: 6px;
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+}
+.lockedNote {
+  margin-top: 6px;
+  display: inline-block;
+  font-size: var(--fs-meta-lg);
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+}
+
+.card {
+  background: var(--c-paper);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card-lg);
+  padding: var(--pad-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+}
+
+.cardTitle {
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--c-muted);
+}
+
+.cardHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+  flex-wrap: wrap;
+}
+
+/* ── tabs ─────────────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: var(--gap-tight);
+}
+.tab,
+.tabOn {
+  flex: 1;
+  min-height: var(--hit-min);
+  padding: 4px;
+  border-radius: var(--r-control);
+  font-size: var(--fs-meta-lg);
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-muted);
+}
+.tabOn {
+  border-color: var(--c-green);
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+.tabsSmall {
+  display: flex;
+  gap: 5px;
+}
+.tabSmall,
+.tabSmallOn {
+  min-height: var(--hit-compact);
+  padding-inline: 9px;
+  border-radius: 9px;
+  font-size: var(--fs-label);
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-muted);
+}
+.tabSmallOn {
+  border-color: var(--c-green);
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+/* ── inputs ───────────────────────────────────────────────────────────── */
+.scaleInputs {
+  display: flex;
+  gap: var(--gap-tight);
+}
+.input,
+.select {
+  flex: 1;
+  min-height: var(--hit-min);
+  padding-inline: 11px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  font-size: var(--fs-body);
+  outline: 0;
+}
+.input:focus-visible,
+.select:focus-visible {
+  border-color: var(--c-green);
+  box-shadow: 0 0 0 2px var(--c-green-bg);
+}
+
+.scaleSummary {
+  font-size: var(--fs-secondary);
+  color: var(--c-ink);
+}
+.warn {
+  font-size: var(--fs-secondary);
+  color: var(--c-red);
+}
+.calcNote,
+.viewNote {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.5;
+}
+
+/* ── ingredients ──────────────────────────────────────────────────────── */
+.ingredients {
+  display: flex;
+  flex-direction: column;
+}
+
+.ingRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-in-group);
+  padding: 10px 0;
+  min-height: var(--hit-min);
+  text-align: start;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--c-line) 60%, transparent);
+  background: transparent;
+}
+.ingredients li:last-child .ingRow {
+  border-bottom: 0;
+}
+
+.qty,
+.qtyMissing {
+  flex: none;
+  min-width: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+}
+.qtyMissing {
+  color: var(--c-red);
+}
+.qtyHint {
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  color: var(--c-muted);
+}
+
+.ingName {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-body);
+}
+.ingNote {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+}
+.ingUnresolved {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-red);
+  line-height: 1.45;
+}
+
+.convertHint {
+  flex: none;
+  font-size: var(--fs-meta-lg);
+  color: var(--c-sand);
+}
+
+.unresolvedSummary {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+  padding: 9px 11px;
+  border-radius: var(--r-card);
+  line-height: 1.5;
+}
+
+/* ── production ───────────────────────────────────────────────────────── */
+.disclosure {
+  width: 100%;
+  min-height: var(--hit-min);
+  border-radius: var(--r-control);
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-body);
+}
+
+.prodBlocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-between-groups);
+}
+.prodBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+.prodTitle {
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+  font-weight: 400;
+  color: var(--c-muted);
+}
+.prodRows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+.prodRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+  font-size: var(--fs-secondary);
+}
+.prodRow dt {
+  color: var(--c-muted);
+}
+.prodRow dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.warningsBox {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+  padding: 9px 11px;
+  border-radius: var(--r-card);
+  line-height: 1.5;
+}
+.warningsTitle {
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* ── steps ────────────────────────────────────────────────────────────── */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-between-groups);
+}
+.step {
+  display: flex;
+  gap: var(--gap-in-group);
+}
+.stepNum {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--c-sand);
+  min-width: 20px;
+}
+.stepBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stepText {
+  font-size: var(--fs-body);
+  line-height: 1.6;
+}
+.stepMeta {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+}
+
+.recipeNote {
+  font-size: var(--fs-secondary);
+  color: var(--c-ink);
+  background: var(--c-green-bg);
+  padding: 11px 12px;
+  border-radius: var(--r-card);
+  line-height: 1.6;
+}
+
+.allergens {
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+}
+
+/* ── conversion sheet (§5.3) ──────────────────────────────────────────── */
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(23, 26, 24, 0.38);
+  padding: 0;
+}
+
+.sheet {
+  width: 100%;
+  max-width: var(--frame-w);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--c-app-bg);
+  border-start-start-radius: var(--r-sheet);
+  border-start-end-radius: var(--r-sheet);
+  padding: var(--pad-card) var(--pad-card) calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+}
+
+.sheetHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+}
+.sheetTitle {
+  font-size: 20px;
+}
+.sheetName {
+  margin-top: 2px;
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+}
+.sheetClose {
+  flex: none;
+  min-width: var(--hit-min);
+  min-height: var(--hit-min);
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  color: var(--c-muted);
+}
+.sheetSub {
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+  font-weight: 400;
+  color: var(--c-muted);
+}
+
+.factRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  margin: 0;
+  padding: 12px;
+  background: var(--c-white);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+}
+.factRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+  font-size: var(--fs-secondary);
+}
+.factRow dt {
+  color: var(--c-muted);
+}
+.factRow dd {
+  margin: 0;
+  text-align: end;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-tight);
+}
+.pill,
+.pillOn {
+  min-height: var(--hit-min);
+  padding-inline: 13px;
+  border-radius: var(--r-control);
+  font-size: var(--fs-secondary);
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-muted);
+}
+.pillOn {
+  border-color: var(--c-green);
+  background: var(--c-green-bg);
+  color: var(--c-green);
+}
+.pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.resultBox {
+  padding: 12px;
+  background: var(--c-white);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+.resultValue {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+}
+.resultBadgeRow {
+  display: flex;
+}
+.resultWhy,
+.resultNote {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.5;
+}
+.resultReview {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-amber);
+  line-height: 1.5;
+}
+.resultFail {
+  font-size: var(--fs-secondary);
+  color: var(--c-red);
+  line-height: 1.6;
+}
+
+.calibrateBtn {
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-body);
+}

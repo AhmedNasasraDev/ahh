@@ -1,0 +1,71 @@
+/* §15: mobile-first. The prototype was laid out at 402×874, so on a desktop we
+ * centre a frame of that width rather than stretching a phone layout. */
+
+.outer {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-outer-bg);
+}
+
+.frame {
+  width: 100%;
+  max-width: var(--frame-w);
+  height: 100vh;
+  height: 100dvh;
+  max-height: var(--frame-h);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--c-app-bg);
+}
+
+/* On a real phone the frame is the whole screen, with no rounding or shadow. */
+@media (min-width: 440px) and (min-height: 900px) {
+  .frame {
+    border-radius: 28px;
+    box-shadow: 0 24px 60px rgba(23, 26, 24, 0.18);
+  }
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.banner {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-in-group);
+  padding: 10px var(--pad-card);
+  font-size: var(--fs-secondary);
+  line-height: 1.5;
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.bannerError {
+  background: var(--c-red-bg);
+  color: var(--c-red);
+}
+
+.bannerText {
+  flex: 1;
+}
+
+.bannerClose {
+  flex: none;
+  min-width: var(--hit-min);
+  min-height: var(--hit-compact);
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+}

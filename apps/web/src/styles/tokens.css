@@ -1,0 +1,84 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Design tokens — transcribed verbatim from
+ * RECIPE_NOTEBOOK_IMPLEMENTATION_SPEC.md §16, cross-checked against README.md
+ * "Design Tokens". Nothing here was invented or adjusted.
+ *
+ * HANDOFF §8: "לא לשנות את השפה העיצובית (§16) בלי סיבה מקצועית מוצדקת."
+ * If a value needs to change, change it here — not at a call site.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── colour ────────────────────────────────────────────────────────────── */
+  --c-app-bg: #fbfbf9; /* רקע אפליקציה — navigation screens */
+  --c-paper: #fdfbf6; /* נייר — the recipe page and cards */
+  --c-white: #ffffff;
+  --c-outer-bg: #e9ece8; /* רקע חוץ — label and order sheets */
+  --c-line: #cdd4ce; /* מסגרת / קו מפריד */
+
+  --c-green: #1e6b4c; /* ירוק ראשי — action, confirm, exact */
+  --c-green-bg: #e2efe8; /* ירוק רקע — selected state, system notes */
+  --c-green-ink: #17543c; /* link hover, from the prototype's a:hover */
+
+  --c-sand: #c4a99b; /* חום־חול — step numbers, paper frame, secondary info */
+
+  --c-amber: #a56a0e; /* ענבר — warning, "נתון מערכת", Demo */
+  --c-amber-bg: #f6ebd6;
+
+  --c-red: #9e362c; /* אדום — error, "הערכה גסה", finished timer */
+  --c-red-bg: #f6e3e0;
+
+  --c-ink: #171a18; /* דיו — primary text, Cook Mode background */
+  --c-muted: #6e7a73; /* אפור טקסט משני */
+  --c-neutral-bg: #edefec; /* אפור רקע ניטרלי */
+
+  /* ── typography ───────────────────────────────────────────────────────── */
+  --font-body: 'Heebo', 'Assistant', 'Arial Hebrew', system-ui, sans-serif;
+  --font-display: 'Frank Ruhl Libre', 'Times New Roman', serif;
+
+  /* the scale actually used in the prototype, §16 */
+  --fs-label: 10px;
+  --fs-meta: 10.5px;
+  --fs-meta-lg: 11.5px;
+  --fs-secondary: 12.5px;
+  --fs-body: 13.5px;
+  --fs-body-lg: 14px;
+  --fs-screen-title: 16px;
+  --fs-recipe-title: 25px;
+  --fs-cook-body: 25px;
+  --fs-cook-step: 54px;
+
+  /* ── radius ───────────────────────────────────────────────────────────── */
+  --r-check: 7px;
+  --r-control: 10px;
+  --r-card: 11px;
+  --r-card-lg: 16px;
+  --r-sheet: 22px;
+  --r-pill: 999px;
+
+  /* ── spacing ──────────────────────────────────────────────────────────── */
+  --gap-tight: 6px;
+  --gap-in-group: 9px;
+  --gap-between-groups: 14px;
+  --pad-card: 14px;
+
+  /* ── interaction ──────────────────────────────────────────────────────── */
+  /* §15: hit targets ≥ 44px. Non-negotiable — this is a kitchen app. */
+  --hit-min: 44px;
+  --hit-compact: 40px;
+
+  /* ── device frame ─────────────────────────────────────────────────────── */
+  /* §15 mobile-first: the prototype was laid out at 402×874. */
+  --frame-w: 402px;
+  --frame-h: 874px;
+}
+
+/* Provenance colours, keyed to the engine's Source union so a badge can never
+ * pick its own colour. Mirrors SOURCE_META in packages/engine/src/provenance.ts. */
+:root {
+  --c-source-exact: var(--c-green);
+  --c-source-personal: var(--c-green);
+  --c-source-recipe: var(--c-green);
+  --c-source-system: var(--c-amber);
+  --c-source-estimate: var(--c-red);
+  --c-source-unavailable: var(--c-red);
+}

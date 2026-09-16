@@ -151,6 +151,57 @@ export interface Step {
   minutes?: string | number;
 }
 
+/** Spec §1.1 Pan. Geometry only; panFactor still lives in the prototype. */
+export interface Pan {
+  kind: 'round' | 'rect' | 'loaf' | 'gn' | 'muffin' | 'none';
+  diameter?: number | string;
+  width?: number | string;
+  length?: number | string;
+  height?: number | string;
+  gn?: string;
+  cavities?: number | string;
+}
+
+/** Spec §1.1 Version — a full snapshot plus a computed description of the change. */
+export interface RecipeVersion {
+  tag: string;
+  at: string;
+  what: string;
+  snapshot: Recipe;
+}
+
+/** Spec §1.1 issues — problem and solution, stored as `p` and `s`. */
+export interface RecipeIssue {
+  id?: string;
+  p: string;
+  s: string;
+}
+
+/** Spec §1.1 trials — the trial log. */
+export interface RecipeTrial {
+  id?: string;
+  date?: string;
+  note?: string;
+}
+
+/**
+ * Spec §1.1 Batch. §13a: the HACCP status is DERIVED from `ccp` and `chillTemp`
+ * and is deliberately not stored, so a batch cannot be marked compliant without
+ * the record behind it.
+ */
+export interface Batch {
+  id?: string;
+  code: string;
+  date?: string;
+  coreTemp?: number | string;
+  chillTemp?: number | string;
+  weight?: number | string;
+  by?: string;
+  note?: string;
+  ccp?: Record<string, boolean>;
+  photo?: boolean;
+}
+
 export interface Recipe {
   id: string;
   name?: string;
@@ -171,7 +222,34 @@ export interface Recipe {
   targetFC?: number | string;
   ingredients?: IngredientLike[];
   steps?: Step[];
+
+  // texts (§1.1)
+  shelfLife?: string;
+  storage?: string;
+  freezing?: string;
+  thawing?: string;
+  equipment?: string;
+  /** §8: public notes — these DO travel into sharing, the order sheet and the label */
+  notes?: string;
+  /** §8: private notes — never leave the owner's own screen */
+  privateNotes?: string;
   manualAllergens?: string[];
+
+  // structure (§1.1)
+  pan?: Pan | null;
+  versions?: RecipeVersion[];
+  versionOf?: string | null;
+  versionNote?: string;
+  /** "<groupId>:<itemId>" when this recipe was copied out of a group (§11) */
+  savedFrom?: string | null;
+
+  issues?: RecipeIssue[];
+  trials?: RecipeTrial[];
+  batches?: Batch[];
+
+  createdAt?: string;
+
+  /** Anything the host app carries that the engine does not read. */
   [k: string]: unknown;
 }
 

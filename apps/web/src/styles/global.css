@@ -1,0 +1,113 @@
+/* Global base. Per §15: RTL root, tabular numerals everywhere numbers appear,
+ * and pointwise LTR for the things that must read left-to-right. */
+
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--c-outer-bg);
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--c-ink);
+  /* §15: prevents digits from dancing during live scaling */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+  text-wrap: pretty;
+}
+
+p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+button {
+  font-family: inherit;
+  font-variant-numeric: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-variant-numeric: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--c-green);
+}
+a:hover {
+  color: var(--c-green-ink);
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* §15: numbers, times, temperatures, prices, emails and batch codes read LTR
+ * even inside an RTL paragraph. Apply with <span class="ltr"> or the utility. */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* §15: back buttons must never wrap onto two lines */
+.nowrap {
+  white-space: nowrap;
+  flex: none;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Scrollbars are hidden inside the device frame, as in the prototype. */
+.hideScrollbar {
+  scrollbar-width: none;
+}
+.hideScrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

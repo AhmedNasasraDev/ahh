@@ -1,0 +1,136 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+  padding: 20px 0 24px;
+}
+
+.head {
+  padding-inline: var(--pad-card);
+}
+.title {
+  font-size: 22px;
+}
+.count {
+  margin-top: 4px;
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+}
+
+.searchRow {
+  padding-inline: var(--pad-card);
+}
+.search {
+  width: 100%;
+  min-height: var(--hit-min);
+  padding-inline: 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  font-size: var(--fs-body);
+  outline: 0;
+}
+.search:focus-visible {
+  border-color: var(--c-green);
+  box-shadow: 0 0 0 2px var(--c-green-bg);
+}
+
+.chips {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-inline: var(--pad-card);
+  padding-block: 2px;
+}
+.chip,
+.chipOn {
+  flex: none;
+  min-height: var(--hit-min);
+  padding-inline: var(--pad-card);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-secondary);
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+.chipOn {
+  border-color: var(--c-green);
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+  padding-inline: var(--pad-card);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--pad-card);
+  background: var(--c-paper);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  text-decoration: none;
+  color: var(--c-ink);
+  min-height: var(--hit-min);
+}
+.card:hover {
+  border-color: var(--c-sand);
+}
+
+.cardName {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+.cardMeta {
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+}
+.cardWarn {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-amber);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+.badgeSub,
+.badgeLocked,
+.badgeVersion,
+.badgeTag {
+  font-size: var(--fs-meta);
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+.badgeSub {
+  background: var(--c-green-bg);
+  color: var(--c-green);
+}
+.badgeLocked {
+  background: var(--c-amber-bg);
+  color: var(--c-amber);
+}
+.badgeVersion {
+  background: var(--c-neutral-bg);
+  color: var(--c-muted);
+}
+.badgeTag {
+  background: transparent;
+  color: var(--c-muted);
+  border: 1px solid var(--c-line);
+}
+
+.empty {
+  padding: 24px var(--pad-card);
+  font-size: var(--fs-body);
+  color: var(--c-muted);
+}

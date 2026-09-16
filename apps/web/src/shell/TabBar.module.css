@@ -1,0 +1,36 @@
+.bar {
+  flex: none;
+  display: flex;
+  border-top: 1px solid var(--c-line);
+  background: var(--c-white);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.tab {
+  flex: 1;
+  min-height: var(--hit-min);
+  border: 0;
+  background: transparent;
+  font-size: var(--fs-secondary);
+  color: var(--c-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-decoration: none;
+}
+
+.active {
+  color: var(--c-green);
+  font-weight: 600;
+}
+
+.pending {
+  color: var(--c-sand);
+}
+
+.pendingHint {
+  font-size: var(--fs-label);
+  color: var(--c-sand);
+}
