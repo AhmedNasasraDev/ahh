@@ -78,6 +78,8 @@ function project(db: FakeDb, userId: string, authOpts: FakeAuthOptions = {}) {
   });
   const client = {
     from: (t: string) => (data.client as { from(t: string): unknown }).from(t),
+    rpc: (n: string, a: Record<string, unknown>) =>
+      (data.client as { rpc(n: string, a: Record<string, unknown>): unknown }).rpc(n, a),
     auth: (auth.client as { auth: unknown }).auth,
   };
   return { client, data, auth, db };

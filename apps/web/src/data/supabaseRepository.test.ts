@@ -177,15 +177,20 @@ describe('isolation between two accounts, at the repository level', () => {
     expect(row!['owner_id']).toBe(USER_A);
   });
 
-  it('a repository built with B\'s id cannot write while A is the session', async () => {
-    // The mismatch a stolen id would cause: the id says B, the session says A,
-    // and the policy refuses. This is WITH CHECK doing its job.
+  it('cannot forge an owner, because the server picks it (stage 5)', async () => {
+    // Before stage 5 this was a client-side INSERT carrying `owner_id`, and a
+    // repository built with the wrong id had its write REJECTED by WITH CHECK.
+    // The save_recipe RPC does not accept an owner at all — it takes
+    // auth.uid() — so the forgery is no longer expressible rather than merely
+    // refused. The stronger property, and the one worth asserting.
     fake.setAuthUid(USER_A);
-    await expect(
-      repoFor(USER_B).saveRecipe({
-        id: 'new-2', name: 'מתכון מושתל', ingredients: [], steps: [],
-      } as unknown as Recipe),
-    ).rejects.toThrow(/יצירת המתכון נכשלה/);
+    const saved = await repoFor(USER_B).saveRecipe({
+      id: 'new-2', name: 'מתכון מושתל', ingredients: [], steps: [],
+    } as unknown as Recipe);
+
+    const row = fake.db['recipes']!.find((r) => r['id'] === saved.id)!;
+    expect(row['owner_id']).toBe(USER_A);   // the session
+    expect(row['owner_id']).not.toBe(USER_B); // not the repository's id
   });
 });
 

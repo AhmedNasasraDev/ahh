@@ -25,15 +25,42 @@
 -- RLS entirely; a version of this script that forgot `set local role
 -- authenticated` would report perfect isolation while testing nothing.
 --
--- WHAT IT COVERS (the four things requirement 5 names)
+-- WHAT IT COVERS (the four things stage-3 requirement 5 names)
 --   recipes · private_notes · calibrations · profiles/preferences
 -- read, and also write: a cross-account UPDATE, DELETE and INSERT.
+--
+-- Extended in stage 5 with the two surfaces §9 and §18.6 added, because both
+-- are reachable with nothing but the anon key:
+--   recipe_versions   — stage-5 requirement 8: another account's history must
+--                       be unreadable, uncreatable and unrestorable. Note the
+--                       policy is indirect (it joins through `recipes`), which
+--                       is exactly the kind of policy that looks right and
+--                       admits everything.
+--   ingredients.sub_recipe_id — stage-5 requirement 15: a link to another
+--                       account's recipe must be impossible even when the id is
+--                       supplied by hand. RLS alone does NOT do this: the
+--                       policy on `ingredients` checks the PARENT recipe, and
+--                       foreign-key validation runs with RLS bypassed, so the
+--                       column would happily accept a stranger's uuid. The
+--                       `check_sub_recipe_link` trigger from 0007 is what
+--                       closes it, and it is asserted here.
 --
 -- FIXTURES
 -- Two throwaway accounts with fixed UUIDs, created at the top and removed at the
 -- bottom. The cleanup is verified, not assumed — the last row of the output is
 -- the count of leftovers, which must be 0. Nothing here is seed data and nothing
 -- here is left behind (requirement 6).
+--
+-- A PROBE THAT CAN RAISE MUST BE WRAPPED IN ITS OWN BEGIN/EXCEPTION
+--
+-- The DO block has a top-level `exception when others` as a safety net, and a
+-- plpgsql exception handler rolls the subtransaction back — including every
+-- `set_config(..., true)` made before it. So ONE unwrapped raise does not fail
+-- one row: it blanks all of them, and the result table then reports every
+-- check as failed, including the ones that had already passed. That is worse
+-- than a crash, because it reads as a broken database rather than a broken
+-- script. This was found the hard way when the anon version probe below was
+-- added unwrapped.
 --
 -- Run:  every statement below, in one session, and read the result table.
 --       Every row must have pass = true.
@@ -82,6 +109,20 @@ values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'קמח לבן', 'flour.white', 'cup', 240, 128),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'קמח לבן', 'flour.white', 'cup', 250, 141);
 
+-- One version for each account, so a leak is visible as a row and as a value.
+-- `recipe_snapshot` is the same function `save_recipe` uses, so these are real
+-- snapshots and not hand-written stand-ins.
+insert into public.recipe_versions (id, recipe_id, tag, what, snapshot, created_by)
+values
+  ('a0000000-0000-4000-8000-0000000000a1'::uuid, 'a0000000-0000-4000-8000-000000000001',
+   'V1', 'הגרסה הסודית של א',
+   public.recipe_snapshot('a0000000-0000-4000-8000-000000000001'),
+   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+  ('b0000000-0000-4000-8000-0000000000b1'::uuid, 'b0000000-0000-4000-8000-000000000001',
+   'V1', 'הגרסה הסודית של ב',
+   public.recipe_snapshot('b0000000-0000-4000-8000-000000000001'),
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+
 -- B's preferences differ from A's, so a leak would be visible as a value and
 -- not only as a row count.
 update public.profiles
@@ -93,7 +134,9 @@ do $$
 declare
   a uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   b uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  a_recipe uuid := 'a0000000-0000-4000-8000-000000000001';
   b_recipe uuid := 'b0000000-0000-4000-8000-000000000001';
+  b_version uuid := 'b0000000-0000-4000-8000-0000000000b1';
   n int;
   txt text;
   err text;
@@ -176,6 +219,83 @@ begin
     perform set_config('rls.tmp15', 'refused', true);
   end;
 
+  -- ── stage-5 requirement 8: another account's version history ────────────
+  -- Unfiltered, then filtered towards B. The policy on `recipe_versions` joins
+  -- through `recipes`, so this is where a join written the wrong way round
+  -- would show up as "every version in the database".
+  select count(*) into n from public.recipe_versions;
+  perform set_config('rls.tmp27', n::text, true);
+  select count(*) into n from public.recipe_versions where recipe_id = b_recipe;
+  perform set_config('rls.tmp28', n::text, true);
+  select coalesce(string_agg(what, ','), '(none)') into txt
+    from public.recipe_versions where recipe_id = b_recipe;
+  perform set_config('rls.tmp29', txt, true);
+
+  -- Writing into B's history. A forged version is worse than a read: it puts a
+  -- false past into somebody else's notebook.
+  begin
+    insert into public.recipe_versions (recipe_id, tag, what, snapshot, created_by)
+    values (b_recipe, 'V99', 'היסטוריה מזויפת', '{}'::jsonb, a);
+    perform set_config('rls.tmp30', 'inserted', true);
+  exception when insufficient_privilege then
+    perform set_config('rls.tmp30', 'refused', true);
+  end;
+
+  update public.recipe_versions set what = 'נחטף' where recipe_id = b_recipe;
+  get diagnostics n = row_count;
+  perform set_config('rls.tmp31', n::text, true);
+
+  delete from public.recipe_versions where recipe_id = b_recipe;
+  get diagnostics n = row_count;
+  perform set_config('rls.tmp32', n::text, true);
+
+  -- And the restore RPC. It is SECURITY INVOKER, so it sees B's version row
+  -- exactly as this session does — which is to say not at all.
+  begin
+    perform public.restore_recipe_version(b_version);
+    perform set_config('rls.tmp33', 'restored', true);
+  exception when others then
+    perform set_config('rls.tmp33', 'refused', true);
+  end;
+
+  -- A can still read A's own history.
+  select count(*) into n from public.recipe_versions where recipe_id = a_recipe;
+  perform set_config('rls.tmp34', n::text, true);
+
+  -- ── stage-5 requirement 15: linking another account's recipe ─────────────
+  -- Straight into the column, which is what the anon key allows. RLS admits
+  -- this row (the PARENT is A's) and the foreign key is satisfied (B's recipe
+  -- does exist), so without the 0007 trigger this succeeds.
+  begin
+    insert into public.ingredients (recipe_id, ord, name, qty, unit, sub_recipe_id)
+    values (a_recipe, 9, 'תת־מתכון גנוב', 100, 'גרם', b_recipe);
+    perform set_config('rls.tmp35', 'inserted', true);
+  exception when others then
+    perform set_config('rls.tmp35', 'refused: ' || SQLSTATE, true);
+  end;
+
+  -- The same attempt as an UPDATE of an existing row, because a trigger
+  -- declared for INSERT only would let this one through.
+  begin
+    update public.ingredients set sub_recipe_id = b_recipe where recipe_id = a_recipe;
+    perform set_config('rls.tmp36', 'updated', true);
+  exception when others then
+    perform set_config('rls.tmp36', 'refused: ' || SQLSTATE, true);
+  end;
+
+  -- A self-reference and a cycle, for completeness: same trigger, same session.
+  begin
+    update public.ingredients set sub_recipe_id = a_recipe where recipe_id = a_recipe;
+    perform set_config('rls.tmp37', 'updated', true);
+  exception when others then
+    perform set_config('rls.tmp37', 'refused: ' || SQLSTATE, true);
+  end;
+
+  -- Nothing above may have left a link behind.
+  select count(*) into n from public.ingredients
+   where recipe_id = a_recipe and sub_recipe_id is not null;
+  perform set_config('rls.tmp38', n::text, true);
+
   -- A's own data must still be reachable. Isolation that also blocks the owner
   -- is not isolation, it is an outage.
   select count(*) into n from public.recipes where owner_id = a;
@@ -200,6 +320,10 @@ begin
   perform set_config('rls.tmp21', n::text, true);
   select count(*) into n from public.recipes where owner_id = b;
   perform set_config('rls.tmp22', n::text, true);
+  select count(*) into n from public.recipe_versions where recipe_id = a_recipe;
+  perform set_config('rls.tmp39', n::text, true);
+  select count(*) into n from public.recipe_versions;
+  perform set_config('rls.tmp40', n::text, true);
 
   -- ── an anonymous caller, which is what an unauthenticated request is ──────
   execute 'reset role';
@@ -214,6 +338,18 @@ begin
   perform set_config('rls.tmp25', n::text, true);
   select count(*) into n from public.density_table;
   perform set_config('rls.tmp26', n::text, true);
+  -- An anon read of a CHILD table does not come back empty — it is refused
+  -- outright, because migration 0006 took EXECUTE on `owns_recipe` away from
+  -- `anon` and every child table's policy calls it by name. Strictly safer
+  -- than an empty result (no row is evaluated at all), and deliberate, so it
+  -- is asserted as a refusal rather than quietly "fixed" by widening the
+  -- grant. It must be wrapped: see the note above about the top-level handler.
+  begin
+    select count(*) into n from public.recipe_versions;
+    perform set_config('rls.tmp41', n::text, true);
+  exception when others then
+    perform set_config('rls.tmp41', 'refused: ' || SQLSTATE, true);
+  end;
 
   execute 'reset role';
   procedure_note := 'probes complete';
@@ -278,7 +414,39 @@ select * from (values
   ('anon',          'an unauthenticated caller sees no calibration',
      '0', current_setting('rls.tmp25', true)),
   ('anon',          'an unauthenticated caller sees no density row either',
-     '0', current_setting('rls.tmp26', true))
+     '0', current_setting('rls.tmp26', true)),
+  -- ── stage-5 requirement 8 ──────────────────────────────────────────────
+  ('recipe_versions', 'A, unfiltered, sees only A''s own version',
+     '1', current_setting('rls.tmp27', true)),
+  ('recipe_versions', 'A, selecting B''s recipe_id, gets nothing',
+     '0', current_setting('rls.tmp28', true)),
+  ('recipe_versions', 'A cannot read the text of B''s version',
+     '(none)', current_setting('rls.tmp29', true)),
+  ('recipe_versions', 'A cannot plant a version in B''s history',
+     'refused', current_setting('rls.tmp30', true)),
+  ('recipe_versions', 'A''s UPDATE of B''s version matches no row',
+     '0', current_setting('rls.tmp31', true)),
+  ('recipe_versions', 'A''s DELETE of B''s version matches no row',
+     '0', current_setting('rls.tmp32', true)),
+  ('recipe_versions', 'A cannot restore B''s version through the RPC',
+     'refused', current_setting('rls.tmp33', true)),
+  ('recipe_versions', 'A can still read A''s own version',
+     '1', current_setting('rls.tmp34', true)),
+  ('recipe_versions', 'B, selecting A''s recipe_id, gets nothing',
+     '0', current_setting('rls.tmp39', true)),
+  ('recipe_versions', 'B, unfiltered, sees only B''s own version',
+     '1', current_setting('rls.tmp40', true)),
+  ('anon',            'an unauthenticated caller is refused the version table outright',
+     'refused: 42501', current_setting('rls.tmp41', true)),
+  -- ── stage-5 requirement 15 ─────────────────────────────────────────────
+  ('sub_recipe_id',   'A cannot INSERT a link to B''s recipe, id supplied by hand',
+     'refused: 42501', current_setting('rls.tmp35', true)),
+  ('sub_recipe_id',   'A cannot UPDATE an existing row into a link to B''s recipe',
+     'refused: 42501', current_setting('rls.tmp36', true)),
+  ('sub_recipe_id',   'a self-reference is refused as a check violation',
+     'refused: 23514', current_setting('rls.tmp37', true)),
+  ('sub_recipe_id',   'and none of those attempts left a link behind',
+     '0', current_setting('rls.tmp38', true))
 ) as t(area, check_name, expected, actual)
 cross join lateral (select t.expected = t.actual) as p(pass);
 
@@ -300,7 +468,10 @@ from (
        + (select count(*) from public.calibrations   where user_id  = any(ids))
        + (select count(*) from public.ingredients i
            where exists (select 1 from public.recipes r
-                          where r.id = i.recipe_id and r.owner_id = any(ids))) as n
+                          where r.id = i.recipe_id and r.owner_id = any(ids)))
+       + (select count(*) from public.recipe_versions v
+           where exists (select 1 from public.recipes r
+                          where r.id = v.recipe_id and r.owner_id = any(ids))) as n
   from (select array['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
                      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']::uuid[] as ids) f
 ) c;

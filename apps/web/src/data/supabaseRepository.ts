@@ -11,18 +11,25 @@
 //     security boundary.
 //   • A write that RLS refuses surfaces as an error. It is never swallowed.
 //
-// Recipes are stored across six tables. A save therefore has to replace the
-// child rows, and Postgres has no multi-statement transaction over the REST
-// API. The order is chosen so a partial failure leaves the recipe readable:
-// the parent row is written first and children are replaced last.
+// Recipes are stored across six tables, so a save has to write a parent row,
+// replace three sets of child rows, and — since stage 5 — snapshot the previous
+// state into recipe_versions first. PostgREST has no multi-statement
+// transaction, so as separate client calls that is five ways to end up with a
+// half-written recipe or a version describing a change that never landed.
+//
+// So a save is ONE call to the `save_recipe` RPC (migration 0007), which does
+// all of it in a single transaction. Reads stay as ordinary selects.
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
+import type { Json, RecipeVersionRow } from '../lib/database.types.js';
 import {
   WriteNotAllowedError,
   type Repository,
   type RepositoryCapabilities,
+  type SaveOptions,
+  type StoredVersion,
 } from './repository.js';
 import {
   bundleToRecipe,
@@ -33,6 +40,7 @@ import {
   prefsToProfileUpdate,
   profileRowToPrefs,
   recipeToRow,
+  snapshotToRecipe,
   stepsToRows,
   type RecipeBundle,
 } from './mappers.js';
@@ -190,41 +198,92 @@ export function createSupabaseRepository({
       return recipe;
     },
 
-    async saveRecipe(recipe: Recipe): Promise<Recipe> {
+    async saveRecipe(recipe: Recipe, options: SaveOptions = {}): Promise<Recipe> {
       requireOnline('המתכון');
       if (!recipe.name || !String(recipe.name).trim()) {
         throw new WriteNotAllowedError('למתכון חייב להיות שם.');
       }
 
-      const parent = recipeToRow(recipe, userId);
       const isNew = !recipe.id || recipe.id.startsWith('new-');
+      const parent = recipeToRow(recipe, userId);
 
-      let recipeId: string;
-      if (isNew) {
-        const { data, error } = await client
-          .from('recipes')
-          .insert(parent)
-          .select('id')
-          .single();
-        if (error) throw new SupabaseRepositoryError('יצירת המתכון נכשלה', error);
-        recipeId = data.id;
-      } else {
-        recipeId = recipe.id;
-        const { error } = await client
-          .from('recipes')
-          .update(parent)
-          .eq('id', recipeId)
-          .eq('owner_id', userId);
-        if (error) throw new SupabaseRepositoryError('עדכון המתכון נכשל', error);
+      const { data, error } = await client.rpc('save_recipe', {
+        p_recipe: parent as unknown as Json,
+        p_ingredients: ingredientsToRows(recipe, '') as unknown as Json,
+        p_steps: stepsToRows(recipe, '') as unknown as Json,
+        p_issues: issuesToRows(recipe, '') as unknown as Json,
+        p_recipe_id: isNew ? null : recipe.id,
+        // Optimistic concurrency: the value this client loaded. The RPC refuses
+        // the save if the row has moved on, rather than overwriting whatever
+        // somebody else just wrote.
+        p_expected_updated_at: isNew ? null : (options.expectedUpdatedAt ?? null),
+        p_version_note: options.versionNote ?? '',
+      });
+
+      if (error) {
+        throw new SupabaseRepositoryError(
+          isNew ? 'יצירת המתכון נכשלה' : 'עדכון המתכון נכשל',
+          error,
+        );
       }
 
-      // Children are replaced wholesale. The ingredient and step lists are
-      // ordered and short, so diffing them would add risk without adding speed.
-      await replaceChildren(client, recipeId, recipe);
-
+      const recipeId = data as unknown as string;
       const saved = await this.getRecipe(recipeId);
       if (!saved) throw new SupabaseRepositoryError('שמירה', 'המתכון לא נמצא אחרי השמירה');
       return saved;
+    },
+
+    // ── versions (§9) ──────────────────────────────────────────────────────
+
+    async listVersions(recipeId: string): Promise<StoredVersion[]> {
+      const { data, error } = await client
+        .from('recipe_versions')
+        .select('id, recipe_id, tag, what, snapshot, created_at, created_by')
+        .eq('recipe_id', recipeId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new SupabaseRepositoryError('טעינת היסטוריית הגרסאות נכשלה', error);
+
+      return (data ?? []).map((row) => {
+        const r = row as unknown as RecipeVersionRow;
+        return {
+          id: r.id,
+          recipeId: r.recipe_id,
+          tag: r.tag,
+          what: r.what,
+          createdAt: r.created_at,
+          // ONE mapper reads both a live row set and a stored snapshot, because
+          // the RPC writes the snapshot in exactly the RecipeBundle shape. A
+          // restored version therefore cannot be interpreted differently from
+          // a live one.
+          snapshot: snapshotToRecipe(r.snapshot, r.recipe_id),
+        };
+      });
+    },
+
+    async restoreVersion(versionId: string): Promise<Recipe> {
+      requireOnline('השחזור');
+
+      const { data, error } = await client.rpc('restore_recipe_version', {
+        p_version_id: versionId,
+      });
+      if (error) throw new SupabaseRepositoryError('השחזור נכשל', error);
+
+      const recipeId = data as unknown as string;
+      const restored = await this.getRecipe(recipeId);
+      if (!restored) {
+        throw new SupabaseRepositoryError('שחזור', 'המתכון לא נמצא אחרי השחזור');
+      }
+      return restored;
+    },
+
+    async recipesUsing(recipeId: string): Promise<Array<{ id: string; name: string }>> {
+      const { data, error } = await client.rpc('recipes_using', {
+        p_recipe_id: recipeId,
+      });
+      // A failure here must not block a delete — it only enriches the warning.
+      if (error) return [];
+      return (data ?? []) as Array<{ id: string; name: string }>;
     },
 
     async deleteRecipe(id: string): Promise<void> {
@@ -333,31 +392,9 @@ export function createSupabaseRepository({
   };
 }
 
-/** Replaces a recipe's ordered child rows. */
-async function replaceChildren(
-  client: TypedSupabaseClient,
-  recipeId: string,
-  recipe: Recipe,
-): Promise<void> {
-  const ingredients = ingredientsToRows(recipe, recipeId);
-  const steps = stepsToRows(recipe, recipeId);
-  const issues = issuesToRows(recipe, recipeId);
-
-  for (const table of ['ingredients', 'steps', 'issues'] as const) {
-    const { error } = await client.from(table).delete().eq('recipe_id', recipeId);
-    if (error) throw new SupabaseRepositoryError(`ניקוי ${table} נכשל`, error);
-  }
-
-  if (ingredients.length) {
-    const { error } = await client.from('ingredients').insert(ingredients);
-    if (error) throw new SupabaseRepositoryError('שמירת הרכיבים נכשלה', error);
-  }
-  if (steps.length) {
-    const { error } = await client.from('steps').insert(steps);
-    if (error) throw new SupabaseRepositoryError('שמירת השלבים נכשלה', error);
-  }
-  if (issues.length) {
-    const { error } = await client.from('issues').insert(issues);
-    if (error) throw new SupabaseRepositoryError('שמירת התקלות נכשלה', error);
-  }
-}
+/*
+ * `replaceChildren` used to live here, doing three DELETEs and three INSERTs as
+ * separate client calls. It is now `public.replace_recipe_children` in
+ * migration 0007, called from inside the save and restore RPCs — the same six
+ * statements, in one transaction instead of six.
+ */

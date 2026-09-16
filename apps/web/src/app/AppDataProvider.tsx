@@ -27,6 +27,8 @@ import {
   WriteNotAllowedError,
   type Repository,
   type RepositoryCapabilities,
+  type SaveOptions,
+  type StoredVersion,
 } from '../data/repository.js';
 import { supabaseStatus } from '../lib/supabase.js';
 import { useOptionalAuth } from '../auth/AuthProvider.js';
@@ -53,9 +55,18 @@ export interface AppData {
    * navigate away, and a form that navigates away from an unsaved recipe loses
    * the user's work. So this throws.
    */
-  saveRecipe(recipe: Recipe): Promise<Recipe>;
+  saveRecipe(recipe: Recipe, options?: SaveOptions): Promise<Recipe>;
   /** Removes a recipe. Throws on failure, for the same reason. */
   deleteRecipe(id: string): Promise<void>;
+  /** The version history for one recipe, newest first (§9). */
+  listVersions(recipeId: string): Promise<StoredVersion[]>;
+  /**
+   * Restores a version. The current state is snapshotted first, so this is
+   * itself undoable (§9). Throws on failure.
+   */
+  restoreVersion(versionId: string): Promise<Recipe>;
+  /** Which of the account's recipes use this one as a base. */
+  recipesUsing(recipeId: string): Promise<Array<{ id: string; name: string }>>;
   clearError(): void;
 }
 
@@ -195,8 +206,8 @@ export function AppDataProvider({
   );
 
   const saveRecipe = useCallback(
-    async (recipe: Recipe): Promise<Recipe> => {
-      const saved = await repo.saveRecipe(recipe);
+    async (recipe: Recipe, options?: SaveOptions): Promise<Recipe> => {
+      const saved = await repo.saveRecipe(recipe, options);
       // Replace by id rather than refetching the notebook: the repository
       // already re-read the recipe after writing it, so this list is as fresh
       // as a round trip would make it, for one less round trip.
@@ -219,6 +230,26 @@ export function AppDataProvider({
     [repo],
   );
 
+  const listVersions = useCallback(
+    (recipeId: string) => repo.listVersions(recipeId),
+    [repo],
+  );
+
+  const restoreVersion = useCallback(
+    async (versionId: string): Promise<Recipe> => {
+      const restored = await repo.restoreVersion(versionId);
+      setRecipes((list) => list.map((r) => (r.id === restored.id ? restored : r)));
+      setError(null);
+      return restored;
+    },
+    [repo],
+  );
+
+  const recipesUsing = useCallback(
+    (recipeId: string) => repo.recipesUsing(recipeId),
+    [repo],
+  );
+
   const value = useMemo<AppData>(
     () => ({
       ready,
@@ -233,6 +264,9 @@ export function AppDataProvider({
       getRecipe,
       saveRecipe,
       deleteRecipe,
+      listVersions,
+      restoreVersion,
+      recipesUsing,
       clearError: () => setError(null),
     }),
     [
@@ -247,6 +281,9 @@ export function AppDataProvider({
       getRecipe,
       saveRecipe,
       deleteRecipe,
+      listVersions,
+      restoreVersion,
+      recipesUsing,
     ],
   );
 

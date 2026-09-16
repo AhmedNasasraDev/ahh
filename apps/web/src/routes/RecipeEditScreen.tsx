@@ -39,6 +39,8 @@ import { useAppData } from '../app/AppDataProvider.js';
 import { SourceBadge } from '../components/SourceBadge.js';
 import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState } from '../features/recipe/completeness.js';
+import { versionDiff } from '../features/recipe/versionDiff.js';
+import { subRecipeOptions } from '../features/recipe/subRecipe.js';
 import {
   draftFromRecipe,
   draftToRecipe,
@@ -47,6 +49,7 @@ import {
   emptyStep,
   isDirty,
   moveRow,
+  patchIngredientRow,
   validateDraft,
   type IngredientDraft,
   type RecipeDraft,
@@ -136,8 +139,29 @@ export function RecipeEditScreen() {
   const patchIngredient = (index: number, p: Partial<IngredientDraft>) =>
     setDraft((d) => ({
       ...d,
-      ingredients: d.ingredients.map((row, i) => (i === index ? { ...row, ...p } : row)),
+      // `patchIngredientRow`, not a spread: it keeps the row's stored identity
+      // (`ingredientKey`) across a quantity or price edit and clears it only on
+      // a real rename.
+      ingredients: d.ingredients.map((row, i) => (i === index ? patchIngredientRow(row, p) : row)),
     }));
+
+  /**
+   * The sub-recipe choices for one row.
+   *
+   * `pendingLinks` carries the OTHER rows' links from this unsaved draft, so a
+   * cycle the user is building right now is caught before the save rather than
+   * by the database afterwards. The row being edited is excluded, or it would
+   * be seen as conflicting with itself.
+   */
+  const subOptionsFor = (rowIndex: number) =>
+    subRecipeOptions({
+      parentId: recipeId ?? '',
+      recipes,
+      pendingLinks: draft.ingredients
+        .map((row, i) => ({ row, i }))
+        .filter(({ row, i }) => i !== rowIndex && row.subId !== '')
+        .map(({ row }) => ({ parentId: recipeId ?? '', subId: row.subId })),
+    });
 
   const patchStep = (index: number, p: Partial<StepDraft>) =>
     setDraft((d) => ({
@@ -156,7 +180,21 @@ export function RecipeEditScreen() {
     setProblems([]);
     setBusy(true);
     try {
-      const saved = await saveRecipe(draftToRecipe(draft));
+      // §9 + requirement 1: the previous state is snapshotted by the server,
+      // and `versionDiff` describes the change. Both are computed here because
+      // this is the only place that holds the recipe before AND after.
+      const next = draftToRecipe(draft);
+      const note = existing
+        ? versionDiff({ before: existing, after: next, recipes, prefs })
+        : '';
+
+      const saved = await saveRecipe(next, {
+        versionNote: note,
+        // Optimistic concurrency: the token from the row this form loaded. If
+        // somebody else saved in between, the server refuses rather than
+        // overwriting their work.
+        expectedUpdatedAt: (existing?.['updatedAt'] as string | undefined) ?? null,
+      });
       // Replace the baseline before navigating, so the unsaved-changes guard
       // does not fire on a form that was just saved successfully.
       setOriginal(draftFromRecipe(saved));
@@ -457,9 +495,23 @@ export function RecipeEditScreen() {
                   </div>
                 )}
 
-                <details className={styles.more}>
+                {/*
+                  Open by default when the row IS linked to a base recipe.
+                  The link changes how the row is measured and costed (§18.6:
+                  weighed, never volume-converted, cost rolled up from the
+                  base), and a collapsed row gave no sign of it at all — so the
+                  most consequential field on the row was also the most hidden.
+                  The summary names the base for the same reason.
+                */}
+                <details className={styles.more} open={row.subId !== ''}>
                   <summary className={styles.moreSummary}>
                     פרטים נוספים ל{label}
+                    {row.subId !== '' && (
+                      <span className={styles.moreSub}>
+                        {' · מתכון בסיס: '}
+                        {recipes.find((r) => r.id === row.subId)?.name ?? row.subId}
+                      </span>
+                    )}
                   </summary>
                   <div className={styles.ingGrid}>
                     <div className={styles.field}>
@@ -547,6 +599,34 @@ export function RecipeEditScreen() {
                         aria-label={`הערה על ${label}`}
                       />
                     </div>
+                  </div>
+
+                  {/* ── sub-recipe link (requirements 11-15) ──────────── */}
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor={`sub-${row.key}`}>
+                      מתכון בסיס
+                    </label>
+                    <select
+                      id={`sub-${row.key}`}
+                      className={styles.select}
+                      value={row.subId}
+                      onChange={(e) => patchIngredient(i, { subId: e.target.value })}
+                      aria-label={`מתכון בסיס עבור ${label}`}
+                    >
+                      <option value="">לא מקושר למתכון אחר</option>
+                      {subOptionsFor(i).map((o) => (
+                        <option key={o.id} value={o.id} disabled={o.rejection !== null}>
+                          {o.name}
+                          {o.isSub ? ' (בסיס)' : ''}
+                          {o.rejection !== null ? ` — ${o.reason}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className={styles.hint}>
+                      {row.subId
+                        ? 'הכמות נמדדת במשקל והעלות מתגלגלת מהמתכון המקושר (§18.6). שורה כזאת אינה מומרת לנפח.'
+                        : 'רק מתכונים מהמחברת שלכם מוצעים כאן, והמסד חוסם קישור למתכון של חשבון אחר או קישור שיוצר מעגל.'}
+                    </p>
                   </div>
                   <div className={styles.checkPair}>
                     <label className={styles.checkRow}>

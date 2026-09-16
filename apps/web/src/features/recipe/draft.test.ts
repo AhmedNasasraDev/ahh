@@ -15,6 +15,7 @@ import {
   emptyIngredient,
   isDirty,
   moveRow,
+  patchIngredientRow,
   resetDraftKeys,
   validateDraft,
   type RecipeDraft,
@@ -266,5 +267,64 @@ describe('unsaved-changes detection ignores the local row keys', () => {
   it('sees a real edit', () => {
     const base = emptyDraft();
     expect(isDirty({ ...base, name: 'חדש' }, base)).toBe(true);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+describe('the stored ingredient identity survives an edit', () => {
+  // `ingredient_key` is what the engine matches a personal calibration and a
+  // density override against (B4). Before this, the draft had no field for it:
+  // loading a recipe dropped it and saving regenerated it from the name in
+  // `mappers.ts`. Nothing in the app writes a key that differs from the name
+  // today — `ingredient_catalog` has no UI yet — so this was latent rather
+  // than active. It is still the editor silently rewriting stored data.
+
+  const loaded = (): RecipeDraft =>
+    draftFromRecipe({
+      id: 'r',
+      name: 'עוגה',
+      ingredients: [
+        { id: 'i1', name: 'קקאו 22-24%', ingredientKey: 'cocoa.dutch', qty: 60, unit: 'g' },
+      ],
+      steps: [],
+    } as unknown as Recipe);
+
+  it('is loaded into the draft rather than discarded', () => {
+    expect(loaded().ingredients[0]!.ingredientKey).toBe('cocoa.dutch');
+  });
+
+  it('round-trips back out unchanged', () => {
+    const out = draftToRecipe(loaded());
+    expect(out.ingredients![0]!.ingredientKey).toBe('cocoa.dutch');
+  });
+
+  it('survives a quantity edit, which does not change what the row IS', () => {
+    const row = patchIngredientRow(loaded().ingredients[0]!, { qty: '80' });
+    expect(row.ingredientKey).toBe('cocoa.dutch');
+  });
+
+  it('survives a price edit too', () => {
+    const row = patchIngredientRow(loaded().ingredients[0]!, { price: '42' });
+    expect(row.ingredientKey).toBe('cocoa.dutch');
+  });
+
+  it('survives a whitespace-only change to the name', () => {
+    // Not a rename. The comparison is the engine's own identity, the same one
+    // used everywhere else.
+    const row = patchIngredientRow(loaded().ingredients[0]!, { name: 'קקאו 22-24% ' });
+    expect(row.ingredientKey).toBe('cocoa.dutch');
+  });
+
+  it('is cleared by a real rename, because then the row is something else', () => {
+    const row = patchIngredientRow(loaded().ingredients[0]!, { name: 'קמח לבן' });
+    expect(row.ingredientKey).toBe('');
+    // and the save then derives the identity from the new name
+    expect(row.name).toBe('קמח לבן');
+  });
+
+  it('leaves a row that never had one alone', () => {
+    const fresh = emptyIngredient();
+    expect(fresh.ingredientKey).toBe('');
+    expect(patchIngredientRow(fresh, { name: 'מים' }).ingredientKey).toBe('');
   });
 });

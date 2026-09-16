@@ -326,10 +326,281 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
     }
   }
 
+  // ── the RPCs from migration 0007 ─────────────────────────────────────────
+  //
+  // Mirrored here, not reimplemented differently: the SQL is the authority and
+  // is verified directly against the live database (see REVIEW_STEP5_REPORT).
+  // This exists so a component test can exercise save-with-version, restore and
+  // the sub-recipe guards without a network — including the failure paths,
+  // which are the ones worth testing.
+  //
+  // The one thing it cannot model is transactionality: JavaScript has no
+  // rollback. So every guard is evaluated BEFORE anything is written, which is
+  // the same observable outcome for a caller — nothing changed, and an error
+  // came back. The real atomicity is proved against Postgres.
+
+  const nextTag = (recipeId: string): string => {
+    const used = (db['recipe_versions'] ?? [])
+      .filter((v) => v['recipe_id'] === recipeId)
+      .map((v) => Number(/^V(\d+)$/.exec(String(v['tag']))?.[1] ?? 0));
+    return `V${Math.max(0, ...used) + 1}`;
+  };
+
+  const snapshotOf = (recipeId: string): Row => ({
+    recipe: { ...(db['recipes'] ?? []).find((r) => r['id'] === recipeId) },
+    ingredients: (db['ingredients'] ?? [])
+      .filter((i) => i['recipe_id'] === recipeId)
+      .map((i) => ({ ...i })),
+    steps: (db['steps'] ?? [])
+      .filter((x) => x['recipe_id'] === recipeId)
+      .map((x) => ({ ...x })),
+    issues: (db['issues'] ?? [])
+      .filter((x) => x['recipe_id'] === recipeId)
+      .map((x) => ({ ...x })),
+  });
+
+  /** The `check_sub_recipe_link` trigger, as a function. */
+  const checkLink = (parentId: string, subId: string | null): string | null => {
+    if (!subId) return null;
+    if (subId === parentId) return 'מתכון אינו יכול להכיל את עצמו כתת־מתכון';
+    const recipes = db['recipes'] ?? [];
+    const parent = recipes.find((r) => r['id'] === parentId);
+    const sub = recipes.find((r) => r['id'] === subId);
+    if (!sub) return 'תת־המתכון המקושר אינו קיים';
+    if (parent?.['owner_id'] !== sub['owner_id']) {
+      return 'תת־מתכון חייב להיות מתכון של אותו חשבון';
+    }
+    // Walk forward from the sub and see whether the parent is reachable.
+    const seen = new Set<string>();
+    const stack = [subId];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (cur === parentId) return 'הקישור הזה יוצר מעגל בין מתכונים';
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      for (const i of db['ingredients'] ?? []) {
+        if (i['recipe_id'] === cur && i['sub_recipe_id']) {
+          stack.push(String(i['sub_recipe_id']));
+        }
+      }
+    }
+    return null;
+  };
+
+  const writeChildren = (
+    recipeId: string,
+    ingredients: Row[],
+    steps: Row[],
+    issues: Row[],
+  ): void => {
+    for (const t of ['ingredients', 'steps', 'issues'] as const) {
+      db[t] = (db[t] ?? []).filter((r) => r['recipe_id'] !== recipeId);
+    }
+    ingredients.forEach((e, i) => {
+      (db['ingredients'] ??= []).push({
+        id: newId('ing'),
+        ...e,
+        recipe_id: recipeId,
+        ord: e['ord'] ?? i,
+      });
+    });
+    steps.forEach((e, i) => {
+      (db['steps'] ??= []).push({
+        id: newId('step'),
+        ...e,
+        recipe_id: recipeId,
+        ord: e['ord'] ?? i,
+        temp_unit: e['temp_unit'] ?? 'C',
+      });
+    });
+    issues.forEach((e, i) => {
+      (db['issues'] ??= []).push({
+        id: newId('issue'),
+        ...e,
+        recipe_id: recipeId,
+        ord: e['ord'] ?? i,
+      });
+    });
+  };
+
+  const rpc = async (
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<FakeResult<unknown>> => {
+    log.push({ table: `rpc:${name}`, op: 'select', filters: [] });
+    if (failWith) return { data: null, error: failWith };
+    if (!authUid) {
+      return { data: null, error: { message: 'לא ניתן לשמור בלי התחברות', code: '42501' } };
+    }
+
+    if (name === 'save_recipe') {
+      const parent = (args['p_recipe'] ?? {}) as Row;
+      const ingredients = (args['p_ingredients'] ?? []) as Row[];
+      const steps = (args['p_steps'] ?? []) as Row[];
+      const issues = (args['p_issues'] ?? []) as Row[];
+      const recipeId = (args['p_recipe_id'] ?? null) as string | null;
+      const expected = (args['p_expected_updated_at'] ?? null) as string | null;
+      const note = String(args['p_version_note'] ?? '');
+
+      const recipes = (db['recipes'] ??= []);
+
+      if (recipeId === null) {
+        const id = newId('recipes');
+        // Guards first: nothing is written if any link is bad.
+        const row: Row = {
+          ...recipeRow(id, authUid),
+          ...parent,
+          id,
+          owner_id: authUid,
+          created_at: NOW,
+          updated_at: NOW,
+        };
+        recipes.push(row);
+        for (const e of ingredients) {
+          const bad = checkLink(id, (e['sub_recipe_id'] ?? null) as string | null);
+          if (bad) {
+            // Undo the parent insert, standing in for the transaction.
+            db['recipes'] = recipes.filter((r) => r['id'] !== id);
+            return { data: null, error: { message: bad, code: '23514' } };
+          }
+        }
+        writeChildren(id, ingredients, steps, issues);
+        return { data: id, error: null };
+      }
+
+      const existing = recipes.find((r) => r['id'] === recipeId);
+      if (!existing || existing['owner_id'] !== authUid) {
+        return { data: null, error: { message: 'המתכון לא נמצא', code: 'P0002' } };
+      }
+      if (expected !== null && existing['updated_at'] !== expected) {
+        return {
+          data: null,
+          error: {
+            message: 'המתכון שונה במקום אחר מאז שנטען. יש לרענן ולנסות שוב.',
+            code: '40001',
+          },
+        };
+      }
+      // Every guard BEFORE the first write, so a refusal leaves no trace.
+      for (const e of ingredients) {
+        const bad = checkLink(recipeId, (e['sub_recipe_id'] ?? null) as string | null);
+        if (bad) return { data: null, error: { message: bad, code: '23514' } };
+      }
+
+      // §9: the PREVIOUS state becomes history.
+      (db['recipe_versions'] ??= []).push({
+        id: newId('ver'),
+        recipe_id: recipeId,
+        tag: nextTag(recipeId),
+        what: note,
+        snapshot: snapshotOf(recipeId),
+        created_at: new Date(Date.now() + (db['recipe_versions'] ?? []).length).toISOString(),
+        created_by: authUid,
+      });
+
+      Object.assign(existing, parent, {
+        id: recipeId,
+        owner_id: authUid,
+        // A distinct value each save, which is what makes the optimistic
+        // concurrency check testable at all.
+        updated_at: new Date(Date.now() + (db['recipe_versions'] ?? []).length).toISOString(),
+      });
+      writeChildren(recipeId, ingredients, steps, issues);
+      return { data: recipeId, error: null };
+    }
+
+    if (name === 'restore_recipe_version') {
+      const versionId = String(args['p_version_id'] ?? '');
+      const version = (db['recipe_versions'] ?? []).find((v) => v['id'] === versionId);
+      if (!version) {
+        return { data: null, error: { message: 'הגרסה לא נמצאה', code: 'P0002' } };
+      }
+      const recipeId = String(version['recipe_id']);
+      const recipe = (db['recipes'] ?? []).find((r) => r['id'] === recipeId);
+      if (!recipe || recipe['owner_id'] !== authUid) {
+        return { data: null, error: { message: 'הגרסה לא נמצאה', code: 'P0002' } };
+      }
+      if (recipe['locked'] === true) {
+        return {
+          data: null,
+          error: {
+            message:
+              'המתכון מסומן כנוסחה מאושרת לייצור. יש לבטל את הנעילה לפני שחזור.',
+            code: '42501',
+          },
+        };
+      }
+      const snap = (version['snapshot'] ?? {}) as Row;
+      const snapRecipe = (snap['recipe'] ?? null) as Row | null;
+      if (!snapRecipe) {
+        return {
+          data: null,
+          error: { message: 'ל-snapshot של הגרסה הזאת אין תוכן', code: '22000' },
+        };
+      }
+      const snapIngredients = ((snap['ingredients'] ?? []) as Row[]).map((e) => ({ ...e }));
+      // The trigger fires on the restore's inserts too, so a snapshot taken
+      // before a sub-recipe was deleted cannot resurrect a dead link.
+      for (const e of snapIngredients) {
+        const bad = checkLink(recipeId, (e['sub_recipe_id'] ?? null) as string | null);
+        if (bad) return { data: null, error: { message: bad, code: '23514' } };
+      }
+
+      // The present becomes history FIRST, so this restore is itself undoable.
+      (db['recipe_versions'] ??= []).push({
+        id: newId('ver'),
+        recipe_id: recipeId,
+        tag: nextTag(recipeId),
+        what: `המצב שלפני שחזור ${String(version['tag'])}`,
+        snapshot: snapshotOf(recipeId),
+        created_at: new Date(Date.now() + (db['recipe_versions'] ?? []).length).toISOString(),
+        created_by: authUid,
+      });
+
+      const { id: _i, owner_id: _o, created_at: _c, updated_at: _u, locked: _l, ...rest } =
+        snapRecipe;
+      void _i; void _o; void _c; void _u; void _l;
+      Object.assign(recipe, rest, {
+        updated_at: new Date(Date.now() + (db['recipe_versions'] ?? []).length).toISOString(),
+      });
+      writeChildren(
+        recipeId,
+        snapIngredients,
+        ((snap['steps'] ?? []) as Row[]).map((e) => ({ ...e })),
+        ((snap['issues'] ?? []) as Row[]).map((e) => ({ ...e })),
+      );
+      return { data: recipeId, error: null };
+    }
+
+    if (name === 'recipes_using') {
+      const target = String(args['p_recipe_id'] ?? '');
+      const mine = new Set(
+        (db['recipes'] ?? [])
+          .filter((r) => r['owner_id'] === authUid)
+          .map((r) => String(r['id'])),
+      );
+      const out = new Map<string, string>();
+      for (const i of db['ingredients'] ?? []) {
+        if (i['sub_recipe_id'] !== target) continue;
+        const rid = String(i['recipe_id']);
+        if (rid === target || !mine.has(rid)) continue;
+        const r = (db['recipes'] ?? []).find((x) => x['id'] === rid);
+        if (r) out.set(rid, String(r['name'] ?? ''));
+      }
+      return {
+        data: [...out].map(([id, name]) => ({ id, name })),
+        error: null,
+      };
+    }
+
+    throw new Error(`fakeSupabase: rpc('${name}') is not modelled`);
+  };
+
   const client = {
     from(table: string) {
       return new Builder(table);
     },
+    rpc,
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
     },

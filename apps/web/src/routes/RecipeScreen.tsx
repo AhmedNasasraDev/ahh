@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   compute,
@@ -16,6 +16,8 @@ import { ConvertSheet } from '../features/recipe/ConvertSheet.js';
 import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState, type CalcState } from '../features/recipe/completeness.js';
 import { duplicateRecipe } from '../features/recipe/duplicate.js';
+import { VersionHistory } from '../features/recipe/VersionHistory.js';
+import type { StoredVersion } from '../data/repository.js';
 import styles from '../features/recipe/recipe.module.css';
 
 type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
@@ -58,6 +60,9 @@ export function RecipeScreen() {
     saveRecipe,
     deleteRecipe,
     setCalibrations,
+    listVersions,
+    restoreVersion,
+    recipesUsing,
   } = useAppData();
 
   const [scaleMode, setScaleMode] = useState<ScaleMode>('recipe');
@@ -70,9 +75,41 @@ export function RecipeScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionBusy, setActionBusy] = useState<'copy' | 'delete' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [versions, setVersions] = useState<readonly StoredVersion[]>([]);
+  const [restoreBusy, setRestoreBusy] = useState<string | null>(null);
+  const [versionError, setVersionError] = useState<string | null>(null);
+  const [usedBy, setUsedBy] = useState<readonly { id: string; name: string }[]>([]);
 
   const recipe = recipes.find((r) => r.id === recipeId) ?? null;
   const pro = prefs.pro === true;
+
+  const reloadVersions = useCallback(async () => {
+    if (!recipeId) return;
+    try {
+      setVersions(await listVersions(recipeId));
+    } catch (e) {
+      // History is informative, not load-bearing: the page must still render.
+      setVersionError(e instanceof Error ? e.message : 'טעינת ההיסטוריה נכשלה');
+    }
+  }, [recipeId, listVersions]);
+
+  useEffect(() => {
+    void reloadVersions();
+  }, [reloadVersions]);
+
+  // Which recipes would break if this one were deleted. `sub_recipe_id` is
+  // ON DELETE SET NULL, so without this the delete silently turns their lines
+  // into ingredients with no weight.
+  useEffect(() => {
+    if (!recipeId) return;
+    let cancelled = false;
+    void recipesUsing(recipeId).then((list) => {
+      if (!cancelled) setUsedBy(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [recipeId, recipesUsing]);
 
   // Baseline at factor 1, then the scaled pass. Both come from the one engine.
   const baseline = useMemo(
@@ -140,6 +177,21 @@ export function RecipeScreen() {
       setActionError(e instanceof Error ? e.message : 'השכפול נכשל.');
     } finally {
       setActionBusy(null);
+    }
+  };
+
+  const onRestore = async (version: StoredVersion) => {
+    setVersionError(null);
+    setRestoreBusy(version.id);
+    try {
+      await restoreVersion(version.id);
+      // The restore created a new version holding the pre-restore state, so the
+      // list has to be re-read — otherwise the undo is invisible.
+      await reloadVersions();
+    } catch (e) {
+      setVersionError(e instanceof Error ? e.message : 'השחזור נכשל');
+    } finally {
+      setRestoreBusy(null);
     }
   };
 
@@ -273,6 +325,22 @@ export function RecipeScreen() {
             יימחקו גם הרכיבים, השלבים, התקלות, יומן הניסיונות, האצוות וההיסטוריה
             של המתכון. אי אפשר לשחזר.
           </p>
+          {usedBy.length > 0 && (
+            /*
+              The part nobody would guess: `sub_recipe_id` is ON DELETE SET
+              NULL, so these recipes keep their ingredient LINE and lose the
+              link — becoming a line with a name, a quantity and no weight.
+              Their own version history also becomes unrestorable, because the
+              restore refuses to recreate a link to a recipe that is gone.
+            */
+            <p className={styles.confirmDeps}>
+              {usedBy.length === 1
+                ? 'מתכון אחד משתמש בזה כמתכון בסיס'
+                : `${usedBy.length} מתכונים משתמשים בזה כמתכון בסיס`}
+              : {usedBy.map((r) => r.name).join(' · ')}. הקישור אצלם יתבטל והשורה
+              תישאר בלי משקל, וגם לא יהיה אפשר לשחזר אצלם גרסאות שמפנות לכאן.
+            </p>
+          )}
           <div className={styles.confirmActions}>
             <button
               type="button"
@@ -543,6 +611,25 @@ export function RecipeScreen() {
           </div>
         )}
       </section>
+
+      {/* ── §9 version history ─────────────────────────────────────────── */}
+      <VersionHistory
+        versions={versions}
+        recipe={recipe}
+        recipes={recipes}
+        prefs={prefs}
+        canRestore={capabilities.canWrite && recipe.locked !== true}
+        lockedReason={
+          recipe.locked === true
+            ? 'המתכון מסומן כנוסחה מאושרת לייצור, ולכן שחזור חסום עד ביטול הנעילה (§9).'
+            : !capabilities.canWrite
+              ? 'אין כרגע חיבור, ולכן אי אפשר לשחזר.'
+              : null
+        }
+        busyId={restoreBusy}
+        error={versionError}
+        onRestore={(v) => void onRestore(v)}
+      />
 
       {/* ── steps ──────────────────────────────────────────────────────── */}
       <section className={styles.card}>

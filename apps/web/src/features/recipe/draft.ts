@@ -20,6 +20,7 @@
 // Nothing here invents a value. A field the user left alone stays empty all the
 // way to the database.
 
+import { normalizeName } from '@recipe-notebook/engine';
 import type { IngredientLike, Recipe, Step } from '@recipe-notebook/engine';
 
 /** A form row for one ingredient. Ids are kept so React keys stay stable. */
@@ -27,6 +28,18 @@ export interface IngredientDraft {
   /** local row id, never sent to the database */
   key: string;
   name: string;
+  /**
+   * The canonical identity stored with this row (`ingredient_key`), when there
+   * is one. It is what the engine matches a personal calibration and a density
+   * override against (B4), so an edit that only changes a quantity must not
+   * rewrite it — and before this field existed, saving through the editor
+   * dropped it and `mappers.ts` regenerated it from the name.
+   *
+   * '' means "derive it from the name", which is what a new row gets.
+   * `patchIngredientRow` clears it when the name is genuinely changed, because
+   * then the row really is a different ingredient.
+   */
+  ingredientKey: string;
   qty: string;
   unit: string;
   flour: boolean;
@@ -88,6 +101,7 @@ export function emptyIngredient(): IngredientDraft {
   return {
     key: nextKey('ing'),
     name: '',
+    ingredientKey: '',
     // Grams by default. It is the only unit that needs no density, so a new row
     // starts in the state where the calculation is certainly complete.
     qty: '',
@@ -106,6 +120,33 @@ export function emptyIngredient(): IngredientDraft {
 
 export function emptyStep(): StepDraft {
   return { key: nextKey('step'), text: '', temp: '', minutes: '' };
+}
+
+/**
+ * Applies one edit to an ingredient row.
+ *
+ * The rule this exists for: a stored `ingredientKey` survives every edit
+ * EXCEPT a real change to the name. Editing a quantity or a price must not
+ * change what the row is — otherwise a personal calibration stops matching it.
+ * Retyping the name is the user saying this is something else, so the key is
+ * cleared and regenerated from the new name on save.
+ *
+ * Whitespace and gershayim variants are not a real change: the comparison is
+ * the engine's own `normalizeName`, the same identity used everywhere else.
+ */
+export function patchIngredientRow(
+  row: IngredientDraft,
+  patch: Partial<IngredientDraft>,
+): IngredientDraft {
+  const next = { ...row, ...patch };
+  if (
+    patch.name !== undefined &&
+    next.ingredientKey !== '' &&
+    normalizeName(patch.name) !== normalizeName(row.name)
+  ) {
+    next.ingredientKey = '';
+  }
+  return next;
 }
 
 export function emptyDraft(category = 'אחר'): RecipeDraft {
@@ -149,6 +190,7 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
     ingredients: (recipe.ingredients ?? []).map((ing) => ({
       key: nextKey('ing'),
       name: str(ing.name),
+      ingredientKey: str(ing.ingredientKey),
       qty: str(ing.qty),
       unit: str(ing.unit) || 'g',
       flour: ing.flour === true,
@@ -220,6 +262,7 @@ export function draftToRecipe(draft: RecipeDraft): Recipe {
         qty: i.qty.trim(),
         unit: i.unit,
       };
+      if (i.ingredientKey) ing.ingredientKey = i.ingredientKey;
       if (i.flour) ing.flour = true;
       if (i.liquid) ing.liquid = true;
       if (i.waterPct.trim()) ing.waterPct = i.waterPct.trim();

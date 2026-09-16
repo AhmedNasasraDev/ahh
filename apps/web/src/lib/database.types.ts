@@ -252,6 +252,26 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       owns_recipe: { Args: { p_recipe_id: string }; Returns: boolean };
+      // migration 0007 — the atomic write paths (§9, stage-5 requirement 9)
+      save_recipe: {
+        Args: {
+          p_recipe: Json;
+          p_ingredients: Json;
+          p_steps: Json;
+          p_issues: Json;
+          p_recipe_id: string | null;
+          p_expected_updated_at: string | null;
+          p_version_note: string;
+        };
+        Returns: string;
+      };
+      restore_recipe_version: { Args: { p_version_id: string }; Returns: string };
+      recipes_using: {
+        Args: { p_recipe_id: string };
+        Returns: Array<{ id: string; name: string }>;
+      };
+      recipe_snapshot: { Args: { p_recipe_id: string }; Returns: Json };
+      next_version_tag: { Args: { p_recipe_id: string }; Returns: string };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

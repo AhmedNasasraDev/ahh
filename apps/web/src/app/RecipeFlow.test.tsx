@@ -27,90 +27,15 @@ vi.mock('idb-keyval', () => memoryIdb());
 
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthProvider } from '../auth/AuthProvider.js';
-import { AuthGate } from '../auth/AuthGate.js';
-import { AppDataProvider } from './AppDataProvider.js';
-import { OnboardingGate } from './OnboardingGate.js';
-import { AppShell } from '../shell/AppShell.js';
-import { OnboardingScreen } from '../routes/OnboardingScreen.js';
-import { NotebookScreen } from '../routes/NotebookScreen.js';
-import { RecipeScreen } from '../routes/RecipeScreen.js';
-import { RecipeEditScreen } from '../routes/RecipeEditScreen.js';
-import { MoreScreen } from '../routes/MoreScreen.js';
-import type { TypedSupabaseClient } from '../lib/supabase.js';
 import {
-  createFakeSupabase,
   newProfileRow,
   recipeRow,
   resetFakeIds,
   USER_A,
   USER_B,
   type FakeDb,
-  type FakeSupabase,
 } from '../test/fakeSupabase.js';
-import { createFakeAuth, type FakeAuthClient } from '../test/fakeAuth.js';
-
-function AppUnderTest({ client, route = '/notebook' }: { client: unknown; route?: string }) {
-  return (
-    <MemoryRouter initialEntries={[route]}>
-      <AuthProvider client={client as TypedSupabaseClient | null}>
-        <AuthGate>
-          <AppDataProvider>
-            <Routes>
-              <Route path="/onboarding" element={<OnboardingScreen />} />
-              <Route
-                element={
-                  <OnboardingGate>
-                    <AppShell />
-                  </OnboardingGate>
-                }
-              >
-                <Route path="/notebook" element={<NotebookScreen />} />
-                <Route path="/recipe/new" element={<RecipeEditScreen />} />
-                <Route path="/recipe/:recipeId/edit" element={<RecipeEditScreen />} />
-                <Route path="/recipe/:recipeId" element={<RecipeScreen />} />
-                <Route path="/more" element={<MoreScreen />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/notebook" replace />} />
-            </Routes>
-          </AppDataProvider>
-        </AuthGate>
-      </AuthProvider>
-    </MemoryRouter>
-  );
-}
-
-function emptyDb(): FakeDb {
-  return {
-    profiles: [], recipes: [], ingredients: [], steps: [], issues: [],
-    trials: [], batches: [], recipe_versions: [], private_notes: [], calibrations: [],
-  };
-}
-
-interface Project {
-  client: unknown;
-  data: FakeSupabase;
-  auth: FakeAuthClient;
-  db: FakeDb;
-}
-
-/** One project, one signed-in account, reusable across "refreshes". */
-function project(db: FakeDb, userId: string, email = 'ahmed@test.invalid'): Project {
-  const data = createFakeSupabase({ db, authUid: userId });
-  const auth = createFakeAuth({
-    storedSession: { access_token: 't', user: { id: userId, email } },
-  });
-  return {
-    client: {
-      from: (t: string) => (data.client as { from(t: string): unknown }).from(t),
-      auth: (auth.client as { auth: unknown }).auth,
-    },
-    data,
-    auth,
-    db,
-  };
-}
+import { AppUnderTest, emptyDb, project } from '../test/appHarness.js';
 
 beforeEach(() => {
   resetFakeIds();

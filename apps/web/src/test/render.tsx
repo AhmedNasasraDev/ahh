@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AppDataProvider } from '../app/AppDataProvider.js';
 import type { Repository, RepositoryCapabilities } from '../data/repository.js';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from '../data/demoRecipes.js';
+import type { StoredVersion } from '../data/repository.js';
 import { defaultPrefs, type Calibration, type MeasurementPrefs, type Recipe } from '@recipe-notebook/engine';
 
 export interface FakeRepoOptions {
@@ -15,6 +16,9 @@ export interface FakeRepoOptions {
   onSaveRecipe?(r: Recipe): void;
   onDeleteRecipe?(id: string): void;
   onSaveCalibrations?(list: readonly Calibration[]): void;
+  versions?: readonly StoredVersion[];
+  onRestoreVersion?(versionId: string): void;
+  usedBy?: readonly { id: string; name: string }[];
 }
 
 /** An in-memory repository, so a screen test never touches IndexedDB. */
@@ -45,6 +49,18 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
       recipes = recipes.filter((r) => r.id !== id);
       opts.onDeleteRecipe?.(id);
     },
+    listVersions: async (recipeId) =>
+      (opts.versions ?? []).filter((v) => v.recipeId === recipeId),
+    restoreVersion: async (versionId) => {
+      const v = (opts.versions ?? []).find((x) => x.id === versionId);
+      if (!v) throw new Error('הגרסה לא נמצאה');
+      // Mirrors what the RPC does: the snapshot becomes the live recipe.
+      const restored = { ...v.snapshot, id: v.recipeId };
+      recipes = recipes.map((r) => (r.id === v.recipeId ? restored : r));
+      opts.onRestoreVersion?.(versionId);
+      return restored;
+    },
+    recipesUsing: async () => [...(opts.usedBy ?? [])],
     getPrefs: async () => prefs,
     savePrefs: async (p) => {
       prefs = p;

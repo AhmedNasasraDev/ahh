@@ -201,6 +201,50 @@ function batchRowToDomain(row: BatchRow): Batch {
   return batch;
 }
 
+/**
+ * A stored version snapshot, turned back into a Recipe.
+ *
+ * The RPC in migration 0007 writes the snapshot in exactly `RecipeBundle`
+ * shape, which is what lets this be a thin wrapper over `bundleToRecipe`
+ * rather than a second mapper. That is the whole point: a version read back
+ * cannot be interpreted differently from the live rows it was taken from, so
+ * there is one source of truth for "what does this row set mean".
+ *
+ * The recipe id is overridden with the LIVE recipe's id. A snapshot carries
+ * the id it had, which is the same recipe — but being explicit means a
+ * snapshot that was somehow written with the wrong id cannot make the viewer
+ * show a different recipe.
+ */
+export function snapshotToRecipe(snapshot: unknown, recipeId: string): Recipe {
+  const s = (snapshot ?? {}) as {
+    recipe?: RecipeRow;
+    ingredients?: IngredientRow[];
+    steps?: StepRow[];
+    issues?: IssueRow[];
+  };
+  if (!s.recipe) {
+    // An empty or malformed snapshot is a real possibility (a row written
+    // before 0007, or hand-edited). Returning a named placeholder keeps the
+    // history list renderable and says plainly that this one cannot be used.
+    return {
+      id: recipeId,
+      name: '',
+      ingredients: [],
+      steps: [],
+      snapshotUnavailable: true,
+    } as Recipe;
+  }
+  return {
+    ...bundleToRecipe({
+      recipe: s.recipe,
+      ingredients: s.ingredients ?? [],
+      steps: s.steps ?? [],
+      issues: s.issues ?? [],
+    }),
+    id: recipeId,
+  };
+}
+
 export function bundleToRecipe(bundle: RecipeBundle): Recipe {
   const r = bundle.recipe;
   const recipe: Recipe = {
@@ -222,6 +266,10 @@ export function bundleToRecipe(bundle: RecipeBundle): Recipe {
     manualAllergens: [...(r.manual_allergens ?? [])],
     versionNote: r.version_note,
     createdAt: toDay(r.created_at),
+    // Carried verbatim (not via toDay) because it is the optimistic-concurrency
+    // token the next save sends back, not a label. Truncating it to a day would
+    // make every save within the same day look concurrent.
+    updatedAt: r.updated_at,
     ingredients: [...bundle.ingredients]
       .sort((a, b) => a.ord - b.ord)
       .map(ingredientRowToDomain),

@@ -98,6 +98,21 @@ export function createLocalDemoRepository(): Repository {
       throw new WriteNotAllowedError(NO_BACKEND_REASON);
     },
 
+    async listVersions() {
+      // Not "no versions yet" — there is no history at all without a server,
+      // and the empty list is the truthful answer rather than a placeholder.
+      return [];
+    },
+
+    async restoreVersion(): Promise<Recipe> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
+    async recipesUsing() {
+      // The demo set has no sub-recipe links to report on.
+      return [];
+    },
+
     async getPrefs() {
       // Preferences are the one thing that is genuinely local-first: they belong
       // to the device's measuring cups until an account exists to own them.

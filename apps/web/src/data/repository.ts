@@ -15,6 +15,35 @@
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 
+/** Extra instructions for a save. All optional; a plain save still works. */
+export interface SaveOptions {
+  /**
+   * The `updated_at` this client loaded, for optimistic concurrency. When it
+   * no longer matches the stored row the save is REFUSED — somebody else saved
+   * in between, and silently overwriting their work is worse than an error.
+   * Omit to skip the check.
+   */
+  expectedUpdatedAt?: string | null;
+  /** §9 versionDiff — the description stored with the snapshot of the previous state. */
+  versionNote?: string;
+}
+
+/** A stored version of a recipe (§9). */
+export interface StoredVersion {
+  id: string;
+  recipeId: string;
+  /** V1, V2, ... assigned by the database */
+  tag: string;
+  /** what changed, per §9's versionDiff */
+  what: string;
+  createdAt: string;
+  /**
+   * The recipe as it was. Reconstructed by the SAME mapper that reads live
+   * rows, so a version cannot be interpreted differently from the present.
+   */
+  snapshot: Recipe;
+}
+
 export type DataSourceKind = 'local-demo' | 'supabase';
 
 export interface RepositoryCapabilities {
@@ -49,8 +78,37 @@ export interface RecipeRepository {
    * Persists a recipe. Rejects with `WriteNotAllowedError` when the repository
    * cannot write — callers must surface that, never pretend it worked.
    * (§17 / AC #17: no screen may present a mock action as if it reached a server.)
+   *
+   * For an existing recipe this ALSO snapshots the previous state into the
+   * version history, atomically (§9). There is no way to save without
+   * versioning, on purpose: an optional snapshot is a snapshot somebody
+   * eventually forgets to take.
    */
-  saveRecipe(recipe: Recipe): Promise<Recipe>;
+  saveRecipe(recipe: Recipe, options?: SaveOptions): Promise<Recipe>;
+
+  /** The version history, newest first (§9). */
+  listVersions(recipeId: string): Promise<StoredVersion[]>;
+
+  /**
+   * Restores a version.
+   *
+   * §9: a restore does not delete. It pushes the CURRENT state into history
+   * first and then applies the snapshot, so a mistaken restore is itself
+   * undoable. Atomic — both writes happen or neither.
+   *
+   * Refused for a `locked` recipe until it is unlocked.
+   */
+  restoreVersion(versionId: string): Promise<Recipe>;
+
+  /**
+   * Which of the caller's own recipes use this one as a sub-recipe.
+   *
+   * `ingredients.sub_recipe_id` is ON DELETE SET NULL, so deleting a base
+   * recipe silently turns every line that referenced it into an ingredient
+   * with no weight. This lets the delete confirmation name what is about to
+   * break instead of finding out later.
+   */
+  recipesUsing(recipeId: string): Promise<Array<{ id: string; name: string }>>;
 }
 
 export interface PrefsRepository {
