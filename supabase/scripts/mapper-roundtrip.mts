@@ -100,12 +100,20 @@ function buildDraft() {
   return d;
 }
 
-/** Canonical digest of a Recipe, ignoring the ids the database assigns. */
+/** Canonical digest of a Recipe, ignoring what the database assigns. */
 function digest(recipe: unknown): string {
   const stable = JSON.stringify(recipe, (key, value) => {
     // Row ids are local before the insert and database uuids afterwards, so
     // they cannot be part of the comparison. Everything else must match.
-    if (key === 'id' || key === 'createdAt') return undefined;
+    //
+    // `updatedAt` joined this list in stage 6, and the reason is worth
+    // recording: stage 5 added it to `bundleToRecipe` as the optimistic
+    // concurrency token, which silently broke THIS script — the recorded
+    // `expected` predated the field, so the round trip reported a mismatch on a
+    // value the database is supposed to assign. It went unnoticed because
+    // stage 5 re-ran the versions round trip and not this one. Both are in the
+    // closing checklist now.
+    if (key === 'id' || key === 'createdAt' || key === 'updatedAt') return undefined;
     return value;
   });
   return createHash('sha256').update(stable ?? '', 'utf8').digest('hex');

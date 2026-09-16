@@ -17,7 +17,7 @@ import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState, type CalcState } from '../features/recipe/completeness.js';
 import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import { VersionHistory } from '../features/recipe/VersionHistory.js';
-import type { StoredVersion } from '../data/repository.js';
+import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
 import styles from '../features/recipe/recipe.module.css';
 
 type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
@@ -81,6 +81,10 @@ export function RecipeScreen() {
   const [usedBy, setUsedBy] = useState<readonly { id: string; name: string }[]>([]);
 
   const recipe = recipes.find((r) => r.id === recipeId) ?? null;
+  // Stage-6 requirements 1-3: held by another recipe, so the delete is refused.
+  // This is the SCREEN's copy of that fact and it is only ever advisory — the
+  // database decides, and `onDelete` adopts the answer it gives.
+  const blocked = usedBy.length > 0;
   const pro = prefs.pro === true;
 
   const reloadVersions = useCallback(async () => {
@@ -202,8 +206,18 @@ export function RecipeScreen() {
       await deleteRecipe(recipe.id);
       navigate('/notebook', { replace: true });
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'המחיקה נכשלה.');
-      setConfirmDelete(false);
+      if (e instanceof RecipeInUseError) {
+        // The database refused (migration 0008). This is not a failure to
+        // report and forget: the dependents list this screen was holding was
+        // evidently stale — another tab, or another device, added a link. So
+        // adopt the list the refusal came with and leave the dialog open,
+        // now showing the real reason.
+        setUsedBy(e.usedBy);
+        setActionError(null);
+      } else {
+        setActionError(e instanceof Error ? e.message : 'המחיקה נכשלה.');
+        setConfirmDelete(false);
+      }
     } finally {
       setActionBusy(null);
     }
@@ -317,49 +331,75 @@ export function RecipeScreen() {
           aria-modal="false"
           aria-label="אישור מחיקת מתכון"
         >
-          <p className={styles.confirmTitle}>למחוק את &quot;{recipe.name}&quot;?</p>
-          {/* §7 asks for a confirmation. A confirmation that does not say what
-              goes with it is not really one — the child rows are ON DELETE
-              CASCADE, so this is the only place the user learns that. */}
-          <p className={styles.confirmBody}>
-            יימחקו גם הרכיבים, השלבים, התקלות, יומן הניסיונות, האצוות וההיסטוריה
-            של המתכון. אי אפשר לשחזר.
-          </p>
-          {usedBy.length > 0 && (
-            /*
-              The part nobody would guess: `sub_recipe_id` is ON DELETE SET
-              NULL, so these recipes keep their ingredient LINE and lose the
-              link — becoming a line with a name, a quantity and no weight.
-              Their own version history also becomes unrestorable, because the
-              restore refuses to recreate a link to a recipe that is gone.
-            */
-            <p className={styles.confirmDeps}>
-              {usedBy.length === 1
-                ? 'מתכון אחד משתמש בזה כמתכון בסיס'
-                : `${usedBy.length} מתכונים משתמשים בזה כמתכון בסיס`}
-              : {usedBy.map((r) => r.name).join(' · ')}. הקישור אצלם יתבטל והשורה
-              תישאר בלי משקל, וגם לא יהיה אפשר לשחזר אצלם גרסאות שמפנות לכאן.
-            </p>
+          {/*
+            Stage 6: a recipe in use as somebody's base CANNOT be deleted. The
+            enforcement is the foreign key in migration 0008 and this cannot
+            weaken it — what this branch adds is the one thing the database
+            cannot say, which is WHICH recipes are holding it and therefore what
+            the user has to do next.
+          */}
+          {blocked ? (
+            <>
+              <p className={styles.confirmTitle}>
+                אי אפשר למחוק את &quot;{recipe.name}&quot;
+              </p>
+              <p className={styles.confirmBody}>
+                {usedBy.length === 1
+                  ? 'מתכון אחד משתמש בו כמתכון בסיס'
+                  : `${usedBy.length} מתכונים משתמשים בו כמתכון בסיס`}
+                , ומחיקה הייתה משאירה אצלם שורה בלי משקל ובלי עלות. כדי למחוק את
+                המתכון הזה, יש להסיר קודם את הקישור בכל אחד מהם:
+              </p>
+              <ul className={styles.confirmDeps} aria-label="מתכונים שמשתמשים במתכון הזה">
+                {usedBy.map((r) => (
+                  <li key={r.id}>
+                    <Link to={`/recipe/${r.id}/edit`}>{r.name}</Link>
+                  </li>
+                ))}
+              </ul>
+              <div className={styles.confirmActions}>
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  onClick={() => setConfirmDelete(false)}
+                  aria-label="סגירת ההודעה"
+                >
+                  הבנתי
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className={styles.confirmTitle}>למחוק את &quot;{recipe.name}&quot;?</p>
+              {/* §7 asks for a confirmation. A confirmation that does not say
+                  what goes with it is not really one — the child rows are
+                  ON DELETE CASCADE, so this is the only place the user learns
+                  that. */}
+              <p className={styles.confirmBody}>
+                יימחקו גם הרכיבים, השלבים, התקלות, יומן הניסיונות, האצוות
+                וההיסטוריה של המתכון. אי אפשר לשחזר.
+              </p>
+              <div className={styles.confirmActions}>
+                <button
+                  type="button"
+                  className={styles.actionBtnDanger}
+                  onClick={() => void onDelete()}
+                  disabled={actionBusy === 'delete'}
+                  aria-label={`אישור מחיקת ${recipe.name}`}
+                >
+                  {actionBusy === 'delete' ? 'מוחק…' : 'כן, למחוק'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  onClick={() => setConfirmDelete(false)}
+                  aria-label="ביטול המחיקה"
+                >
+                  ביטול
+                </button>
+              </div>
+            </>
           )}
-          <div className={styles.confirmActions}>
-            <button
-              type="button"
-              className={styles.actionBtnDanger}
-              onClick={() => void onDelete()}
-              disabled={actionBusy === 'delete'}
-              aria-label={`אישור מחיקת ${recipe.name}`}
-            >
-              {actionBusy === 'delete' ? 'מוחק…' : 'כן, למחוק'}
-            </button>
-            <button
-              type="button"
-              className={styles.actionBtn}
-              onClick={() => setConfirmDelete(false)}
-              aria-label="ביטול המחיקה"
-            >
-              ביטול
-            </button>
-          </div>
         </div>
       )}
 

@@ -864,6 +864,9 @@
 }
 
 /* Named dependents in the delete confirmation. */
+/* Since stage 6 this is a LIST of the recipes holding this one, each a link to
+   its editor — the user's next action is to go and unlink it, so the list is
+   the way out and not decoration. */
 .confirmDeps {
   margin-block-start: 8px;
   padding: 8px 10px;
@@ -871,4 +874,143 @@
   background: rgba(255, 255, 255, 0.55);
   font-size: var(--fs-meta-lg);
   line-height: 1.6;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.confirmDeps a {
+  /* A comfortable tap target on a phone without turning the list into buttons. */
+  display: inline-block;
+  min-height: var(--hit-compact);
+  padding-block: 6px;
+  color: var(--c-green);
+  font-weight: 600;
+}
+
+/* ── version comparison (stage-6 requirements 7-13) ──────────────────────── */
+
+/* Two pickers. Stacked on a phone, side by side as soon as there is room —
+   they are a pair and reading them as a pair is the point. */
+.cmpPickers {
+  display: grid;
+  gap: 10px;
+  margin-block-end: 12px;
+}
+@container app (min-width: 600px) {
+  .cmpPickers {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cmpHeading {
+  font-size: var(--fs-meta-lg);
+  font-weight: 700;
+  color: var(--c-ink-2);
+  margin-block-end: 8px;
+}
+.cmpSummary {
+  padding: 8px 10px;
+  border-radius: var(--r-card);
+  background: var(--c-sand);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.6;
+  margin-block-end: 12px;
+}
+.cmpEmpty {
+  padding: 12px;
+  border-radius: var(--r-card);
+  background: var(--c-sand);
+  font-size: var(--fs-meta-lg);
+  line-height: 1.7;
+  color: var(--c-ink-2);
+}
+
+.cmpList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 14px;
+}
+
+/* One change. On a phone the label sits above the two values so neither gets
+   squeezed; on a wider frame it becomes a single line. No table, because a
+   two-value-column table does not fit 402px without horizontal scrolling. */
+.cmpChange,
+.cmpAdded,
+.cmpRemoved {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, 0.03);
+}
+@container app (min-width: 600px) {
+  .cmpChange,
+  .cmpAdded,
+  .cmpRemoved {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+}
+.cmpAdded {
+  border-inline-start: 3px solid var(--c-green);
+}
+.cmpRemoved {
+  border-inline-start: 3px solid var(--c-clay);
+}
+
+.cmpLabel {
+  font-size: var(--fs-meta);
+  color: var(--c-ink-2);
+  font-weight: 600;
+}
+.cmpValues {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--fs-meta-lg);
+}
+/* The old value is struck through rather than only greyed: colour alone is not
+   a distinction, and a reader who cannot see the difference still needs to know
+   which of the two is the earlier one. */
+.cmpBefore {
+  text-decoration: line-through;
+  color: var(--c-ink-2);
+}
+.cmpArrow {
+  color: var(--c-ink-2);
+}
+.cmpAfter {
+  font-weight: 700;
+}
+
+.cmpIngBlock {
+  margin-block-end: 12px;
+}
+.cmpIngName {
+  font-size: var(--fs-meta-lg);
+  font-weight: 700;
+  margin-block-end: 4px;
+}
+
+/* "Compare two versions" — the entry point for an arbitrary pair, as opposed to
+   the per-row button that compares one version with the live recipe. */
+.versionCompareAll {
+  min-height: var(--hit-min);
+  width: 100%;
+  margin-block-start: 10px;
+  padding-inline: 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--c-green);
+  font-size: var(--fs-meta-lg);
+  font-weight: 600;
+  cursor: pointer;
 }

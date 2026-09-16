@@ -26,6 +26,7 @@ import {
 import type { StoredVersion } from '../../data/repository.js';
 import { calcState } from './completeness.js';
 import { versionSummary } from './versionDiff.js';
+import { VersionCompare, type CompareSide } from './VersionCompare.js';
 import styles from './recipe.module.css';
 
 /** A timestamp as "12.03.2026, 14:20" — LTR, because it is a number. */
@@ -63,6 +64,12 @@ export function VersionHistory({
 }) {
   const [viewing, setViewing] = useState<StoredVersion | null>(null);
   const [confirming, setConfirming] = useState<StoredVersion | null>(null);
+  // Stage-6 requirement 7: any two versions of this recipe, not just a version
+  // against the live one. `null` = the comparison is closed; the two sides are
+  // remembered so reopening lands where the reader left off.
+  const [comparing, setComparing] = useState<{ from: CompareSide; to: CompareSide } | null>(
+    null,
+  );
 
   // §9: the timeline reads V1…Vn plus "נוכחית". The live recipe's own label is
   // one past the highest stored tag.
@@ -123,6 +130,15 @@ export function VersionHistory({
               <button
                 type="button"
                 className={styles.versionBtn}
+                onClick={() => setComparing({ from: v.id, to: 'current' })}
+                disabled={v.snapshot['snapshotUnavailable'] === true}
+                aria-label={`השוואת גרסה ${v.tag} לגרסה הנוכחית`}
+              >
+                השוואה
+              </button>
+              <button
+                type="button"
+                className={styles.versionBtn}
                 onClick={() => setConfirming(v)}
                 disabled={
                   !canRestore ||
@@ -178,6 +194,39 @@ export function VersionHistory({
           אין עוד היסטוריה. כל שמירה של המתכון הזה תשמור קודם את המצב שלפניה,
           כך שתמיד אפשר לחזור אחורה.
         </p>
+      )}
+
+      {/*
+        Requirement 7 asks for ANY two versions, which the per-version
+        "compare with current" button above does not give: comparing V2 with V4
+        is a different question, and the one a baker asks when a formula drifted
+        over several saves. This opens the same screen with both sides free.
+        It needs two versions to be worth offering — with one, the only
+        comparison available is the one the row already offers.
+      */}
+      {versions.length >= 2 && (
+        <button
+          type="button"
+          className={styles.versionCompareAll}
+          onClick={() =>
+            setComparing({ from: versions[0]!.id, to: 'current' })
+          }
+          aria-label="השוואה בין שתי גרסאות"
+        >
+          השוואה בין שתי גרסאות
+        </button>
+      )}
+
+      {comparing && (
+        <VersionCompare
+          recipe={recipe}
+          versions={versions}
+          recipes={recipes}
+          prefs={prefs}
+          initialFrom={comparing.from}
+          initialTo={comparing.to}
+          onClose={() => setComparing(null)}
+        />
       )}
 
       {viewing && (

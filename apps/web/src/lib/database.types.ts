@@ -272,6 +272,9 @@ export type Database = {
       };
       recipe_snapshot: { Args: { p_recipe_id: string }; Returns: Json };
       next_version_tag: { Args: { p_recipe_id: string }; Returns: string };
+      // migration 0009 — stage-6 requirements 1-6. Returns void; the refusal is
+      // an error with code 23503, not a value.
+      delete_recipe: { Args: { p_recipe_id: string }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

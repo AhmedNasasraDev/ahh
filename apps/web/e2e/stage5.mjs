@@ -270,7 +270,62 @@ try {
   );
   await page.screenshot({ path: `${OUT}/14-linked-row-phone.png`, fullPage: true });
 
+  // ── stage 6: the delete guard ───────────────────────────────────────────
+  //
+  // WHAT A BROWSER CAN CHECK HERE, AND WHAT IT CANNOT.
+  //
+  // The blocking dialog is NOT reachable in this build, and that is correct
+  // rather than a gap in the UI: without a server the recipe is read-only, so
+  // the delete button is disabled before the question "is anything using this?"
+  // can arise. Trying to drive the dialog from here would mean loosening the
+  // read-only rule to make a test pass.
+  //
+  // So the guard's coverage is split:
+  //   supabase/tests/delete-guard.sql   the enforcement, against live Postgres,
+  //                                     as `authenticated` and as `anon`
+  //   app/DeleteGuardFlow.test.tsx      the dialog, the named dependents, the
+  //                                     links and the bypass, through the real
+  //                                     component tree
+  //   here                              that the read-only build disables the
+  //                                     delete rather than offering one it
+  //                                     cannot perform
+  await page.goto('http://127.0.0.1:8124/recipe/ganache', { waitUntil: 'load' });
+  await page.waitForTimeout(700);
+
+  const delBtn = page.getByRole('button', { name: /^מחיקת/ }).first();
+  check('the recipe page offers a delete control', (await delBtn.count()) > 0);
+  check(
+    'and it is disabled in a build with no server, rather than failing when pressed',
+    await delBtn.isDisabled(),
+  );
+  const noBackend = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+  check(
+    'the page says why nothing can be changed',
+    /אין כרגע חיבור|לקריאה בלבד|אין חיבור/.test(noBackend),
+    noBackend.slice(0, 140),
+  );
+  await page.screenshot({ path: `${OUT}/15-readonly-actions-phone.png`, fullPage: true });
+
+  // ── stage 6: the version-comparison entry point ─────────────────────────
+  //
+  // The demo repository truthfully has NO version history (there is no server),
+  // so the comparison screen itself cannot be opened here — its coverage is
+  // VersionCompare.test.tsx. What a browser can check is that the entry points
+  // are correctly absent rather than present and broken.
+  await page.goto('http://127.0.0.1:8124/recipe/brioche-choc', { waitUntil: 'load' });
+  await page.waitForTimeout(700);
+  check(
+    'no "compare two versions" button with no history to compare',
+    (await page.getByRole('button', { name: 'השוואה בין שתי גרסאות' }).count()) === 0,
+  );
+  check(
+    'and no per-version compare button either',
+    (await page.getByRole('button', { name: /^השוואת גרסה/ }).count()) === 0,
+  );
+
   // ── accessibility of the new controls ───────────────────────────────────
+  await page.goto('http://127.0.0.1:8124/recipe/ganache/edit', { waitUntil: 'load' });
+  await page.waitForTimeout(700);
   const pickerCount = await page.locator('select[aria-label^="מתכון בסיס עבור"]').count();
   const pickerNames = await page.locator('select[aria-label^="מתכון בסיס עבור"]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));

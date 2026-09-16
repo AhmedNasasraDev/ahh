@@ -71,6 +71,11 @@ export interface RecipeRepository {
    * it. That is deliberate: a recipe whose ingredients had been orphaned would
    * still compute, and would compute wrongly.
    *
+   * A recipe that is IN USE as somebody's sub-recipe is refused — by the
+   * database, in migration 0008, not here. Rejects with `RecipeInUseError`,
+   * which carries the dependents the caller is allowed to see so the screen can
+   * name them.
+   *
    * Rejects with `WriteNotAllowedError` when the repository cannot write.
    */
   deleteRecipe(id: string): Promise<void>;
@@ -103,10 +108,14 @@ export interface RecipeRepository {
   /**
    * Which of the caller's own recipes use this one as a sub-recipe.
    *
-   * `ingredients.sub_recipe_id` is ON DELETE SET NULL, so deleting a base
-   * recipe silently turns every line that referenced it into an ingredient
-   * with no weight. This lets the delete confirmation name what is about to
-   * break instead of finding out later.
+   * Since stage 6 this is not a warning but the reason a delete is refused:
+   * `ingredients.sub_recipe_id` is NO ACTION (migration 0008), so a base recipe
+   * in use cannot be deleted at all. The screen uses this to say WHICH recipes
+   * are holding it, which a foreign-key violation cannot tell anyone.
+   *
+   * It is RLS-filtered at source, so it can only ever return recipes the caller
+   * may see — which is what keeps the refusal from saying anything about
+   * another account (stage-6 requirement 6).
    */
   recipesUsing(recipeId: string): Promise<Array<{ id: string; name: string }>>;
 }
@@ -134,5 +143,27 @@ export class WriteNotAllowedError extends Error {
   constructor(readonly reason: string) {
     super(reason);
     this.name = 'WriteNotAllowedError';
+  }
+}
+
+/**
+ * A recipe could not be deleted because other recipes use it as a base
+ * (stage-6 requirements 1-3).
+ *
+ * `usedBy` is what the screen needs and the database cannot provide: a foreign
+ * key violation says a constraint was violated, not which recipes are holding
+ * the thing. The list comes from `recipesUsing`, which is RLS-filtered, so it
+ * is everything the caller is allowed to know and nothing more. It can be
+ * EMPTY — a dependency may have been added by another tab between the check and
+ * the delete — and the message has to survive that case rather than rendering
+ * an empty list as though nothing were wrong.
+ */
+export class RecipeInUseError extends Error {
+  constructor(
+    readonly usedBy: ReadonlyArray<{ id: string; name: string }>,
+    message = 'המתכון הזה משמש כמתכון בסיס, ולכן אי אפשר למחוק אותו.',
+  ) {
+    super(message);
+    this.name = 'RecipeInUseError';
   }
 }

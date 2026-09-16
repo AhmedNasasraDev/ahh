@@ -174,5 +174,99 @@
     "id": "required",
     "note": "required",
     "recipe_id": "required"
+  },
+  "_functions_comment": "Captured from the applied schema. `args` is the INPUT argument names in order: PostgREST passes RPC arguments BY NAME, so a drifted name is not a type error but a runtime 'function not found'. `security_definer` and the two execute flags are here so that a grant loosening is a failing check rather than something noticed months later — see migrations 0006 and 0010.",
+  "_functions": {
+    "check_sub_recipe_link": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "delete_recipe": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "handle_new_user": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "next_version_tag": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "owns_recipe": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "recipe_snapshot": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "recipes_using": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "replace_recipe_children": {
+      "args": [
+        "p_recipe_id",
+        "p_ingredients",
+        "p_steps",
+        "p_issues"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "restore_recipe_version": {
+      "args": [
+        "p_version_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "save_recipe": {
+      "args": [
+        "p_recipe",
+        "p_ingredients",
+        "p_steps",
+        "p_issues",
+        "p_recipe_id",
+        "p_expected_updated_at",
+        "p_version_note"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "touch_updated_at": {
+      "args": [],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": false
+    }
   }
 }

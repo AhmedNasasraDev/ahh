@@ -17,6 +17,21 @@
 // `compute()` for the yield fallback, which is the one part that must not be
 // re-implemented.
 //
+// STAGE 6 — ONE COMPARISON, TWO PRESENTATIONS
+//
+// Stage-6 requirement 14 says not to add a second diff engine if this one can
+// serve, and it can, but only after being turned inside out. §9 needs a
+// ONE-LINE description; the comparison screen needs the field-by-field detail
+// that description was computed from and then threw away. Computing them
+// separately is exactly the second source of truth the instruction rules out —
+// the line and the screen could then disagree about the same two versions.
+//
+// So `compareRecipes()` below does the work and returns the structure, and
+// `versionDiff()` is a formatter over it. §9's wording, its clause order, its
+// three-name cap and its yield fallback are all unchanged and still tested
+// against the prototype's specification; they are now derived from the same
+// data the screen renders.
+//
 // Two deliberate departures from the prototype, both about honesty:
 //
 //   1. The prototype keys ingredients by raw name, so "קמח " and "קמח" are
@@ -40,6 +55,63 @@ import {
   type MeasurementPrefs,
   type Recipe,
 } from '@recipe-notebook/engine';
+
+/**
+ * Which recipe fields the comparison covers (stage-6 requirement 9: "the
+ * relevant recipe fields and the ingredients, not just a general heading").
+ *
+ * Deliberately NOT everything on `Recipe`. Left out:
+ *   - `id`, `createdAt`, `versions`, `versionOf`, `savedFrom` — identity and
+ *     bookkeeping, not the formula.
+ *   - `trials`, `batches`, `issues` — records of events (§13/§13a). A version
+ *     does not snapshot them, so there is nothing to compare.
+ *   - `privateNotes` — §8: never leaves the owner's own screen, and a version
+ *     snapshot does not carry it.
+ *   - `ingredients`, `steps` — compared structurally below, not as fields.
+ *
+ * The order is the order they are shown in, which is the order they matter in.
+ */
+const COMPARED_FIELDS: ReadonlyArray<{ key: string; label: string }> = [
+  { key: 'name', label: 'שם' },
+  { key: 'category', label: 'קטגוריה' },
+  { key: 'isSub', label: 'מתכון בסיס' },
+  { key: 'locked', label: 'נוסחה מאושרת לייצור' },
+  { key: 'yieldUnits', label: 'מספר יחידות' },
+  { key: 'unitWeight', label: 'משקל ליחידה' },
+  { key: 'yieldActual', label: 'תשואה מעשית' },
+  { key: 'weightBefore', label: 'משקל לפני אפייה' },
+  { key: 'weightAfter', label: 'משקל אחרי אפייה' },
+  { key: 'doughMode', label: 'מצב בצק' },
+  { key: 'ddt', label: 'טמפרטורת בצק מבוקשת' },
+  { key: 'flourTemp', label: 'טמפרטורת קמח' },
+  { key: 'roomTemp', label: 'טמפרטורת חדר' },
+  { key: 'friction', label: 'חיכוך' },
+  { key: 'targetFC', label: 'יעד פוד קוסט' },
+  { key: 'tags', label: 'תגיות' },
+  { key: 'shelfLife', label: 'חיי מדף' },
+  { key: 'storage', label: 'אחסון' },
+  { key: 'freezing', label: 'הקפאה' },
+  { key: 'thawing', label: 'הפשרה' },
+  { key: 'equipment', label: 'ציוד' },
+  { key: 'notes', label: 'הערות' },
+  { key: 'manualAllergens', label: 'אלרגנים שסומנו ידנית' },
+  { key: 'versionNote', label: 'הערת גרסה' },
+];
+
+/** The fields of one ingredient row that the comparison reports on. */
+const COMPARED_ING_FIELDS: ReadonlyArray<{ key: string; label: string }> = [
+  { key: 'qty', label: 'כמות' },
+  { key: 'unit', label: 'יחידה' },
+  { key: 'price', label: 'מחיר' },
+  { key: 'priceUnit', label: 'ליחידת מחיר' },
+  { key: 'waterPct', label: 'אחוז מים' },
+  { key: 'gPer100', label: 'צפיפות' },
+  { key: 'unitWeight', label: 'משקל ליחידה' },
+  { key: 'flour', label: 'נחשב קמח' },
+  { key: 'liquid', label: 'נחשב נוזל' },
+  { key: 'subId', label: 'מתכון בסיס' },
+  { key: 'note', label: 'הערה' },
+];
 
 /** Up to three names, as §9 specifies. */
 const MAX_NAMES = 3;
@@ -119,49 +191,195 @@ export interface VersionDiffInput {
 }
 
 /**
- * A one-line description of what changed, in the §9 wording.
- * Never empty: "שינויים קלים" when nothing on the list was detected.
+ * One side of a value that changed.
+ *
+ * `null` means ABSENT, and that is the whole point of the type. The data model
+ * turns on `null ≠ 0` and on "no price" ≠ "price 0" (stage-6 requirements 11
+ * and 12), so a comparison that rendered both as an empty cell, or both as 0,
+ * would erase exactly the distinction the rest of the system is built to keep.
+ * `format()` below is the only place these become text.
  */
-export function versionDiff({
+export type CellValue = string | number | boolean | null;
+
+export interface FieldChange {
+  key: string;
+  label: string;
+  before: CellValue;
+  after: CellValue;
+}
+
+export interface IngredientSide {
+  /** identity plus occurrence — see `factsOf` */
+  key: string;
+  name: string;
+  /** what was written, e.g. "2 כוס" */
+  written: string;
+  /** resolved grams, or null when the engine could not weigh it */
+  grams: number | null;
+}
+
+export interface IngredientChange extends IngredientSide {
+  fields: FieldChange[];
+}
+
+export interface RecipeComparison {
+  fields: FieldChange[];
+  added: IngredientSide[];
+  removed: IngredientSide[];
+  changed: IngredientChange[];
+  steps: { before: number; after: number };
+  /** the §9 one-liner, from this same data */
+  summary: string;
+}
+
+/** Normalises a raw field value to a cell, keeping absent distinct from 0/''. */
+function cell(v: unknown): CellValue {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'boolean' || typeof v === 'number') return v;
+  if (Array.isArray(v)) return v.length ? v.join(', ') : null;
+  const t = String(v).trim();
+  return t === '' ? null : t;
+}
+
+/**
+ * Are two cells the same value?
+ *
+ * `null` equals only `null`. A numeric 0 and the string '0' are the same
+ * written number and must not read as a change — but 0 and null never are.
+ */
+function sameCell(a: CellValue, b: CellValue): boolean {
+  if (a === null || b === null) return a === b;
+  if (typeof a === 'boolean' || typeof b === 'boolean') return a === b;
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  return String(a) === String(b);
+}
+
+/** One ingredient row as a bag of comparable cells, keyed by field. */
+function ingCells(ing: IngredientLike): Map<string, CellValue> {
+  const out = new Map<string, CellValue>();
+  for (const { key } of COMPARED_ING_FIELDS) {
+    // `flour` and `liquid` are flags: absent means false, not "unknown".
+    if (key === 'flour' || key === 'liquid') {
+      out.set(key, (ing as Record<string, unknown>)[key] === true);
+    } else {
+      out.set(key, cell((ing as Record<string, unknown>)[key]));
+    }
+  }
+  return out;
+}
+
+/**
+ * Everything that differs between two states of one recipe (stage-6 7-12).
+ *
+ * This is the source of truth: `versionDiff()` is a formatter over it, so the
+ * §9 one-liner and the comparison screen can never disagree.
+ */
+export function compareRecipes({
   before,
   after,
   recipes,
   prefs,
-}: VersionDiffInput): string {
-  const bits: string[] = [];
+}: VersionDiffInput): RecipeComparison {
+  // ── the recipe's own fields (requirement 9) ───────────────────────────
+  const fields: FieldChange[] = [];
+  for (const { key, label } of COMPARED_FIELDS) {
+    const b =
+      key === 'isSub' || key === 'locked' || key === 'doughMode'
+        ? (before as Record<string, unknown>)[key] === true
+        : cell((before as Record<string, unknown>)[key]);
+    const a =
+      key === 'isSub' || key === 'locked' || key === 'doughMode'
+        ? (after as Record<string, unknown>)[key] === true
+        : cell((after as Record<string, unknown>)[key]);
+    if (!sameCell(b, a)) fields.push({ key, label, before: b, after: a });
+  }
 
-  if ((before.name ?? '') !== (after.name ?? '')) bits.push('שם השתנה');
-
+  // ── the ingredients ───────────────────────────────────────────────────
+  // Keyed by identity AND occurrence, so two legitimately duplicated rows stay
+  // two rows (requirement 10). Nothing constrains `ingredient_key` to be unique
+  // within a recipe, and water added in two stages is an ordinary formula.
   const oldRows = factsOf(before, recipes, prefs);
   const newRows = factsOf(after, recipes, prefs);
-  const keys = new Set([...oldRows.keys(), ...newRows.keys()]);
+  const oldIngs = ingsByKey(before);
+  const newIngs = ingsByKey(after);
+  const keys = [...new Set([...oldRows.keys(), ...newRows.keys()])];
 
-  const added: string[] = [];
-  const removed: string[] = [];
-  const moved: string[] = [];
-  const relinked: string[] = [];
+  const added: IngredientSide[] = [];
+  const removed: IngredientSide[] = [];
+  const changed: IngredientChange[] = [];
+
+  const sideOf = (key: string, f: RowFacts): IngredientSide => ({
+    key,
+    name: f.name,
+    written: `${f.qty} ${unitLabel(f.unit)}`.trim(),
+    grams: f.grams,
+  });
 
   for (const key of keys) {
     const o = oldRows.get(key);
     const n = newRows.get(key);
-    if (!o && n) added.push(n.name);
-    else if (o && !n) removed.push(o.name);
-    else if (o && n) {
-      if (amountChanged(o, n)) moved.push(n.name);
-      // Not in §9's list, but a sub-recipe link changing IS a change to the
-      // formula and "שינויים קלים" would be a lie about it.
-      if (o.subId !== n.subId) relinked.push(n.name);
+    if (!o && n) {
+      added.push(sideOf(key, n));
+    } else if (o && !n) {
+      removed.push(sideOf(key, o));
+    } else if (o && n) {
+      const ob = ingCells(oldIngs.get(key) ?? {});
+      const nb = ingCells(newIngs.get(key) ?? {});
+      const rowFields: FieldChange[] = [];
+      for (const { key: f, label } of COMPARED_ING_FIELDS) {
+        const bv = ob.get(f) ?? null;
+        const av = nb.get(f) ?? null;
+        if (sameCell(bv, av)) continue;
+        // A sub-recipe id is meaningless on screen; show the recipe's name,
+        // falling back to the id when it is a recipe we can no longer see.
+        if (f === 'subId') {
+          rowFields.push({
+            key: f,
+            label,
+            before: bv === null ? null : nameOfRecipe(String(bv), recipes),
+            after: av === null ? null : nameOfRecipe(String(av), recipes),
+          });
+        } else {
+          rowFields.push({ key: f, label, before: bv, after: av });
+        }
+      }
+      if (rowFields.length > 0) changed.push({ ...sideOf(key, n), fields: rowFields });
     }
   }
 
-  if (added.length) bits.push(`נוסף ${nameList(added)}`);
-  if (removed.length) bits.push(`הוסר ${nameList(removed)}`);
+  const steps = {
+    before: (before.steps ?? []).length,
+    after: (after.steps ?? []).length,
+  };
+
+  // ── §9's one-liner, from the structure above ──────────────────────────
+  const bits: string[] = [];
+  if (fields.some((f) => f.key === 'name')) bits.push('שם השתנה');
+  if (added.length) bits.push(`נוסף ${nameList(added.map((r) => r.name))}`);
+  if (removed.length) bits.push(`הוסר ${nameList(removed.map((r) => r.name))}`);
+
+  // §9 counts a QUANTITY change, which is not the same as any field changing:
+  // the amount is compared in resolved grams, so a unit change that leaves the
+  // formula alone is not one. `amountChanged` is that rule, unchanged.
+  const moved = changed
+    .filter((r) => {
+      const o = oldRows.get(r.key);
+      const n = newRows.get(r.key);
+      return o && n ? amountChanged(o, n) : false;
+    })
+    .map((r) => r.name);
   if (moved.length) bits.push(`שונתה כמות: ${nameList(moved)}`);
+
+  const relinked = changed
+    .filter((r) => r.fields.some((f) => f.key === 'subId'))
+    .map((r) => r.name);
+  // Not in §9's list, but a sub-recipe link changing IS a change to the formula
+  // and "שינויים קלים" would be a lie about it.
   if (relinked.length) bits.push(`שונה מתכון הבסיס: ${nameList(relinked)}`);
 
-  const oldSteps = (before.steps ?? []).length;
-  const newSteps = (after.steps ?? []).length;
-  if (oldSteps !== newSteps) bits.push('מספר השלבים שונה');
+  if (steps.before !== steps.after) bits.push('מספר השלבים שונה');
 
   // §9: the yield comparison is a FALLBACK, only consulted when nothing above
   // was detected. Running it always would append "התשואה השתנתה" to every
@@ -172,7 +390,40 @@ export function versionDiff({
     if (Math.abs(a.actualYield - b.actualYield) > 1) bits.push('התשואה השתנתה');
   }
 
-  return bits.length ? bits.join(' · ') : 'שינויים קלים';
+  return {
+    fields,
+    added,
+    removed,
+    changed,
+    steps,
+    summary: bits.length ? bits.join(' · ') : 'שינויים קלים',
+  };
+}
+
+/** The same occurrence keys `factsOf` builds, mapped to the raw rows. */
+function ingsByKey(recipe: Recipe): Map<string, IngredientLike> {
+  const out = new Map<string, IngredientLike>();
+  const seen = new Map<string, number>();
+  for (const ing of recipe.ingredients ?? []) {
+    const key = ingredientKeyOf(ing);
+    if (!key) continue;
+    const n = (seen.get(key) ?? 0) + 1;
+    seen.set(key, n);
+    out.set(`${key}#${n}`, ing);
+  }
+  return out;
+}
+
+function nameOfRecipe(id: string, recipes: readonly Recipe[]): string {
+  return String(recipes.find((r) => r.id === id)?.name ?? id);
+}
+
+/**
+ * A one-line description of what changed, in the §9 wording.
+ * Never empty: "שינויים קלים" when nothing on the list was detected.
+ */
+export function versionDiff(input: VersionDiffInput): string {
+  return compareRecipes(input).summary;
 }
 
 /**

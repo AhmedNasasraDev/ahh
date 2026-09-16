@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { defaultPrefs, type Recipe } from '@recipe-notebook/engine';
-import { versionDiff, versionSummary } from './versionDiff.js';
+import { compareRecipes, versionDiff, versionSummary } from './versionDiff.js';
 
 const prefs = { ...defaultPrefs('pro'), done: true, tools: { cup: 240, tbsp: 15, tsp: 5 } };
 
@@ -251,5 +251,290 @@ describe('the version summary (requirement 4)', () => {
   it('handles a version with no ingredients at all', () => {
     const empty = R({ ingredients: [], steps: [] });
     expect(versionSummary(empty, [empty], prefs)).toBe('0 רכיבים');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// `compareRecipes` — the structure the comparison screen renders
+// (stage-6 requirements 9-12). `versionDiff` is a formatter over this, so the
+// tests above already pin the summary; these pin the detail it is derived from.
+
+describe('the recipe fields that are compared (requirement 9)', () => {
+  it('reports a changed field with both sides', () => {
+    const out = compareRecipes({
+      before: R({ storage: 'במקרר' }),
+      after: R({ storage: 'בהקפאה' }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields).toEqual([
+      { key: 'storage', label: 'אחסון', before: 'במקרר', after: 'בהקפאה' },
+    ]);
+  });
+
+  it('covers the numeric and the text fields, not just the name', () => {
+    const out = compareRecipes({
+      before: R({ targetFC: 27.5, shelfLife: '3 ימים', equipment: 'מיקסר' }),
+      after: R({ targetFC: 30, shelfLife: '5 ימים', equipment: 'מיקסר' }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields.map((f) => f.key).sort()).toEqual(['shelfLife', 'targetFC']);
+  });
+
+  it('reports tags as a readable list rather than an array', () => {
+    const out = compareRecipes({
+      before: R({ tags: ['בדיקה'] }),
+      after: R({ tags: ['בדיקה', 'כוסמין'] }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields[0]).toMatchObject({ before: 'בדיקה', after: 'בדיקה, כוסמין' });
+  });
+
+  it('treats a flag as false when absent, not as unknown', () => {
+    const out = compareRecipes({
+      before: R(),
+      after: R({ locked: true }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields).toEqual([
+      { key: 'locked', label: 'נוסחה מאושרת לייצור', before: false, after: true },
+    ]);
+  });
+
+  it('leaves out identity, bookkeeping and event records', () => {
+    // A version snapshot does not carry trials or batches, and `id` changing is
+    // not a change to the formula. Reporting them would be noise at best.
+    const out = compareRecipes({
+      before: R({ id: 'a', createdAt: '2020-01-01', trials: [], versionOf: null } as never),
+      after: R({ id: 'b', createdAt: '2026-01-01', trials: [{ id: 't' }], versionOf: 'x' } as never),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields).toEqual([]);
+  });
+});
+
+describe('requirement 11 — null and 0 stay different values', () => {
+  it('an absent number becoming 0 is a change, with the sides distinguishable', () => {
+    const out = compareRecipes({
+      before: R({ yieldActual: '' }),
+      after: R({ yieldActual: 0 }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields).toEqual([
+      { key: 'yieldActual', label: 'תשואה מעשית', before: null, after: 0 },
+    ]);
+  });
+
+  it('0 becoming absent is also a change, in the other direction', () => {
+    const out = compareRecipes({
+      before: R({ yieldActual: 0 }),
+      after: R({ yieldActual: '' }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields[0]).toMatchObject({ before: 0, after: null });
+  });
+
+  it('but the same number written two ways is not a change', () => {
+    // The draft holds strings, the database holds numbers. `450` and `'450'`
+    // are the same measurement and reporting them would be a false positive on
+    // every recipe that had ever been through the form.
+    const out = compareRecipes({
+      before: R({ unitWeight: 500 }),
+      after: R({ unitWeight: '500' }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields).toEqual([]);
+  });
+
+  it('and an absent value is not equal to an empty string', () => {
+    // Both are "nothing written", so this must NOT be reported — the
+    // distinction that matters is nothing-vs-zero, not undefined-vs-''.
+    const out = compareRecipes({
+      before: R({ storage: undefined } as never),
+      after: R({ storage: '' }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.fields).toEqual([]);
+  });
+});
+
+describe('requirement 12 — a missing price is not a price of 0', () => {
+  const withPrice = (price: unknown): Recipe =>
+    R({
+      ingredients: [{ id: 'i1', name: 'קמח לבן', qty: 500, unit: 'g', flour: true, price } as never],
+      steps: [],
+    });
+
+  it('reports no-price becoming free', () => {
+    const out = compareRecipes({
+      before: withPrice(undefined),
+      after: withPrice(0),
+      recipes: [],
+      prefs,
+    });
+    expect(out.changed).toHaveLength(1);
+    expect(out.changed[0]!.fields).toEqual([
+      { key: 'price', label: 'מחיר', before: null, after: 0 },
+    ]);
+  });
+
+  it('reports free becoming unpriced', () => {
+    const out = compareRecipes({
+      before: withPrice(0),
+      after: withPrice(undefined),
+      recipes: [],
+      prefs,
+    });
+    expect(out.changed[0]!.fields).toEqual([
+      { key: 'price', label: 'מחיר', before: 0, after: null },
+    ]);
+  });
+
+  it('does not report a price that did not move', () => {
+    const out = compareRecipes({
+      before: withPrice(4.25),
+      after: withPrice(4.25),
+      recipes: [],
+      prefs,
+    });
+    expect(out.changed).toEqual([]);
+  });
+});
+
+describe('requirement 10 — duplicated ingredients stay separate', () => {
+  const twoStage = (first: number, second: number): Recipe =>
+    R({
+      ingredients: [
+        { id: 'i1', name: 'מים', ingredientKey: 'water', qty: first, unit: 'g', liquid: true },
+        { id: 'i2', name: 'קמח לבן', ingredientKey: 'flour.white', qty: 500, unit: 'g', flour: true },
+        { id: 'i3', name: 'מים', ingredientKey: 'water', qty: second, unit: 'g', liquid: true },
+      ],
+      steps: [],
+    });
+
+  it('does not merge two rows that share an ingredient_key', () => {
+    const out = compareRecipes({
+      before: twoStage(100, 250),
+      after: twoStage(100, 300),
+      recipes: [],
+      prefs,
+    });
+    // ONE of the two water rows moved, and it must be reported as one row and
+    // not as the pair collapsing into a single changed entry.
+    expect(out.changed).toHaveLength(1);
+    expect(out.changed[0]!.name).toBe('מים');
+    expect(out.changed[0]!.key).toBe('water#2');
+    // the SECOND water row, 250 -> 300. The first is untouched at 100, which is
+    // what "not merged" means here.
+    expect(out.changed[0]!.fields).toEqual([
+      { key: 'qty', label: 'כמות', before: 250, after: 300 },
+    ]);
+  });
+
+  it('keys them by occurrence, so both can change independently', () => {
+    const out = compareRecipes({
+      before: twoStage(100, 250),
+      after: twoStage(150, 300),
+      recipes: [],
+      prefs,
+    });
+    expect(out.changed.map((r) => r.key).sort()).toEqual(['water#1', 'water#2']);
+    expect(out.added).toEqual([]);
+    expect(out.removed).toEqual([]);
+  });
+
+  it('an added occurrence is an addition, not a change to the first one', () => {
+    const before = R({
+      ingredients: [
+        { id: 'i1', name: 'מים', ingredientKey: 'water', qty: 100, unit: 'g', liquid: true },
+        { id: 'i2', name: 'קמח לבן', ingredientKey: 'flour.white', qty: 500, unit: 'g', flour: true },
+      ],
+      steps: [],
+    });
+    const out = compareRecipes({ before, after: twoStage(100, 250), recipes: [], prefs });
+    expect(out.added.map((r) => r.key)).toEqual(['water#2']);
+    expect(out.changed).toEqual([]);
+  });
+});
+
+describe('an added or removed ingredient carries what it was', () => {
+  it('gives the written amount and the resolved grams', () => {
+    const before = R({ ingredients: [], steps: [] });
+    const after = R({
+      ingredients: [{ id: 'i1', name: 'קמח לבן', qty: 2, unit: 'cup', flour: true }],
+      steps: [],
+    });
+    const out = compareRecipes({ before, after, recipes: [], prefs });
+    expect(out.added).toHaveLength(1);
+    // 2 cups at 240 ml of white flour at 50 g/100 ml = 240 g, from the engine
+    expect(out.added[0]).toMatchObject({ name: 'קמח לבן', written: '2 כוס', grams: 240 });
+  });
+
+  it('reports grams as null when the engine could not weigh it', () => {
+    const before = R({ ingredients: [], steps: [] });
+    const after = R({
+      ingredients: [{ id: 'i1', name: 'קקאו', qty: 1, unit: 'cup' }],
+      steps: [],
+    });
+    const out = compareRecipes({ before, after, recipes: [], prefs });
+    // Not 0. A cup of cocoa has no reliable density, and calling it 0 g would
+    // be the invented number the whole provenance chain exists to prevent.
+    expect(out.added[0]!.grams).toBeNull();
+  });
+});
+
+describe('a sub-recipe link shows the recipe, not its id', () => {
+  const base = { id: 'base', name: 'גנאש', ingredients: [], steps: [] } as unknown as Recipe;
+
+  it('names the base recipe on both sides', () => {
+    const before = R({
+      ingredients: [{ id: 'i1', name: 'מילוי', qty: 100, unit: 'g' }],
+      steps: [],
+    });
+    const after = R({
+      ingredients: [{ id: 'i1', name: 'מילוי', qty: 100, unit: 'g', subId: 'base' }],
+      steps: [],
+    });
+    const out = compareRecipes({ before, after, recipes: [base, before, after], prefs });
+    expect(out.changed[0]!.fields).toEqual([
+      { key: 'subId', label: 'מתכון בסיס', before: null, after: 'גנאש' },
+    ]);
+  });
+
+  it('falls back to the id for a recipe that is no longer visible', () => {
+    // A version can reference a recipe that has since been deleted. Showing a
+    // blank would read as "no base recipe", which is a different formula.
+    const before = R({
+      ingredients: [{ id: 'i1', name: 'מילוי', qty: 100, unit: 'g', subId: 'gone' }],
+      steps: [],
+    });
+    const after = R({
+      ingredients: [{ id: 'i1', name: 'מילוי', qty: 100, unit: 'g' }],
+      steps: [],
+    });
+    const out = compareRecipes({ before, after, recipes: [before, after], prefs });
+    expect(out.changed[0]!.fields).toEqual([
+      { key: 'subId', label: 'מתכון בסיס', before: 'gone', after: null },
+    ]);
+  });
+});
+
+describe('the step count', () => {
+  it('is reported as a before and after, not just "changed"', () => {
+    const out = compareRecipes({
+      before: R({ steps: [{ id: 's1', text: 'ללוש' }] }),
+      after: R({ steps: [{ id: 's1', text: 'ללוש' }, { id: 's2', text: 'לאפות' }] }),
+      recipes: [],
+      prefs,
+    });
+    expect(out.steps).toEqual({ before: 1, after: 2 });
   });
 });

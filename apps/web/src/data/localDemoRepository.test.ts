@@ -29,3 +29,25 @@ describe('the local demo repository refuses to fake a write', () => {
     expect(firstRunPrefs().profile).toBe('pro');
   });
 });
+
+describe('recipesUsing, in the read-only demo notebook', () => {
+  it('names the recipe that really does depend on the ganache', async () => {
+    // The demo set contains one genuine sub-recipe link. Reporting "nothing
+    // depends on this" about it was the wrong answer to the question stage 6
+    // makes the delete dialog ask.
+    const repo = createLocalDemoRepository();
+    const users = await repo.recipesUsing('ganache');
+    expect(users.map((r) => r.id)).toEqual(['brioche-choc']);
+  });
+
+  it('reports nothing for a recipe nothing uses', async () => {
+    const repo = createLocalDemoRepository();
+    expect(await repo.recipesUsing('brioche')).toEqual([]);
+  });
+
+  it('never reports a recipe as depending on itself', async () => {
+    const repo = createLocalDemoRepository();
+    const users = await repo.recipesUsing('brioche-choc');
+    expect(users.map((r) => r.id)).not.toContain('brioche-choc');
+  });
+});

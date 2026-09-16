@@ -263,6 +263,31 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
       }
 
       if (this.op === 'delete') {
+        // Migration 0008's guard, on the RAW delete path as well as the RPC.
+        // In Postgres this is a foreign key, so it applies to
+        // `DELETE /recipes?id=eq.x` sent straight at PostgREST with nothing but
+        // the anon key — which is the bypass stage-6 requirement 5 names. A
+        // double that only guarded the RPC would let a test "prove" the bypass
+        // was blocked while modelling nothing.
+        if (this.table === 'recipes') {
+          const held = candidates.find((row) =>
+            (db['ingredients'] ?? []).some(
+              (i) => i['sub_recipe_id'] === row['id'] && i['recipe_id'] !== row['id'],
+            ),
+          );
+          if (held) {
+            log.push({ ...entry, rowsOut: 0 });
+            return {
+              data: null,
+              error: {
+                message:
+                  'update or delete on table "recipes" violates foreign key constraint "ingredients_sub_recipe_id_fkey" on table "ingredients"',
+                code: '23503',
+              },
+            };
+          }
+        }
+
         for (const row of candidates) {
           const i = all.indexOf(row);
           if (i >= 0) all.splice(i, 1);
@@ -591,6 +616,53 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
         data: [...out].map(([id, name]) => ({ id, name })),
         error: null,
       };
+    }
+
+    if (name === 'delete_recipe') {
+      const target = String(args['p_recipe_id'] ?? '');
+
+      // Migration 0008's guard. In the real database this is a foreign key
+      // that no client can get around; here it is a check, evaluated BEFORE
+      // anything is written, because JavaScript has no rollback.
+      //
+      // Deliberately NOT scoped to the caller's own recipes: the constraint is
+      // not RLS-aware either. What keeps that from leaking is the owner-equality
+      // invariant the 0007 trigger maintains, and modelling the guard as the
+      // database really behaves is the only way a test could ever catch that
+      // invariant breaking.
+      const blockers = (db['ingredients'] ?? []).filter(
+        (i) => i['sub_recipe_id'] === target && i['recipe_id'] !== target,
+      );
+      if (blockers.length > 0) {
+        return {
+          data: null,
+          error: {
+            message:
+              'המתכון הזה משמש כמתכון בסיס, ולכן אי אפשר למחוק אותו.',
+            code: '23503',
+          },
+        };
+      }
+
+      // RLS: another account's id matches no row, so this is a silent no-op.
+      const row = (db['recipes'] ?? []).find(
+        (r) => r['id'] === target && r['owner_id'] === authUid,
+      );
+      if (!row) return { data: null, error: null };
+
+      db['recipes'] = (db['recipes'] ?? []).filter((r) => r !== row);
+      for (const child of [
+        'ingredients',
+        'steps',
+        'issues',
+        'trials',
+        'batches',
+        'recipe_versions',
+        'private_notes',
+      ]) {
+        db[child] = (db[child] ?? []).filter((c) => c['recipe_id'] !== target);
+      }
+      return { data: null, error: null };
     }
 
     throw new Error(`fakeSupabase: rpc('${name}') is not modelled`);

@@ -108,9 +108,20 @@ export function createLocalDemoRepository(): Repository {
       throw new WriteNotAllowedError(NO_BACKEND_REASON);
     },
 
-    async recipesUsing() {
-      // The demo set has no sub-recipe links to report on.
-      return [];
+    async recipesUsing(recipeId: string) {
+      // This used to return [] with a comment saying the demo set has no
+      // sub-recipe links. It does: the chocolate brioche uses the ganache. So
+      // the demo notebook was reporting "nothing depends on this" about a
+      // recipe that something depends on — which since stage 6 is not a missing
+      // warning but a wrong answer to "why can't I delete this?".
+      const all = await this.listRecipes();
+      return all
+        .filter(
+          (r) =>
+            r.id !== recipeId &&
+            (r.ingredients ?? []).some((i) => i.subId === recipeId),
+        )
+        .map((r) => ({ id: r.id, name: String(r.name ?? '') }));
     },
 
     async getPrefs() {

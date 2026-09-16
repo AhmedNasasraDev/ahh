@@ -25,6 +25,7 @@ import { normalizeCalibrations } from '@recipe-notebook/engine';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import type { Json, RecipeVersionRow } from '../lib/database.types.js';
 import {
+  RecipeInUseError,
   WriteNotAllowedError,
   type Repository,
   type RepositoryCapabilities,
@@ -74,6 +75,28 @@ export class SupabaseRepositoryError extends Error {
 
 function isOnline(): boolean {
   return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+}
+
+/**
+ * Is this the refusal from migration 0008's guard?
+ *
+ * The code is checked, not the message. `delete_recipe` raises with
+ * `errcode = 'foreign_key_violation'` and its own Hebrew text, while the bare
+ * constraint raises Postgres's own English text — and the message is the part
+ * that changes with a Postgres version or a locale. The code is the contract.
+ *
+ * PostgREST puts the SQLSTATE in `code`, and a `PostgrestError` is a plain
+ * object rather than an Error subclass, so this reads defensively: a shape that
+ * is not what we expect must fall through to the generic failure rather than be
+ * mistaken for "in use".
+ */
+function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    String((error as { code: unknown }).code) === '23503'
+  );
 }
 
 export interface SupabaseRepositoryDeps {
@@ -281,7 +304,9 @@ export function createSupabaseRepository({
       const { data, error } = await client.rpc('recipes_using', {
         p_recipe_id: recipeId,
       });
-      // A failure here must not block a delete — it only enriches the warning.
+      // A failure here must not decide anything. Since stage 6 the DELETE is
+      // refused by the database whatever this returns; this only supplies the
+      // names for the message.
       if (error) return [];
       return (data ?? []) as Array<{ id: string; name: string }>;
     },
@@ -289,15 +314,29 @@ export function createSupabaseRepository({
     async deleteRecipe(id: string): Promise<void> {
       requireOnline('המתכון');
 
-      // The `owner_id` filter is belt-and-braces — RLS already limits this to
-      // the signed-in account — but it also turns "somebody else's id" into a
-      // no-op rather than an error, which is the right shape for a delete.
-      const { error } = await client
-        .from('recipes')
-        .delete()
-        .eq('id', id)
-        .eq('owner_id', userId);
-      if (error) throw new SupabaseRepositoryError('מחיקת המתכון נכשלה', error);
+      // `delete_recipe` rather than a plain DELETE. The guarantee is the
+      // foreign key from migration 0008, which no client can get around — but
+      // that constraint is DEFERRED (so that deleting an account still
+      // cascades), which means a raw DELETE is refused at COMMIT rather than at
+      // the statement. The function runs the check inside the call, so the
+      // refusal arrives as an ordinary error with a code to branch on.
+      //
+      // RLS still applies inside it: another account's id matches no row and
+      // the call is a silent no-op, which is the right shape for a delete and
+      // also refuses to confirm that the id exists.
+      const { error } = await client.rpc('delete_recipe', { p_recipe_id: id });
+
+      if (error) {
+        // 23503 is the one refusal that has a meaning worth translating: the
+        // recipe is in use as somebody's base. Anything else is a real failure.
+        if (isForeignKeyViolation(error)) {
+          // Asked only now, and only to name them. An empty list is possible
+          // (a dependency added between the two calls) and `RecipeInUseError`
+          // handles that rather than pretending the delete succeeded.
+          throw new RecipeInUseError(await this.recipesUsing(id));
+        }
+        throw new SupabaseRepositoryError('מחיקת המתכון נכשלה', error);
+      }
 
       // Drop the local copy too. Leaving it would make a deleted recipe
       // reappear the next time the network drops and the mirror answers.

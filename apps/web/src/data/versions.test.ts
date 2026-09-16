@@ -19,7 +19,7 @@ vi.mock('idb-keyval', () => memoryIdb());
 
 import type { Recipe } from '@recipe-notebook/engine';
 import { createSupabaseRepository } from './supabaseRepository.js';
-import { WriteNotAllowedError } from './repository.js';
+import { RecipeInUseError, WriteNotAllowedError } from './repository.js';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import {
   createFakeSupabase,
@@ -507,7 +507,16 @@ describe('sub-recipe links, at the repository level', () => {
     expect(await r.recipesUsing(lonely.id)).toEqual([]);
   });
 
-  it('a deleted base recipe leaves the dependent line without a link', async () => {
+  // ── stage 6: a base recipe in use cannot be deleted at all ─────────────
+  //
+  // This replaces a stage-5 test that asserted the OPPOSITE — that deleting a
+  // base recipe left the dependent line without a link, which is what ON
+  // DELETE SET NULL did. Stage 6 is the explicit product decision to refuse the
+  // delete instead, so the old assertion is not a regression to be fixed but
+  // the behaviour that was deliberately removed. Migration 0008 is what
+  // enforces it.
+
+  it('refuses to delete a base recipe that another recipe uses', async () => {
     const r = repo();
     const base = await r.saveRecipe(draft({ id: 'new-base', name: 'בסיס', ingredients: [], steps: [] }));
     const top = await r.saveRecipe(
@@ -518,14 +527,263 @@ describe('sub-recipe links, at the repository level', () => {
       }),
     );
 
-    await r.deleteRecipe(base.id);
-    // ON DELETE SET NULL: the line survives and loses its link, which is what
-    // the delete confirmation warns about.
-    fake.db['ingredients'] = (fake.db['ingredients'] ?? []).map((i) =>
-      i['sub_recipe_id'] === base.id ? { ...i, sub_recipe_id: null } : i,
-    );
+    await expect(r.deleteRecipe(base.id)).rejects.toThrow(RecipeInUseError);
+
+    // Nothing moved: not the base recipe, and not the dependent's link.
+    expect((fake.db['recipes'] ?? []).some((x) => x['id'] === base.id)).toBe(true);
     const back = (await r.getRecipe(top.id))!;
-    expect(back.ingredients![0]!.name).toBe('הבסיס');
-    expect(back.ingredients![0]!.subId).toBeUndefined();
+    expect(back.ingredients![0]!.subId).toBe(base.id);
+  });
+
+  it('the refusal carries the dependents, so the screen can name them', async () => {
+    const r = repo();
+    const base = await r.saveRecipe(draft({ id: 'new-base', name: 'בסיס', ingredients: [], steps: [] }));
+    await r.saveRecipe(
+      draft({
+        id: 'new-top', name: 'עוגה שתלויה בו',
+        ingredients: [{ id: 't1', name: 'הבסיס', qty: 100, unit: 'g', subId: base.id }],
+        steps: [],
+      }),
+    );
+
+    // A foreign-key violation says a constraint was violated. It cannot say
+    // WHICH recipes are holding the thing, and that is the only part the user
+    // can act on.
+    await expect(r.deleteRecipe(base.id)).rejects.toMatchObject({
+      name: 'RecipeInUseError',
+      usedBy: [{ name: 'עוגה שתלויה בו' }],
+    });
+  });
+
+  it('deletes it once the last dependency is removed (requirement 4)', async () => {
+    const r = repo();
+    const base = await r.saveRecipe(draft({ id: 'new-base', name: 'בסיס', ingredients: [], steps: [] }));
+    const top = await r.saveRecipe(
+      draft({
+        id: 'new-top', name: 'תלוי',
+        ingredients: [{ id: 't1', name: 'הבסיס', qty: 100, unit: 'g', subId: base.id }],
+        steps: [],
+      }),
+    );
+    await expect(r.deleteRecipe(base.id)).rejects.toThrow(RecipeInUseError);
+
+    // Unlink it the way the editor would — a save with the link cleared.
+    await r.saveRecipe(
+      { ...top, ingredients: [{ id: 't1', name: 'הבסיס', qty: 100, unit: 'g' }] } as Recipe,
+      { expectedUpdatedAt: null },
+    );
+
+    await r.deleteRecipe(base.id);
+    expect((fake.db['recipes'] ?? []).some((x) => x['id'] === base.id)).toBe(false);
+    expect(await r.recipesUsing(base.id)).toEqual([]);
+  });
+
+  it('a recipe nothing uses is unaffected by the guard', async () => {
+    const r = repo();
+    const lonely = await r.saveRecipe(draft());
+    await r.deleteRecipe(lonely.id);
+    expect((fake.db['recipes'] ?? []).some((x) => x['id'] === lonely.id)).toBe(false);
+  });
+
+  it('blocks the raw DELETE too, not only the RPC (requirement 5)', async () => {
+    // The bypass the requirement names: past the repository, straight at the
+    // table, which is what the anon key can send to PostgREST. In Postgres this
+    // is the foreign key from 0008 and applies to every route in.
+    const r = repo();
+    const base = await r.saveRecipe(draft({ id: 'new-base', name: 'בסיס', ingredients: [], steps: [] }));
+    await r.saveRecipe(
+      draft({
+        id: 'new-top', name: 'תלוי',
+        ingredients: [{ id: 't1', name: 'הבסיס', qty: 100, unit: 'g', subId: base.id }],
+        steps: [],
+      }),
+    );
+
+    const res = await (fake.client as unknown as {
+      from(t: string): {
+        delete(): { eq(c: string, v: string): Promise<{ error: { code?: string } | null }> };
+      };
+    })
+      .from('recipes')
+      .delete()
+      .eq('id', base.id);
+
+    expect(res.error?.code).toBe('23503');
+    expect((fake.db['recipes'] ?? []).some((x) => x['id'] === base.id)).toBe(true);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-6 hardening of the sub-recipe path (requirements 15-17).
+
+describe('requirement 16 — changing a link that already exists', () => {
+  const setUp = async () => {
+    const r = repo();
+    const one = await r.saveRecipe(
+      draft({ id: 'new-one', name: 'בסיס א', ingredients: [], steps: [] }),
+    );
+    const two = await r.saveRecipe(
+      draft({ id: 'new-two', name: 'בסיס ב', ingredients: [], steps: [] }),
+    );
+    const top = await r.saveRecipe(
+      draft({
+        id: 'new-top', name: 'עליון',
+        ingredients: [{ id: 't1', name: 'מילוי', qty: 100, unit: 'g', subId: one.id }],
+        steps: [],
+      }),
+    );
+    return { r, one, two, top };
+  };
+
+  it('repoints a link from one base recipe to another', async () => {
+    const { r, two, top } = await setUp();
+    const saved = await r.saveRecipe(
+      { ...top, ingredients: [{ ...top.ingredients![0]!, subId: two.id }] } as Recipe,
+      { expectedUpdatedAt: top['updatedAt'] as string },
+    );
+    expect((await r.getRecipe(saved.id))!.ingredients![0]!.subId).toBe(two.id);
+  });
+
+  it('frees the old base recipe for deletion once repointed', async () => {
+    const { r, one, two, top } = await setUp();
+    // held to begin with
+    await expect(r.deleteRecipe(one.id)).rejects.toThrow(RecipeInUseError);
+
+    await r.saveRecipe(
+      { ...top, ingredients: [{ ...top.ingredients![0]!, subId: two.id }] } as Recipe,
+      { expectedUpdatedAt: top['updatedAt'] as string },
+    );
+
+    // the old one is free, and the NEW one is now the one that is held
+    await r.deleteRecipe(one.id);
+    await expect(r.deleteRecipe(two.id)).rejects.toThrow(RecipeInUseError);
+  });
+
+  it('refuses to repoint a link at the recipe itself', async () => {
+    const { r, top } = await setUp();
+    await expect(
+      r.saveRecipe(
+        { ...top, ingredients: [{ ...top.ingredients![0]!, subId: top.id }] } as Recipe,
+        { expectedUpdatedAt: top['updatedAt'] as string },
+      ),
+    ).rejects.toThrow();
+    // and the original link is intact — a refused save changes nothing
+    expect((await r.getRecipe(top.id))!.ingredients![0]!.subId).not.toBe(top.id);
+  });
+
+  it('refuses a repoint that closes a loop', async () => {
+    const { r, one, top } = await setUp();
+    // `top` uses `one`. Making `one` use `top` closes it.
+    await expect(
+      r.saveRecipe(
+        {
+          ...one,
+          ingredients: [{ id: 'o1', name: 'עליון', qty: 50, unit: 'g', subId: top.id }],
+        } as Recipe,
+        { expectedUpdatedAt: one['updatedAt'] as string },
+      ),
+    ).rejects.toThrow();
+    expect((await r.getRecipe(one.id))!.ingredients ?? []).toHaveLength(0);
+  });
+
+  it('records the repoint in the version history', async () => {
+    const { r, two, top } = await setUp();
+    await r.saveRecipe(
+      { ...top, ingredients: [{ ...top.ingredients![0]!, subId: two.id }] } as Recipe,
+      { expectedUpdatedAt: top['updatedAt'] as string, versionNote: 'שונה מתכון הבסיס: מילוי' },
+    );
+    const [v] = await r.listVersions(top.id);
+    // the version holds the OLD link, which is what makes the change undoable
+    expect(v!.snapshot.ingredients![0]!.subId).not.toBe(two.id);
+    expect(v!.what).toContain('שונה מתכון הבסיס');
+  });
+});
+
+describe('requirement 17 — restoring a version whose sub-recipe link is no longer valid', () => {
+  /**
+   * Builds the only state that can produce this, now that stage 6 refuses to
+   * delete a base recipe that is in use:
+   *
+   *   1. `top` uses `base`.
+   *   2. `top` is saved again, so V1 holds the state WITH the link.
+   *   3. the link is removed from `top` and saved — V2 also holds it.
+   *   4. `base` is now unused, so it can be deleted.
+   *
+   * V1 and V2 both reference a recipe that no longer exists. Restoring either
+   * must fail, and fail atomically.
+   */
+  const orphanedVersion = async () => {
+    const r = repo();
+    const base = await r.saveRecipe(
+      draft({ id: 'new-base', name: 'בסיס', ingredients: [], steps: [] }),
+    );
+    let top = await r.saveRecipe(
+      draft({
+        id: 'new-top', name: 'עליון',
+        ingredients: [{ id: 't1', name: 'מילוי', qty: 100, unit: 'g', subId: base.id }],
+        steps: [{ id: 's1', text: 'לערבב' }],
+      }),
+    );
+    // a save, so the linked state becomes V1
+    top = await r.saveRecipe(
+      { ...top, name: 'עליון 2' } as Recipe,
+      { expectedUpdatedAt: top['updatedAt'] as string },
+    );
+    // unlink, so the base recipe becomes deletable
+    top = await r.saveRecipe(
+      { ...top, ingredients: [{ id: 't1', name: 'מילוי', qty: 100, unit: 'g' }] } as Recipe,
+      { expectedUpdatedAt: top['updatedAt'] as string },
+    );
+    await r.deleteRecipe(base.id);
+    const versions = await r.listVersions(top.id);
+    return { r, top, base, versions };
+  };
+
+  it('refuses the restore rather than recreating a dangling link', async () => {
+    const { r, versions } = await orphanedVersion();
+    const linked = versions.find((v) => v.snapshot.ingredients?.[0]?.subId)!;
+    expect(linked).toBeDefined();
+    await expect(r.restoreVersion(linked.id)).rejects.toThrow();
+  });
+
+  it('leaves the recipe exactly as it was — no partial write', async () => {
+    const { r, top, versions } = await orphanedVersion();
+    const before = (await r.getRecipe(top.id))!;
+    const linked = versions.find((v) => v.snapshot.ingredients?.[0]?.subId)!;
+
+    await expect(r.restoreVersion(linked.id)).rejects.toThrow();
+
+    const after = (await r.getRecipe(top.id))!;
+    // The failure point is INSIDE the restore, after the pre-restore snapshot
+    // and the parent update in the real RPC — so "nothing changed" is the
+    // property that matters, and it covers the name as well as the rows.
+    expect(after.name).toBe(before.name);
+    expect(after.ingredients!.map((i) => [i.name, i.qty, i.subId])).toEqual(
+      before.ingredients!.map((i) => [i.name, i.qty, i.subId]),
+    );
+    expect(after.steps!.map((s) => s.text)).toEqual(before.steps!.map((s) => s.text));
+  });
+
+  it('does not add a version for the restore that did not happen', async () => {
+    const { r, top, versions } = await orphanedVersion();
+    const linked = versions.find((v) => v.snapshot.ingredients?.[0]?.subId)!;
+    const countBefore = (await r.listVersions(top.id)).length;
+
+    await expect(r.restoreVersion(linked.id)).rejects.toThrow();
+
+    // A version describing a restore that was refused would be false history —
+    // the same failure mode requirement 9 of stage 5 exists to rule out.
+    expect(await r.listVersions(top.id)).toHaveLength(countBefore);
+  });
+
+  it('but a version with NO sub-recipe link restores normally', async () => {
+    // The limitation has to be confined to the versions that actually reference
+    // the deleted recipe, not the whole history.
+    const { r, top, versions } = await orphanedVersion();
+    const clean = versions.find((v) => !v.snapshot.ingredients?.[0]?.subId);
+    if (clean) {
+      await expect(r.restoreVersion(clean.id)).resolves.toBeDefined();
+    }
+    expect(await r.getRecipe(top.id)).not.toBeNull();
   });
 });
