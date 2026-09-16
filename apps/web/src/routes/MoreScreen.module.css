@@ -1,0 +1,53 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.account {
+  padding: 20px 20px 18px;
+  border-block-end: 1px solid var(--c-line);
+}
+
+.accountTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-screen-title);
+  color: var(--c-ink);
+}
+
+.email {
+  margin-block-start: 8px;
+  font-size: var(--fs-body);
+  color: var(--c-ink);
+}
+
+.note {
+  margin-block-start: 6px;
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.6;
+}
+
+.signOut {
+  margin-block-start: 14px;
+  padding: 9px 18px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+  color: var(--c-red);
+  cursor: pointer;
+}
+.signOut:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.error {
+  margin-block-start: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-card);
+  font-size: var(--fs-meta-lg);
+  color: var(--c-red);
+  background: var(--c-red-bg);
+}

@@ -4,9 +4,11 @@
 // below this provider knows whether the data came from Supabase, from the demo
 // set or from the offline mirror — that is the point of data/repository.ts.
 //
-// Deliberately plain React context and no server-state library yet. With no
-// backend there is no cache to invalidate, and adding TanStack Query now would
-// be structure without a job. It slots in behind this provider in stage 3.
+// Still plain React context and no server-state library. The app fetches three
+// things once per session — preferences, calibrations and the recipe list — and
+// re-reads a recipe on save. There is no background refetch and no cross-screen
+// cache to invalidate, so TanStack Query would be structure without a job. It
+// slots in behind this provider if and when there is one.
 
 import {
   createContext,
@@ -20,12 +22,14 @@ import {
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import { createLocalDemoRepository, firstRunPrefs } from '../data/localDemoRepository.js';
+import { createSupabaseRepository } from '../data/supabaseRepository.js';
 import {
   WriteNotAllowedError,
   type Repository,
   type RepositoryCapabilities,
 } from '../data/repository.js';
 import { supabaseStatus } from '../lib/supabase.js';
+import { useOptionalAuth } from '../auth/AuthProvider.js';
 
 export interface AppData {
   ready: boolean;
@@ -46,16 +50,20 @@ export interface AppData {
 const AppDataContext = createContext<AppData | null>(null);
 
 function describeBackend(caps: RepositoryCapabilities): string {
+  if (caps.source === 'supabase') {
+    if (caps.servingFromCache) {
+      return 'מוצג מהעתק שנשמר על המכשיר. אין כרגע חיבור לשרת, ולכן אי אפשר לשמור שינויים.';
+    }
+    return caps.online
+      ? 'מחובר לחשבון שלכם.'
+      : 'אין כרגע חיבור לאינטרנט. אפשר לקרוא, אבל לא לשמור.';
+  }
+
   const s = supabaseStatus();
-  if (s.configured) {
-    return 'מחובר ל-Supabase.';
+  if (!s.configured && s.reason === 'service-role-key-in-browser') {
+    return 'המפתח שהוגדר הוא service_role ולכן לא נעשה בו שימוש. בדפדפן מותר רק מפתח anon או publishable.';
   }
-  if (s.reason === 'service-role-key-in-browser') {
-    return 'המפתח שהוגדר הוא service_role ולכן לא נעשה בו שימוש. בדפדפן מותר רק מפתח anon.';
-  }
-  return caps.source === 'local-demo'
-    ? 'אין עדיין חשבון ושרת. מוצגים מתכוני הדמו, וההעדפות נשמרות על המכשיר הזה בלבד.'
-    : 'מקור הנתונים אינו מוגדר.';
+  return 'אין חיבור לשרת בהתקנה הזאת. מוצגים מתכוני הדמו לקריאה בלבד, וההעדפות נשמרות על המכשיר הזה בלבד.';
 }
 
 export function AppDataProvider({
@@ -66,7 +74,25 @@ export function AppDataProvider({
   /** injected in tests */
   repository?: Repository;
 }) {
-  const repo = useMemo(() => repository ?? createLocalDemoRepository(), [repository]);
+  const auth = useOptionalAuth();
+  const userId = auth?.user?.id ?? null;
+  const client = auth?.client ?? null;
+
+  /**
+   * Which repository is in force.
+   *
+   * This is the whole point of the seam in data/repository.ts: the decision is
+   * three lines here, and not one screen below this provider knows or cares.
+   *
+   * A signed-in user gets Supabase. Everyone else — no project configured, or
+   * configured but signed out — gets the read-only demo repository, which
+   * refuses writes rather than faking them.
+   */
+  const repo = useMemo(() => {
+    if (repository) return repository;
+    if (client && userId) return createSupabaseRepository({ client, userId });
+    return createLocalDemoRepository();
+  }, [repository, client, userId]);
 
   const [ready, setReady] = useState(false);
   const [prefs, setPrefsState] = useState<MeasurementPrefs>(firstRunPrefs);

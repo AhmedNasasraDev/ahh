@@ -13,7 +13,7 @@
 // site data blocked, and in some embedded webviews. A cache miss must degrade to
 // "we have nothing local", never to a crash.
 
-import { del, get, set } from 'idb-keyval';
+import { clear, del, get, set } from 'idb-keyval';
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 
 const KEY = {
@@ -111,6 +111,37 @@ export const writeCookProgress = (progress: CookProgress): Promise<boolean> =>
 
 export const clearCookProgress = (recipeId: string): Promise<void> =>
   safeDel(KEY.cookProgress(recipeId));
+
+/**
+ * Wipes the whole mirror.
+ *
+ * Called on sign-out. The mirror is a plaintext copy of ONE account's recipes,
+ * preferences and calibrations, sitting on a device that may be shared — a
+ * kitchen tablet, most likely. Leaving it in place would mean the next person
+ * to sign in could read the previous account's notebook straight out of the
+ * cache before the first network response arrives, which is exactly the
+ * isolation RLS exists to provide.
+ *
+ * `clear()` empties the default idb-keyval store, and this module is the only
+ * writer to it, so nothing else is affected. Failure is tolerated the same way
+ * every other accessor here tolerates it, and each key is then removed
+ * individually as a fallback.
+ */
+export async function clearMirror(): Promise<void> {
+  try {
+    await clear();
+    return;
+  } catch {
+    /* fall through to the per-key path below */
+  }
+  const index = await readRecipeIndex();
+  await Promise.all([
+    safeDel(KEY.prefs),
+    safeDel(KEY.calibrations),
+    safeDel(KEY.recipeIndex),
+    ...index.flatMap((r) => [safeDel(KEY.recipe(r.id)), safeDel(KEY.cookProgress(r.id))]),
+  ]);
+}
 
 /** Exposed for tests and for a future "clear local data" control in settings. */
 export const MIRROR_KEYS = KEY;

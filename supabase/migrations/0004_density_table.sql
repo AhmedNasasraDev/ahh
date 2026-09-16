@@ -22,7 +22,8 @@
 -- The seed is GENERATED from the engine, never hand-written:
 --   node supabase/scripts/generate-density-seed.mjs
 --
--- NOT APPLIED. No Supabase project is provisioned.
+-- APPLIED to project qxdpsomelzpvphkhkqrw (Recipe Notebook, eu-central-1).
+-- Verify: mcp list_migrations, or supabase/schema.snapshot.json + npm run schema:check.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.density_table (
@@ -54,7 +55,7 @@ create table if not exists public.density_table (
 );
 
 comment on table public.density_table is
-  'Single source of truth for ingredient density, in grams per 100 ml. Seeded from packages/engine DENSITY_TABLE. Lookup order is `ord`.';
+  'Single source of truth for ingredient density, in grams per 100 ml. Seeded from packages/engine DENSITY_TABLE. Lookup order is ord.';
 
 -- Ingredients we know are distinct from every row here and have no value for.
 -- Refused before term matching, so a general term can never answer for them.
@@ -63,7 +64,7 @@ create table if not exists public.density_data_gaps (
 );
 
 comment on table public.density_data_gaps is
-  'Known gaps (CONFLICTS.md §6). A personal calibration or a recipe-level g_per_100 still overrides these.';
+  'Known gaps (CONFLICTS.md 6). A personal calibration or a recipe-level g_per_100 still overrides these.';
 
 drop trigger if exists density_table_touch on public.density_table;
 create trigger density_table_touch

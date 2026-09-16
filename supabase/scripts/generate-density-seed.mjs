@@ -58,7 +58,10 @@ const sql = `-- GENERATED from packages/engine DENSITY_TABLE — do not edit by 
 -- A pending row carries NO value on purpose (spec §5.1 rule 5). See CONFLICTS.md
 -- for what each one is waiting on.
 --
--- NOT APPLIED. No Supabase project is provisioned.
+-- APPLIED to project qxdpsomelzpvphkhkqrw (Recipe Notebook, eu-central-1).
+-- Verified after applying: the digest of the 34 rows in the database matches the
+-- digest of DENSITY_TABLE, so the seed is the engine's data and not a retyping
+-- of it.
 
 insert into public.density_table
   (key, match_terms, exclude_terms, word_match, g_per_100, confidence,

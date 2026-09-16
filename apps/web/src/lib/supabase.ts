@@ -1,8 +1,8 @@
-// Supabase wiring — PREPARED, NOT CONNECTED.
+// Supabase wiring.
 //
-// No project is provisioned and no migration has been run. This module exists so
-// that stage 3 is "fill in two env vars and swap the repository", not "go and
-// design the client layer".
+// Project qxdpsomelzpvphkhkqrw (eu-central-1), migrations 0001-0005 applied.
+// Configuration lives in apps/web/.env.local, which is not committed; the app
+// still runs without it, on the local demo repository, and says so.
 //
 // HANDOFF §6, non-negotiable:
 //   • only the anon/publishable key may reach the browser
@@ -10,8 +10,8 @@
 //   • the Claude API key never does either — recipe parsing goes through a
 //     server proxy with a per-user rate limit, which is a later stage
 //
-// A missing configuration is a normal state, not an error: the app runs on the
-// local demo repository and says so.
+// A missing configuration is a normal state, not an error: a checkout with no
+// .env.local runs on the local demo repository, read-only.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types.js';
@@ -31,8 +31,19 @@ function readEnv(): Partial<SupabaseConfig> {
   };
 }
 
-/** Guards against a service-role key being pasted into the browser env by mistake. */
+/**
+ * Guards against a privileged key being pasted into the browser env by mistake.
+ *
+ * Supabase issues two families of keys and this has to catch both:
+ *   • legacy JWTs, where the privilege is the `role` claim in the payload
+ *   • modern keys, where `sb_secret_…` is the privileged one and
+ *     `sb_publishable_…` is the safe one
+ *
+ * A prefix test comes first, because an `sb_secret_` key is not a JWT and would
+ * otherwise fall through the decode and be reported as safe.
+ */
 export function looksLikeServiceRoleKey(key: string): boolean {
+  if (key.startsWith('sb_secret_')) return true;
   try {
     const [, payload] = key.split('.');
     if (!payload) return false;

@@ -1,8 +1,9 @@
 // The data seam.
 //
 // Everything above this file talks to these interfaces and never to Supabase or
-// to IndexedDB directly. That is what makes stage 3 (connecting Supabase) a
-// change in one directory instead of a change in every screen.
+// to IndexedDB directly. That is what made connecting Supabase in stage 3 a
+// change in one directory rather than a change in every screen: not one route
+// component was touched to accommodate it.
 //
 // Offline model — approved for this project:
 //   Supabase is the source of truth. The active recipe, the measurement
@@ -21,7 +22,10 @@ export interface RepositoryCapabilities {
   source: DataSourceKind;
   /** false when the browser reports no network */
   online: boolean;
-  /** false until authentication exists — writes are refused, not queued */
+  /**
+   * whether a write can succeed right now. False for the demo repository, which
+   * has nowhere to write, and false offline — writes are refused, not queued.
+   */
   canWrite: boolean;
   /** true when the data on screen came from the offline mirror */
   servingFromCache: boolean;

@@ -21,5 +21,12 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     reporters: ['verbose'],
+    // The test run must not depend on whether this machine has a .env.local.
+    // Blanked here, and any test that needs a value stubs it with vi.stubEnv —
+    // so a developer with a live project and CI without one get the same result.
+    env: {
+      VITE_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: '',
+    },
   },
 });

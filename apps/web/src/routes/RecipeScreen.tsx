@@ -13,6 +13,7 @@ import {
 import { useAppData } from '../app/AppDataProvider.js';
 import { SourceBadge } from '../components/SourceBadge.js';
 import { ConvertSheet } from '../features/recipe/ConvertSheet.js';
+import { calcState, type CalcState } from '../features/recipe/completeness.js';
 import styles from '../features/recipe/recipe.module.css';
 
 type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
@@ -86,6 +87,20 @@ export function RecipeScreen() {
     );
   }
 
+  // Requirement 8: how much of this calculation is real, before any figure is
+  // put on screen.
+  const calc = calcState(computed);
+
+  /**
+   * A figure that is a sum over the ingredient rows.
+   *
+   * When nothing could be weighed there is no such figure, so this returns a
+   * dash instead of the zero the sum would otherwise produce. When only some
+   * rows were weighed the figure is genuine but incomplete, and `ProdBlock`
+   * marks it — the notice above the page says by how much.
+   */
+  const derived = (value: string): string => (calc.level === 'none' ? '—' : value);
+
   const totalMinutes = (recipe.steps ?? []).reduce((a, s) => a + Number(s.minutes ?? 0), 0);
   const timeLabel =
     totalMinutes >= 60
@@ -132,7 +147,7 @@ export function RecipeScreen() {
           <span className="ltr">
             {computed.unitsActual
               ? `${Math.round(computed.unitsActual)} יחידות`
-              : formatGrams(computed.actualYield)}
+              : derived(formatGrams(computed.actualYield))}
           </span>
           {Number(recipe.unitWeight) > 0 && (
             <>
@@ -149,6 +164,9 @@ export function RecipeScreen() {
         </p>
         {recipe.locked && <p className={styles.lockedNote}>נוסחה מאושרת לייצור</p>}
       </header>
+
+      <CalcNotice state={calc} />
+
 
       {/* ── §6 scaling ─────────────────────────────────────────────────── */}
       <section className={styles.card}>
@@ -206,7 +224,7 @@ export function RecipeScreen() {
         <p className={styles.scaleSummary}>
           {factor === 1 ? 'כמו במתכון' : <>מקדם ×<span className="ltr">{factor.toFixed(2)}</span></>}
           {' · '}
-          <span className="ltr">{formatGrams(computed.actualYield)}</span>
+          <span className="ltr">{derived(formatGrams(computed.actualYield))}</span>
           {computed.unitsActual > 0 && (
             <>
               {' · '}
@@ -304,37 +322,47 @@ export function RecipeScreen() {
 
         {showProduction && (
           <div className={styles.prodBlocks}>
+            {/*
+              Every figure in these three blocks is a sum over the ingredient
+              rows, so `partial` marks all of them at once rather than each
+              call site having to remember (requirement 8). The two rows that
+              are not sums — the food-cost target and the water temperature —
+              are excluded below.
+            */}
             <ProdBlock
               title="תשואה ופחת"
+              partial={calc.partialFigures}
               items={[
-                ['תשואה תאורטית', formatGrams(computed.theoretical)],
-                ['תשואה מעשית', formatGrams(computed.actualYield)],
-                ['פחת ייצור', `${computed.prodLoss.toFixed(1)}%`],
-                ['פחת אפייה', `${computed.bakeLoss.toFixed(1)}%`],
+                ['תשואה תאורטית', derived(formatGrams(computed.theoretical))],
+                ['תשואה מעשית', derived(formatGrams(computed.actualYield))],
+                ['פחת ייצור', derived(`${computed.prodLoss.toFixed(1)}%`)],
+                ['פחת אפייה', derived(`${computed.bakeLoss.toFixed(1)}%`)],
                 [
                   'משקל לשקילה ליחידה',
-                  computed.scaleWeight ? formatGrams(computed.scaleWeight) : '—',
+                  computed.scaleWeight ? derived(formatGrams(computed.scaleWeight)) : '—',
                 ],
                 [
                   'יחידות בפועל',
-                  computed.unitsActual ? computed.unitsActual.toFixed(1) : '—',
+                  computed.unitsActual ? derived(computed.unitsActual.toFixed(1)) : '—',
                 ],
               ]}
             />
             {pro && (
               <ProdBlock
                 title="עלות ותמחור"
+                partial={calc.partialFigures}
+                exact={['יעד פוד קוסט']}
                 items={[
-                  ['עלות כוללת', formatNis(computed.cost)],
+                  ['עלות כוללת', derived(formatNis(computed.cost))],
                   [
                     'עלות ליחידה',
-                    computed.costPerUnit ? formatNis(computed.costPerUnit) : '—',
+                    computed.costPerUnit ? derived(formatNis(computed.costPerUnit)) : '—',
                   ],
-                  ['עלות לק"ג', formatNis(computed.costPerKg)],
+                  ['עלות לק"ג', derived(formatNis(computed.costPerKg))],
                   ['יעד פוד קוסט', `${recipe.targetFC ?? 0}%`],
                   [
                     'מחיר מכירה לפני מע"מ',
-                    computed.price ? formatNis(computed.price) : '—',
+                    computed.price ? derived(formatNis(computed.price)) : '—',
                   ],
                 ]}
               />
@@ -342,11 +370,13 @@ export function RecipeScreen() {
             {computed.flour > 0 && (
               <ProdBlock
                 title="נוסחה"
+                partial={calc.partialFigures}
+                exact={["טמפ' מים מחושבת"]}
                 items={[
-                  ['סך קמח', formatGrams(computed.flour)],
-                  ['סך נוזלים', formatGrams(computed.liquid)],
-                  ['הידרציה', `${computed.hydration.toFixed(1)}%`],
-                  ['הידרציה נטו, מים בפועל', `${computed.trueHydration.toFixed(1)}%`],
+                  ['סך קמח', derived(formatGrams(computed.flour))],
+                  ['סך נוזלים', derived(formatGrams(computed.liquid))],
+                  ['הידרציה', derived(`${computed.hydration.toFixed(1)}%`)],
+                  ['הידרציה נטו, מים בפועל', derived(`${computed.trueHydration.toFixed(1)}%`)],
                   ...(computed.waterTemp !== null
                     ? ([['טמפ\' מים מחושבת', `${Math.round(computed.waterTemp)}°C`]] as [
                         string,
@@ -416,17 +446,63 @@ export function RecipeScreen() {
   );
 }
 
-function ProdBlock({ title, items }: { title: string; items: [string, string][] }) {
+/**
+ * Requirement 8, at the top of the page: the honest state of the calculation,
+ * before any figure derived from it is read.
+ */
+function CalcNotice({ state }: { state: CalcState }) {
+  if (state.level === 'full') return null;
+  return (
+    <div
+      className={state.level === 'none' ? styles.calcNoneBox : styles.calcPartialBox}
+      role="status"
+      aria-label="שלמות החישוב"
+    >
+      <p className={styles.calcNoticeTitle}>
+        {state.level === 'none' ? 'לא ניתן לחשב' : 'נתונים חלקיים'}
+      </p>
+      <p className={styles.calcNoticeBody}>{state.summary}</p>
+      {state.missingNames.length > 0 && (
+        <p className={styles.calcNoticeList}>
+          חסרים נתונים עבור: {state.missingNames.join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProdBlock({
+  title,
+  items,
+  partial = false,
+  /** rows that are an input, not a sum, so a partial calculation does not touch them */
+  exact = [],
+}: {
+  title: string;
+  items: [string, string][];
+  partial?: boolean;
+  exact?: readonly string[];
+}) {
   return (
     <div className={styles.prodBlock}>
       <h3 className={styles.prodTitle}>{title}</h3>
       <dl className={styles.prodRows}>
-        {items.map(([k, v]) => (
-          <div key={k} className={styles.prodRow}>
-            <dt>{k}</dt>
-            <dd className="ltr">{v}</dd>
-          </div>
-        ))}
+        {items.map(([k, v]) => {
+          const marked = partial && !exact.includes(k) && v !== '—';
+          return (
+            <div key={k} className={styles.prodRow}>
+              <dt>{k}</dt>
+              <dd className="ltr">
+                {v}
+                {marked && (
+                  <span className={styles.partialChip} title="מחושב מחלק מהרכיבים בלבד">
+                    חלקי
+                  </span>
+                )}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
     </div>
   );

@@ -12,7 +12,15 @@ export function AppShell() {
 
   // §17 / AC #17: the app states plainly where its data comes from. It never
   // presents a local-only session as if it were connected.
-  const showBackendNote = capabilities.source === 'local-demo';
+  //
+  // Connected-and-online is the only state with nothing to disclose. A demo
+  // session, a dropped connection and data served from the offline mirror are
+  // each a different promise about whether a save will stick, so each one says
+  // so — describeBackend() in AppDataProvider writes the sentence.
+  const showBackendNote =
+    capabilities.source === 'local-demo' ||
+    capabilities.servingFromCache ||
+    !capabilities.online;
 
   return (
     <div className={styles.outer}>

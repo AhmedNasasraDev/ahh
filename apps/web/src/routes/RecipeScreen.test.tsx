@@ -222,3 +222,115 @@ describe('§5.4 unit display modes', () => {
     expect(screen.getByText(/נשאר בגרמים ומסומן ככזה/)).toBeInTheDocument();
   });
 });
+
+// ── requirement 8, on screen ────────────────────────────────────────────────
+// `calcState` is unit-tested in features/recipe/completeness.test.ts. What
+// matters here is that a partial total never reaches the user looking whole.
+
+/** Everything by weight: nothing needs a density, so the figures are complete. */
+const ALL_WEIGHED: Recipe = {
+  id: 'weighed',
+  name: 'מתכון במשקל בלבד',
+  category: 'לחמים ובצקים',
+  yieldUnits: 10,
+  unitWeight: 100,
+  targetFC: 30,
+  ingredients: [
+    { id: 'i1', name: 'קמח לבן', qty: 600, unit: 'גרם', flour: true, price: 5.4, priceUnit: 'ק"ג' },
+    { id: 'i2', name: 'מים', qty: 400, unit: 'גרם', liquid: true },
+  ],
+  steps: [{ id: 's1', text: 'ללוש ולאפות.', minutes: 40 }],
+};
+
+/** Cocoa and rice both await verification, so no row can be weighed. */
+const NONE_WEIGHED: Recipe = {
+  id: 'nothing',
+  name: 'מתכון שאי אפשר לחשב',
+  category: 'עוגות ועוגיות',
+  yieldUnits: 8,
+  unitWeight: 90,
+  targetFC: 28,
+  ingredients: [
+    { id: 'i1', name: 'קקאו', qty: 1, unit: 'כוס', price: 40, priceUnit: 'ק"ג' },
+    { id: 'i2', name: 'אורז', qty: 2, unit: 'כוס', price: 8, priceUnit: 'ק"ג' },
+  ],
+  steps: [{ id: 's1', text: 'לערבב.', minutes: 10 }],
+};
+
+describe('requirement 8 — a partial calculation is never shown as a whole one', () => {
+  it('says nothing when every ingredient was weighed', async () => {
+    renderRecipe('weighed', { recipes: [ALL_WEIGHED] });
+    await screen.findByRole('heading', { name: ALL_WEIGHED.name! });
+    expect(screen.queryByLabelText('שלמות החישוב')).not.toBeInTheDocument();
+  });
+
+  it('shows no "חלקי" marker on a complete cost figure', async () => {
+    const user = userEvent.setup();
+    renderRecipe('weighed', { recipes: [ALL_WEIGHED] });
+    await screen.findByRole('heading', { name: ALL_WEIGHED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+    expect(screen.queryByText('חלקי')).not.toBeInTheDocument();
+  });
+
+  it('announces the partial state with the count, at the top of the page', async () => {
+    renderRecipe('cupcake', { recipes: [CUP_CAKE] });
+    await screen.findByRole('heading', { name: CUP_CAKE.name! });
+    const notice = screen.getByLabelText('שלמות החישוב');
+    expect(notice).toHaveTextContent('נתונים חלקיים');
+    expect(notice).toHaveTextContent('רכיב אחד');
+    expect(notice).toHaveTextContent('קקאו');
+  });
+
+  it('marks the total cost and the sale price as partial, not as final', async () => {
+    const user = userEvent.setup();
+    renderRecipe('cupcake', { recipes: [CUP_CAKE] });
+    await screen.findByRole('heading', { name: CUP_CAKE.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+
+    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    expect(within(costRow).getByText('חלקי')).toBeInTheDocument();
+    const yieldRow = screen.getByText('תשואה תאורטית').closest('div')!;
+    expect(within(yieldRow).getByText('חלקי')).toBeInTheDocument();
+  });
+
+  it('leaves the food-cost target unmarked, because it is an input and not a sum', async () => {
+    const user = userEvent.setup();
+    renderRecipe('cupcake', { recipes: [CUP_CAKE] });
+    await screen.findByRole('heading', { name: CUP_CAKE.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+    const fcRow = screen.getByText('יעד פוד קוסט').closest('div')!;
+    expect(within(fcRow).queryByText('חלקי')).not.toBeInTheDocument();
+  });
+
+  it('distinguishes "not computable" from "partial" in so many words', async () => {
+    renderRecipe('nothing', { recipes: [NONE_WEIGHED] });
+    await screen.findByRole('heading', { name: NONE_WEIGHED.name! });
+    const notice = screen.getByLabelText('שלמות החישוב');
+    expect(notice).toHaveTextContent('לא ניתן לחשב');
+    expect(notice).not.toHaveTextContent('נתונים חלקיים');
+  });
+
+  it('shows a dash instead of a zero total when nothing could be weighed', async () => {
+    const user = userEvent.setup();
+    renderRecipe('nothing', { recipes: [NONE_WEIGHED] });
+    await screen.findByRole('heading', { name: NONE_WEIGHED.name! });
+    await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
+
+    // A cost of ₪0.00 would read as "this recipe is free", which is the exact
+    // failure mode requirement 8 exists to prevent.
+    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    expect(within(costRow).getByText('—')).toBeInTheDocument();
+    expect(within(costRow).queryByText(/₪/)).not.toBeInTheDocument();
+
+    const yieldRow = screen.getByText('תשואה תאורטית').closest('div')!;
+    expect(within(yieldRow).getByText('—')).toBeInTheDocument();
+  });
+
+  it('names every missing ingredient, so the gap can be closed', async () => {
+    renderRecipe('nothing', { recipes: [NONE_WEIGHED] });
+    await screen.findByRole('heading', { name: NONE_WEIGHED.name! });
+    const notice = screen.getByLabelText('שלמות החישוב');
+    expect(notice).toHaveTextContent('קקאו');
+    expect(notice).toHaveTextContent('אורז');
+  });
+});

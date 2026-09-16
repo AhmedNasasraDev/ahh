@@ -1,9 +1,17 @@
-// The repository in force until Supabase is connected.
+// The repository for a checkout with no Supabase project configured.
 //
-// Reads the prototype's five demo recipes, mirrors what it serves into
-// IndexedDB, and REFUSES to write — because there is nowhere honest to write to
-// yet. A refused write surfaces as `WriteNotAllowedError`, which the UI shows as
-// a plain explanation. It is never swallowed and never faked.
+// Supabase is connected, and a signed-in session is served by
+// supabaseRepository.ts. This one still has a job: a clone with no .env.local
+// has to run, and it runs on the prototype's five demo recipes.
+//
+// It mirrors what it serves into IndexedDB and REFUSES to write, because there
+// is nowhere honest to write to. A refused write surfaces as
+// `WriteNotAllowedError`, which the UI shows as a plain explanation. It is never
+// swallowed and never faked.
+//
+// The demo recipes are never presented as an account's own notebook — the shell
+// banner labels them, and a signed-in account never sees them at all. That is
+// the distinction stage-3 requirement 6 asks for.
 //
 // That refusal is deliberate. The prototype's two worst UI defects (B8) were
 // messages claiming a file had been written and a share had been sent when
@@ -20,8 +28,8 @@ import {
 } from './repository.js';
 
 const NO_BACKEND_REASON =
-  'אין עדיין חשבון ושרת, ולכן שינויים אינם נשמרים מחוץ למכשיר הזה. ' +
-  'החיבור ל-Supabase הוא השלב הבא.';
+  'אין חיבור לשרת בהתקנה הזאת, ולכן שינויים אינם נשמרים מחוץ למכשיר הזה. ' +
+  'התחברות לחשבון תאפשר שמירה.';
 
 function isOnline(): boolean {
   return typeof navigator === 'undefined' ? true : navigator.onLine !== false;

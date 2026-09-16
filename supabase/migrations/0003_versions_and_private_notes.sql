@@ -6,7 +6,8 @@
 -- RLS", which is exactly right: they are the two tables where a leak would be a
 -- product failure and not just a bug.
 --
--- NOT APPLIED. No Supabase project is provisioned.
+-- APPLIED to project qxdpsomelzpvphkhkqrw (Recipe Notebook, eu-central-1).
+-- Verify: mcp list_migrations, or supabase/schema.snapshot.json + npm run schema:check.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── recipe_versions (§9) ────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ create unique index if not exists private_notes_user_item_uniq
   on public.private_notes (user_id, group_item_id) where group_item_id is not null;
 
 comment on table public.private_notes is
-  'Personal notes. HANDOFF §3: ALL WHERE user_id = auth.uid(), with no exception — not for an instructor, not for a group owner, not in any report.';
+  'Personal notes. HANDOFF 3: ALL WHERE user_id = auth.uid(), with no exception - not for an instructor, not for a group owner, not in any report.';
 
 drop trigger if exists private_notes_touch on public.private_notes;
 create trigger private_notes_touch
@@ -103,16 +104,16 @@ create policy recipe_versions_via_recipe on public.recipe_versions
 drop policy if exists private_notes_own on public.private_notes;
 create policy private_notes_own on public.private_notes
   for all
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
 
 -- Own rows are writable; system rows (owner_id IS NULL) are read-only.
 drop policy if exists ingredient_catalog_read on public.ingredient_catalog;
 create policy ingredient_catalog_read on public.ingredient_catalog
-  for select using (owner_id = auth.uid() or owner_id is null);
+  for select using (owner_id = (select auth.uid()) or owner_id is null);
 
 drop policy if exists ingredient_catalog_write on public.ingredient_catalog;
 create policy ingredient_catalog_write on public.ingredient_catalog
   for all
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid());
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));

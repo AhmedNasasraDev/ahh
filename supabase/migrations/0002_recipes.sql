@@ -17,7 +17,8 @@
 -- chill explicitly. The explicit names win, because haccpOf() depends on knowing
 -- WHICH temperature it is reading.
 --
--- NOT APPLIED. No Supabase project is provisioned.
+-- APPLIED to project qxdpsomelzpvphkhkqrw (Recipe Notebook, eu-central-1).
+-- Verify: mcp list_migrations, or supabase/schema.snapshot.json + npm run schema:check.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── recipes ─────────────────────────────────────────────────────────────────
@@ -76,9 +77,9 @@ create table if not exists public.recipes (
 );
 
 comment on column public.recipes.yield_actual is
-  'Measured yield in grams. NULL = use the theoretical total (spec §1.1) — distinct from 0.';
+  'Measured yield in grams. NULL = use the theoretical total (spec 1.1) - distinct from 0.';
 comment on column public.recipes.locked is
-  'Approved production formula (§9). Version restore is refused while true (§18.7).';
+  'Approved production formula (9). Version restore is refused while true (18.7).';
 
 create index if not exists recipes_owner_idx    on public.recipes (owner_id);
 create index if not exists recipes_category_idx on public.recipes (owner_id, category);
@@ -202,8 +203,8 @@ alter table public.batches     enable row level security;
 drop policy if exists recipes_own on public.recipes;
 create policy recipes_own on public.recipes
   for all
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid());
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));
 
 -- Child rows follow their recipe's owner. One helper keeps the six policies
 -- identical, so none of them can drift.
@@ -212,6 +213,7 @@ returns boolean
 language sql
 stable
 security invoker
+set search_path = ''
 as $$
   select exists (
     select 1 from public.recipes r

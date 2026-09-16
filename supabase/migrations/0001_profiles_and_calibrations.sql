@@ -10,7 +10,17 @@
 -- shadow it. So `auth.users` plays the role of `users`, and `locale` — the one
 -- app-owned column on it — moves into `profiles`. Nothing else changed.
 --
--- NOT APPLIED. No Supabase project is provisioned. See supabase/README.md.
+-- Three things below differ from a naive transcription of the handoff, all for
+-- reasons the Supabase linter or planner cares about:
+--   • every function pins `search_path = ''` and qualifies its table names, so a
+--     SECURITY DEFINER function cannot be redirected by a caller's search_path
+--   • the policy predicates say `(select auth.uid())` rather than `auth.uid()`.
+--     Identical meaning; Postgres hoists the subquery into an InitPlan and
+--     evaluates it once per query instead of once per row.
+--   • EXECUTE on the trigger functions is revoked in 0006 — see that file.
+--
+-- APPLIED to project qxdpsomelzpvphkhkqrw (Recipe Notebook, eu-central-1).
+-- Verify: mcp list_migrations, or supabase/schema.snapshot.json + npm run schema:check.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create extension if not exists "pgcrypto";
@@ -34,9 +44,9 @@ create table if not exists public.profiles (
 );
 
 comment on table public.profiles is
-  'Per-account measurement preferences and disclosure level. Spec §1.2, §3.';
+  'Per-account measurement preferences and disclosure level. Spec 1.2, 3.';
 comment on column public.profiles.tools is
-  'Measuring tool volumes in millilitres, e.g. {"cup":250}. Every volume conversion depends on this (engine B1).';
+  'Measuring tool volumes in millilitres. Every volume conversion depends on this (engine B1).';
 
 -- ── calibrations (spec §1.2 Calibration, §5.1 precedence rank 1) ────────────
 create table if not exists public.calibrations (
@@ -57,7 +67,7 @@ create table if not exists public.calibrations (
 );
 
 comment on table public.calibrations is
-  'Personal density measurements. Highest precedence in spec §5.1. Never readable by anyone else — see the RLS policy.';
+  'Personal density measurements. Highest precedence in spec 5.1. Never readable by anyone else.';
 
 create index if not exists calibrations_user_idx
   on public.calibrations (user_id, ingredient_key);
@@ -66,6 +76,7 @@ create index if not exists calibrations_user_idx
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -83,7 +94,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.profiles (user_id)
@@ -114,11 +125,11 @@ alter table public.calibrations enable row level security;
 drop policy if exists profiles_own on public.profiles;
 create policy profiles_own on public.profiles
   for all
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
 
 drop policy if exists calibrations_own on public.calibrations;
 create policy calibrations_own on public.calibrations
   for all
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));

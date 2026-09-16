@@ -2,12 +2,16 @@
   "name": "recipe-notebook",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspace @recipe-notebook/engine && npm run build --workspace @recipe-notebook/web",
     "dev": "npm run dev --workspace @recipe-notebook/web",
-    "seed:check": "node supabase/scripts/generate-density-seed.mjs --check"
+    "seed:check": "node supabase/scripts/generate-density-seed.mjs --check",
+    "schema:check": "node supabase/scripts/check-types-against-schema.mjs"
   }
 }

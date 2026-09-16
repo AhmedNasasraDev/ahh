@@ -484,3 +484,50 @@
   color: var(--c-green);
   font-size: var(--fs-body);
 }
+
+/* ── requirement 8: how complete the calculation is ───────────────────── */
+/*
+   Two levels, two token colours already in §16: amber for "some of it",
+   red for "none of it". No new colour is introduced — the palette carries
+   the meaning it carries everywhere else in the app.
+*/
+.calcPartialBox,
+.calcNoneBox {
+  padding: 11px 13px;
+  border-radius: var(--r-card);
+  line-height: 1.55;
+  border-inline-start: 3px solid currentColor;
+}
+.calcPartialBox {
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+}
+.calcNoneBox {
+  color: var(--c-red);
+  background: var(--c-red-bg);
+}
+.calcNoticeTitle {
+  font-weight: 600;
+  font-size: var(--fs-secondary);
+}
+.calcNoticeBody {
+  font-size: var(--fs-meta-lg);
+}
+.calcNoticeList {
+  font-size: var(--fs-meta-lg);
+  opacity: 0.85;
+  margin-block-start: 3px;
+}
+
+/* Marks one figure as a sum over only part of the ingredients. */
+.partialChip {
+  display: inline-block;
+  margin-inline-start: 5px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-family: var(--font-body);
+  color: var(--c-amber);
+  background: var(--c-amber-bg);
+  vertical-align: middle;
+}

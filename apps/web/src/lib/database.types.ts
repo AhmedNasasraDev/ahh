@@ -1,9 +1,15 @@
-// Hand-written to match supabase/migrations/*.sql.
+// The database's shape, as TypeScript.
 //
-// Once a project exists this file is replaced by the generated one:
-//   supabase gen types typescript --project-id <id> > src/lib/database.types.ts
-// It is written by hand now so the client is typed before a project exists, and
-// so a mismatch between the migrations and the app shows up as a type error.
+// Hand-written on purpose, and kept that way after the project was provisioned.
+// `supabase gen types` widens every CHECK constraint to `string` and every jsonb
+// column to `Json`, which throws away exactly the distinctions this app runs on:
+// ToolId, PriceUnit, temp_unit 'C' | 'F', and the four density resolution
+// states. Those unions are load-bearing, so the narrow version stays.
+//
+// The safety net for a hand-written file is mechanical, not vigilance:
+//   npm run schema:check
+// compares the column names and nullability here against
+// supabase/schema.snapshot.json, which is read back out of the live database.
 
 export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
 
@@ -18,14 +24,25 @@ export type DensityResolution =
   | 'pending-verification'
   | 'pending-form';
 
-interface Table<Row, Insert = Partial<Row>, Update = Partial<Row>> {
+/**
+ * One table's three shapes.
+ *
+ * A TYPE alias, not an interface, and the same goes for every row type below.
+ * postgrest-js constrains a table's Row/Insert/Update to
+ * `Record<string, unknown>`; TypeScript gives an object type literal an
+ * implicit index signature but gives an interface none. Declared as interfaces,
+ * `Database['public']` quietly fails postgrest's `GenericSchema` check, the
+ * client's `Schema` parameter resolves to `never`, and every insert and update
+ * argument in the repository is rejected as `never` with no hint as to why.
+ */
+type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
   Update: Update;
   Relationships: [];
-}
+};
 
-export interface ProfileRow {
+export type ProfileRow = {
   user_id: string;
   profile: ProfileKind;
   pro: boolean;
@@ -36,9 +53,9 @@ export interface ProfileRow {
   onboarding_done: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface CalibrationRow {
+export type CalibrationRow = {
   id: string;
   user_id: string;
   ingredient_name: string;
@@ -49,9 +66,9 @@ export interface CalibrationRow {
   grams: number;
   tool_ml_assumed: boolean;
   created_at: string;
-}
+};
 
-export interface RecipeRow {
+export type RecipeRow = {
   id: string;
   owner_id: string;
   group_id: string | null;
@@ -85,9 +102,9 @@ export interface RecipeRow {
   saved_from_item_id: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface IngredientRow {
+export type IngredientRow = {
   id: string;
   recipe_id: string;
   ord: number;
@@ -106,9 +123,9 @@ export interface IngredientRow {
   price_unit: PriceUnit | null;
   sub_recipe_id: string | null;
   note: string;
-}
+};
 
-export interface StepRow {
+export type StepRow = {
   id: string;
   recipe_id: string;
   ord: number;
@@ -116,24 +133,24 @@ export interface StepRow {
   temp: number | null;
   temp_unit: 'C' | 'F';
   minutes: number | null;
-}
+};
 
-export interface IssueRow {
+export type IssueRow = {
   id: string;
   recipe_id: string;
   ord: number;
   problem: string;
   solution: string;
-}
+};
 
-export interface TrialRow {
+export type TrialRow = {
   id: string;
   recipe_id: string;
   date: string | null;
   note: string;
-}
+};
 
-export interface BatchRow {
+export type BatchRow = {
   id: string;
   recipe_id: string;
   code: string;
@@ -150,9 +167,9 @@ export interface BatchRow {
   /** §13a: set by the server. A user-editable timestamp is worthless in an audit. */
   taken_at: string | null;
   created_at: string;
-}
+};
 
-export interface RecipeVersionRow {
+export type RecipeVersionRow = {
   id: string;
   recipe_id: string;
   tag: string;
@@ -160,18 +177,18 @@ export interface RecipeVersionRow {
   snapshot: Json;
   created_at: string;
   created_by: string | null;
-}
+};
 
-export interface PrivateNoteRow {
+export type PrivateNoteRow = {
   id: string;
   user_id: string;
   recipe_id: string | null;
   group_item_id: string | null;
   body: string;
   updated_at: string;
-}
+};
 
-export interface IngredientCatalogRow {
+export type IngredientCatalogRow = {
   id: string;
   owner_id: string | null;
   group_id: string | null;
@@ -184,9 +201,9 @@ export interface IngredientCatalogRow {
   allergens: string[];
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface DensityTableRow {
+export type DensityTableRow = {
   key: string;
   match_terms: string[];
   exclude_terms: string[];
@@ -202,9 +219,16 @@ export interface DensityTableRow {
   forms: string[];
   ord: number;
   updated_at: string;
-}
+};
 
-export interface Database {
+export type Database = {
+  /**
+   * supabase-js reads this to pick its PostgREST behaviour. It is part of the
+   * generated shape, so it is part of this one.
+   */
+  __InternalSupabase: {
+    PostgrestVersion: '14.5';
+  };
   public: {
     Tables: {
       profiles: Table<ProfileRow>;
@@ -221,11 +245,15 @@ export interface Database {
       density_table: Table<DensityTableRow>;
       density_data_gaps: Table<{ name: string }>;
     };
-    Views: Record<string, never>;
+    // Empty MAPPED types, not `Record<string, never>`. Record<string, never>
+    // says every possible name is a view whose row type is `never`, so
+    // `from('recipes')` resolves against Views instead of Tables and every
+    // insert argument collapses to `never`.
+    Views: { [_ in never]: never };
     Functions: {
       owns_recipe: { Args: { p_recipe_id: string }; Returns: boolean };
     };
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
-}
+};
