@@ -58,6 +58,14 @@ function buildDraft() {
   d.unitWeight = '800';
   d.yieldActual = ''; // MUST become NULL
   d.targetFC = '27.5';
+  // stage 8: the sale side and the cost breakdown, with the distinction that
+  // matters — an ENTERED 0 next to an UNENTERED field.
+  d.salePrice = '95';
+  d.salePriceBasis = 'unit';
+  d.packagingCost = '2.5';
+  d.laborCost = '0';        // MUST land as 0
+  d.otherCost = '';         // MUST land as NULL
+  d.targetGM = '62.5';
   d.shelfLife = '3 ימים';
   d.notes = 'הערה עם גרשיים: קמח 82%';
   d.ingredients = [
@@ -123,6 +131,24 @@ const q = (s: unknown) =>
   s === null || s === undefined ? 'NULL' : `'${String(s).replace(/'/g, "''")}'`;
 const n = (v: unknown) => (v === null || v === undefined ? 'NULL' : String(v));
 const b = (v: unknown) => (v ? 'true' : 'false');
+/**
+ * One value, as a SQL literal, by its JavaScript type.
+ *
+ * The recipes INSERT is generated from the row object's own keys rather than
+ * from a hand-written column list. That list had already drifted: `sale_price`
+ * (stage 7) and the five stage-8 costing columns were missing from it, so this
+ * round trip — the one thing that checks the mappers against real column types
+ * — was not checking them at all. A derived list cannot drift again.
+ */
+const lit = (v: unknown): string => {
+  if (v === null || v === undefined) return 'NULL';
+  if (typeof v === 'boolean') return b(v);
+  if (typeof v === 'number') return n(v);
+  if (Array.isArray(v)) return arr(v);
+  if (typeof v === 'object') return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
+  return q(v);
+};
+
 const arr = (list: unknown) =>
   Array.isArray(list) && list.length
     ? `ARRAY[${list.map(q).join(', ')}]::text[]`
@@ -154,21 +180,9 @@ insert into auth.users (id, email)
 values ('${OWNER}', 'roundtrip@test.invalid');
 
 insert into public.recipes (
-  id, owner_id, group_id, name, category, tags, is_sub, locked,
-  yield_units, unit_weight, yield_actual, weight_before, weight_after,
-  dough_mode, ddt, flour_temp, room_temp, friction, target_fc,
-  shelf_life, storage, freezing, thawing, equipment, notes,
-  manual_allergens, pan, version_of, version_note, saved_from_item_id
+  id, ${Object.keys(parent).join(', ')}
 ) values (
-  '${RECIPE_ID}', '${OWNER}', NULL, ${q(parent.name)}, ${q(parent.category)},
-  ${arr(parent.tags)}, ${b(parent.is_sub)}, ${b(parent.locked)},
-  ${n(parent.yield_units)}, ${n(parent.unit_weight)}, ${n(parent.yield_actual)},
-  ${n(parent.weight_before)}, ${n(parent.weight_after)},
-  ${b(parent.dough_mode)}, ${n(parent.ddt)}, ${n(parent.flour_temp)},
-  ${n(parent.room_temp)}, ${n(parent.friction)}, ${n(parent.target_fc)},
-  ${q(parent.shelf_life)}, ${q(parent.storage)}, ${q(parent.freezing)},
-  ${q(parent.thawing)}, ${q(parent.equipment)}, ${q(parent.notes)},
-  ${arr(parent.manual_allergens)}, NULL, NULL, ${q(parent.version_note)}, NULL
+  '${RECIPE_ID}', ${Object.values(parent).map(lit).join(', ')}
 );
 
 insert into public.ingredients (
@@ -285,6 +299,14 @@ function verify(rowsPath: string) {
     ['the tags array survived as an array', Array.isArray(r['tags']) && (r['tags'] as unknown[]).length === 2],
     ['the gershayim in the notes survived', String(r['notes']).includes('82%')],
     ['the ingredient order survived', ings.map((i) => i['name']).join('|') === 'קמח מלא|מים|שמן זית|מלח'],
+    // stage 8: the same NULL-vs-0 distinction, on the cost breakdown. An
+    // entered labour cost of 0 means "we do not pay for this"; an unentered
+    // other-cost means nobody has said. Real numeric columns are where that
+    // distinction is most easily lost.
+    ['an entered labour cost of 0 came back as 0', r['laborCost'] === 0],
+    ['an unentered other cost came back ABSENT, not as 0', !('otherCost' in r)],
+    ['the sale price and its basis survived', r['salePrice'] === 95 && r['salePriceBasis'] === 'unit'],
+    ['the gross-margin target survived', r['targetGM'] === 62.5],
   ];
 
   let ok = true;

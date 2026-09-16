@@ -27,6 +27,11 @@
 -- 3. A probe that can raise must be wrapped in its own BEGIN/EXCEPTION, or one
 --    raise discards every result recorded before it.
 --
+-- STAGE 8 NOTE: `package_price` became `purchase_total` in migration 0013, and
+-- `package_count` joined it (defaulting to 1). Every purchase below is a single
+-- package, so the arithmetic these checks assert is unchanged — only the column
+-- name is.
+--
 -- Run:  every statement below, in one session. Every row must have pass = true.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -41,7 +46,7 @@ insert into auth.users (id, email) values
 -- A and B both have a material under the SAME key, at different prices. This
 -- is the case that would collide if uniqueness were on `key` alone.
 insert into public.ingredient_catalog
-  (owner_id, key, name, purchase_unit, package_qty, package_price, supplier, allergens)
+  (owner_id, key, name, purchase_unit, package_qty, purchase_total, supplier, allergens)
 values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','חמאה','חמאה 82%','g',200,8.90,'תנובה',array['חלב']),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','חמאה','חמאה שלי','kg',1,125,'סודי',array['חלב']);
@@ -68,7 +73,7 @@ begin
     from public.ingredient_catalog where supplier = 'סודי';
   insert into p values (3,'req 6','A cannot read B''s SUPPLIER','(none)', txt);
 
-  update public.ingredient_catalog set package_price = 1 where owner_id = b;
+  update public.ingredient_catalog set purchase_total = 1 where owner_id = b;
   get diagnostics n = row_count;
   insert into p values (4,'req 6','A''s UPDATE of B''s material matches no row','0', n::text);
 
@@ -78,7 +83,7 @@ begin
 
   begin
     insert into public.ingredient_catalog
-      (owner_id, key, name, purchase_unit, package_qty, package_price)
+      (owner_id, key, name, purchase_unit, package_qty, purchase_total)
     values (b, 'נשתל', 'נשתל אצל ב', 'kg', 1, 5);
     insert into p values (6,'req 6','A cannot plant a material in B''s centre','refused','INSERTED');
   exception when others then
@@ -121,7 +126,7 @@ begin
     trim_scale((snap->'ingredients'->0->>'price')::numeric)::text);
   insert into p values (12,'req 5','and its unit','ק"ג', (snap->'ingredients'->0->>'price_unit'));
 
-  update public.ingredient_catalog set package_price = 17.80 where owner_id = a;
+  update public.ingredient_catalog set purchase_total = 17.80 where owner_id = a;
   select trim_scale(price)::text into txt from public.ingredient_catalog where owner_id = a;
   insert into p values (13,'req 2','the central price moved','89', txt);
 
@@ -133,7 +138,7 @@ begin
 
   -- ── requirement 8: NULL vs 0, in the catalog ────────────────────────
   insert into public.ingredient_catalog
-    (owner_id, key, name, purchase_unit, package_qty, package_price)
+    (owner_id, key, name, purchase_unit, package_qty, purchase_total)
   values (a,'מלח','מלח','kg',1,null), (a,'מים','מים','l',1,0);
 
   select coalesce(trim_scale(price)::text,'null') into txt

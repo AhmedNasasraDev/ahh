@@ -22,6 +22,10 @@
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import type { CatalogItem } from '../features/pricing/catalog.js';
+import type {
+  PurchaseInput,
+  PurchaseRecord,
+} from '../features/pricing/purchases.js';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import type { Json, RecipeVersionRow } from '../lib/database.types.js';
@@ -387,6 +391,64 @@ export function createSupabaseRepository({
         .eq('owner_id', userId)
         .eq('key', key);
       if (error) throw new SupabaseRepositoryError('מחיקת חומר הגלם נכשלה', error);
+    },
+
+    async recordPurchase(input: PurchaseInput): Promise<CatalogItem> {
+      requireOnline('הרכישה');
+      if (!input.key.trim()) {
+        throw new WriteNotAllowedError('לחומר גלם חייב להיות שם.');
+      }
+
+      // One RPC, one transaction: the history row and the active price. The
+      // client cannot get between them and leave a price with no purchase
+      // behind it, or a purchase that never became the price.
+      const { error } = await client.rpc('record_purchase', {
+        p_key: input.key.trim(),
+        p_name: input.name,
+        p_purchase_unit: input.purchaseUnit,
+        p_package_count: input.packageCount,
+        p_package_qty: input.packageQty,
+        p_purchase_total: input.purchaseTotal,
+        p_usable_pct: input.usablePct,
+        p_supplier: input.supplier,
+        p_purchased_at: input.purchasedAt,
+        p_note: input.note,
+      });
+      if (error) throw new SupabaseRepositoryError('רישום הרכישה נכשל', error);
+
+      // Read the row back rather than echo the input: the prices are generated
+      // columns, so only the database knows them.
+      const { data, error: readError } = await client
+        .from('ingredient_catalog')
+        .select('*')
+        .eq('owner_id', userId)
+        .eq('key', input.key.trim())
+        .single();
+      if (readError) {
+        throw new SupabaseRepositoryError('טעינת חומר הגלם אחרי הרכישה נכשלה', readError);
+      }
+      return catalogRowToItem(data as never);
+    },
+
+    async purchaseHistory(key: string): Promise<PurchaseRecord[]> {
+      const { data, error } = await client.rpc('purchase_history', { p_key: key });
+      // Informative only. A history that fails to load must not stop the user
+      // recording a new purchase.
+      if (error) return [];
+      return (data ?? []).map((r) => ({
+        id: r.id,
+        purchasedAt: r.purchased_at,
+        supplier: r.supplier,
+        purchaseUnit: r.purchase_unit,
+        packageCount: Number(r.package_count),
+        packageQty: r.package_qty === null ? null : Number(r.package_qty),
+        purchaseTotal: r.purchase_total === null ? null : Number(r.purchase_total),
+        usablePct: r.usable_pct === null ? null : Number(r.usable_pct),
+        purchasePrice: r.purchase_price === null ? null : Number(r.purchase_price),
+        price: r.price === null ? null : Number(r.price),
+        prevPrice: r.prev_price === null ? null : Number(r.prev_price),
+        pctChange: r.pct_change === null ? null : Number(r.pct_change),
+      }));
     },
 
     async recipesPricingOn(key: string) {

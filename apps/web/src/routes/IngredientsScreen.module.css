@@ -268,3 +268,79 @@
   flex-direction: column;
   gap: 10px;
 }
+
+/* ── the derived price, and the scales it reads at (stage 8) ─────────────── */
+
+.derivedMain {
+  font-size: var(--fs-meta-lg);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.derivedTag {
+  font-weight: 400;
+  color: var(--c-muted);
+}
+
+/* One number at three scales. Laid out as a row so they read as the same
+   fact seen closer up, not as three separate prices. */
+.conversions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+  list-style: none;
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  color: var(--c-muted);
+}
+
+.yieldNote {
+  margin-top: 6px;
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--c-ink);
+}
+
+/* ── the purchase history (requirement C) ───────────────────────────────── */
+
+.historyList {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.historyRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-line);
+  font-size: var(--fs-meta);
+}
+
+.historyRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.historyWhen {
+  min-width: 5.5em;
+  color: var(--c-muted);
+}
+
+.historyPrice {
+  font-weight: 700;
+}
+
+.historyWho,
+.historyPack {
+  color: var(--c-muted);
+}
+
+.historyChange {
+  font-weight: 700;
+  color: var(--c-red);
+}

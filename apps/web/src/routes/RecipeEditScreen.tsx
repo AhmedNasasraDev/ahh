@@ -766,7 +766,7 @@ export function RecipeEditScreen() {
           </div>
           {pro && (
             <div className={styles.previewRow}>
-              <dt>עלות כוללת</dt>
+              <dt>עלות חומרי גלם</dt>
               <dd className="ltr">
                 {/* A fully weighed recipe with no prices has no cost — not a
                     cost of zero. The two axes are tracked separately. */}
@@ -895,6 +895,100 @@ export function RecipeEditScreen() {
                   דברים שונים.
                 </p>
               </div>
+            )}
+
+            {/*
+              Stage 8. Is that price for the whole batch or for one unit? The
+              answer is stored, never guessed: reading a per-unit price as a
+              batch price turns a 30% food cost into a 300% one, and nothing on
+              the screen would reveal which happened.
+            */}
+            {pro && (
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="r-sale-basis">
+                  מחיר המכירה הוא ל…
+                </label>
+                <select
+                  id="r-sale-basis"
+                  className={styles.input}
+                  value={draft.salePriceBasis}
+                  onChange={(e) =>
+                    patch({ salePriceBasis: e.target.value === 'unit' ? 'unit' : 'batch' })
+                  }
+                  aria-label="בסיס מחיר המכירה"
+                >
+                  <option value="batch">כל המתכון</option>
+                  <option value="unit">יחידה אחת</option>
+                </select>
+              </div>
+            )}
+
+            {/* Requirement E: entered, never invented. */}
+            {pro && (
+              <>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="r-packaging">
+                    עלות אריזה ₪
+                  </label>
+                  <input
+                    id="r-packaging"
+                    className={`${styles.input} ltr`}
+                    inputMode="decimal"
+                    value={draft.packagingCost}
+                    onChange={(e) => patch({ packagingCost: e.target.value })}
+                    aria-label="עלות אריזה"
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="r-labor">
+                    עלות עבודה ₪
+                  </label>
+                  <input
+                    id="r-labor"
+                    className={`${styles.input} ltr`}
+                    inputMode="decimal"
+                    value={draft.laborCost}
+                    onChange={(e) => patch({ laborCost: e.target.value })}
+                    aria-label="עלות עבודה"
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="r-other">
+                    עלויות נוספות ₪
+                  </label>
+                  <input
+                    id="r-other"
+                    className={`${styles.input} ltr`}
+                    inputMode="decimal"
+                    value={draft.otherCost}
+                    onChange={(e) => patch({ otherCost: e.target.value })}
+                    aria-label="עלויות נוספות"
+                  />
+                  <p className={styles.hint}>
+                    עלויות ישירות נוספות שהוזנו כאן בלבד. שכירות, חשמל ותקורה
+                    אינם מחושבים אוטומטית, כי אין מודל שמגדיר איך לחלק אותם
+                    למתכון אחד. שדה ריק פירושו שלא הוזן, ואפס פירושו שאין עלות
+                    כזאת.
+                  </p>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="r-gm">
+                    יעד רווח גולמי, אחוזים
+                  </label>
+                  <input
+                    id="r-gm"
+                    className={`${styles.input} ltr`}
+                    inputMode="decimal"
+                    value={draft.targetGM}
+                    onChange={(e) => patch({ targetGM: e.target.value })}
+                    aria-label="יעד רווח גולמי"
+                  />
+                  <p className={styles.hint}>
+                    ממנו מחושב מחיר שמתאים ליעד, לפי העלות הכוללת. אינו הרווח
+                    הגולמי בפועל.
+                  </p>
+                </div>
+              </>
             )}
           </div>
         )}

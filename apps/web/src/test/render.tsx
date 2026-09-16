@@ -7,6 +7,10 @@ import { DEMO_CATEGORIES, DEMO_RECIPES } from '../data/demoRecipes.js';
 import type { StoredVersion } from '../data/repository.js';
 import { defaultPrefs, type Calibration, type MeasurementPrefs, type Recipe } from '@recipe-notebook/engine';
 import { basePriceOf, type CatalogItem } from '../features/pricing/catalog.js';
+import type {
+  PurchaseInput,
+  PurchaseRecord,
+} from '../features/pricing/purchases.js';
 
 export interface FakeRepoOptions {
   prefs?: MeasurementPrefs | null;
@@ -23,6 +27,21 @@ export interface FakeRepoOptions {
   pricingOn?: readonly { id: string; name: string; rows: number; overridden: number }[];
   onRestoreVersion?(versionId: string): void;
   usedBy?: readonly { id: string; name: string }[];
+  onRecordPurchase?(input: PurchaseInput): void;
+  /** history rows a test wants to exist before it records anything */
+  history?: readonly PurchaseRecord[];
+}
+
+/**
+ * The generated columns, mirrored. The DATABASE derives the unit price, so a
+ * double that echoed the input would let a test pass on a price the real thing
+ * would have recomputed.
+ */
+function derive(item: CatalogItem): CatalogItem {
+  const d = basePriceOf(item);
+  return d
+    ? { ...item, purchasePrice: d.purchase, price: d.price, priceUnit: d.unit }
+    : { ...item, purchasePrice: null, price: null, priceUnit: null };
 }
 
 /** An in-memory repository, so a screen test never touches IndexedDB. */
@@ -30,6 +49,7 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
   let prefs = opts.prefs === undefined ? { ...defaultPrefs('pro'), done: true } : opts.prefs;
   let calib = [...(opts.calibrations ?? [])];
   let catalog: CatalogItem[] = [...(opts.catalog ?? [])];
+  const purchases: Array<{ key: string; record: PurchaseRecord }> = [];
   let recipes = [...(opts.recipes ?? DEMO_RECIPES)];
   const caps: RepositoryCapabilities = {
     source: 'local-demo',
@@ -77,15 +97,7 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
     // tests keep testing what they tested.
     listCatalog: async () => [...(opts.catalog ?? [])],
     saveCatalogItem: async (item) => {
-      const saved: CatalogItem = {
-        ...item,
-        // Mirrors the generated columns: the DATABASE derives the unit price,
-        // so a double that echoed the input would let a test pass on a price
-        // the real thing would have recomputed.
-        ...(basePriceOf(item)
-          ? { price: basePriceOf(item)!.price, priceUnit: basePriceOf(item)!.unit }
-          : { price: null, priceUnit: null }),
-      };
+      const saved = derive(item);
       catalog = [...catalog.filter((c) => c.key !== saved.key), saved];
       opts.onSaveCatalogItem?.(saved);
       return saved;
@@ -94,6 +106,60 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
       catalog = catalog.filter((c) => c.key !== key);
     },
     recipesPricingOn: async () => [...(opts.pricingOn ?? [])],
+    // Stage 8: the same two writes `record_purchase` does in one transaction —
+    // append the purchase, then move the active price.
+    recordPurchase: async (input) => {
+      const previous = catalog.find((c) => c.key === input.key);
+      const saved = derive({
+        id: previous?.id ?? `cat-${input.key}`,
+        key: input.key,
+        name: input.name || input.key,
+        purchaseUnit: input.purchaseUnit,
+        packageQty: input.packageQty,
+        packageCount: input.packageCount,
+        purchaseTotal: input.purchaseTotal,
+        usablePct: input.usablePct,
+        supplier: input.supplier,
+        purchasedAt: input.purchasedAt,
+        priceUpdatedAt: input.purchasedAt,
+        note: input.note,
+        purchasePrice: null,
+        price: null,
+        priceUnit: null,
+        allergens: previous ? [...previous.allergens] : [],
+      });
+      const prevPrice = purchases
+        .filter((r) => r.key === input.key)
+        .at(-1)?.record.price ?? null;
+      purchases.push({
+        key: input.key,
+        record: {
+          id: `pur-${purchases.length + 1}`,
+          purchasedAt: input.purchasedAt ?? '2026-01-01',
+          supplier: input.supplier,
+          purchaseUnit: input.purchaseUnit,
+          packageCount: input.packageCount,
+          packageQty: input.packageQty,
+          purchaseTotal: input.purchaseTotal,
+          usablePct: input.usablePct,
+          purchasePrice: saved.purchasePrice,
+          price: saved.price,
+          prevPrice,
+          pctChange:
+            prevPrice === null || prevPrice === 0 || saved.price === null
+              ? null
+              : ((saved.price - prevPrice) / prevPrice) * 100,
+        },
+      });
+      catalog = [...catalog.filter((c) => c.key !== saved.key), saved];
+      opts.onRecordPurchase?.(input);
+      return saved;
+    },
+    purchaseHistory: async (key) =>
+      [
+        ...(opts.history ?? []),
+        ...purchases.filter((r) => r.key === key).map((r) => r.record),
+      ].reverse(),
     listCalibrations: async () => calib,
     saveCalibrations: async (list) => {
       calib = [...list];

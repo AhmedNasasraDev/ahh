@@ -74,6 +74,15 @@ function buildOriginal() {
   d.unitWeight = '800';
   d.yieldActual = ''; // MUST stay NULL through snapshot AND restore
   d.targetFC = '27.5';
+  // stage 8: the costing fields go through `save_recipe` → `apply_recipe_costing`
+  // and must come back through a RESTORE as well. An entered 0 next to an
+  // unentered field, because that is the pair a restore is most likely to lose.
+  d.salePrice = '95';
+  d.salePriceBasis = 'unit';
+  d.packagingCost = '2.5';
+  d.laborCost = '0';
+  d.otherCost = '';
+  d.targetGM = '62.5';
   d.notes = 'הערה עם גרשיים: קמח 82%';
   d.ingredients = [
     { ...emptyIngredient(), name: 'קמח מלא', qty: '600', unit: 'g', flour: true, price: '4.25', priceUnit: 'ק"ג' },
@@ -334,6 +343,15 @@ function verify(rowsPath: string) {
       [`${where}: the tags survived as an array of two`, Array.isArray(r['tags']) && (r['tags'] as unknown[]).length === 2],
       [`${where}: the gershayim and percent in the text survived`, String(r['notes']).includes('82%')],
       [`${where}: the ingredient order survived`, ings.map((i) => i['name']).join('|') === 'קמח מלא|מים|שמן זית|מלח'],
+      // stage 8. The restore half is the one that matters: `sale_price` was
+      // silently dropped by both save and restore until migration 0014, and a
+      // digest match alone would not say which field had been lost.
+      [`${where}: the sale price and its basis survived`,
+        r['salePrice'] === 95 && r['salePriceBasis'] === 'unit'],
+      [`${where}: an entered labour cost of 0 is 0, not missing`, r['laborCost'] === 0],
+      [`${where}: an unentered other cost is ABSENT, not 0`, !('otherCost' in r)],
+      [`${where}: the packaging cost and the margin target survived`,
+        r['packagingCost'] === 2.5 && r['targetGM'] === 62.5],
     );
   };
   say(fromSnapshot, 'snapshot');

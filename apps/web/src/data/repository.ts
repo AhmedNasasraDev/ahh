@@ -15,6 +15,10 @@
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import type { CatalogItem } from '../features/pricing/catalog.js';
+import type {
+  PurchaseInput,
+  PurchaseRecord,
+} from '../features/pricing/purchases.js';
 
 /** Extra instructions for a save. All optional; a plain save still works. */
 export interface SaveOptions {
@@ -154,6 +158,23 @@ export interface CatalogRepository {
   recipesPricingOn(key: string): Promise<
     Array<{ id: string; name: string; rows: number; overridden: number }>
   >;
+  /**
+   * Records a purchase (stage-8 requirements A, C).
+   *
+   * ONE call, because the append to the history and the update of the active
+   * price must both happen or neither: a history that disagrees with the price
+   * in effect is worse than no history. `record_purchase` (migration 0013)
+   * does both in one transaction.
+   *
+   * Returns the material as it now stands, so the caller shows the price the
+   * DATABASE derived and never one it computed itself.
+   */
+  recordPurchase(input: PurchaseInput): Promise<CatalogItem>;
+  /**
+   * The purchases of one material, newest first, each with the change from the
+   * one before it (requirement C).
+   */
+  purchaseHistory(key: string): Promise<PurchaseRecord[]>;
 }
 
 export interface PrefsRepository {

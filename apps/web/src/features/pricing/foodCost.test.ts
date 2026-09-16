@@ -14,8 +14,10 @@ import { foodCost } from './foodCost.js';
 const prefs = { ...defaultPrefs('pro'), done: true, tools: { cup: 240, tbsp: 15, tsp: 5 } };
 
 const priced = (key: string, price: number, unit: PriceUnit = 'ק"ג'): CatalogItem => ({
-  id: key, key, name: key, purchaseUnit: 'kg', packageQty: 1, packagePrice: price,
-  supplier: '', priceUpdatedAt: null, note: '', price, priceUnit: unit, allergens: [],
+  id: key, key, name: key, purchaseUnit: 'kg', packageQty: 1, packageCount: 1,
+  purchaseTotal: price, usablePct: null, supplier: '', purchasedAt: null,
+  priceUpdatedAt: null, note: '', purchasePrice: price, price, priceUnit: unit,
+  allergens: [],
 });
 
 /** 1 kg of dough: 500 g flour at ₪5/kg + 500 g water at ₪0/l. */
@@ -225,8 +227,9 @@ describe('a price change across several recipes and levels', () => {
 describe('units, end to end through the centre', () => {
   const eggs = (over: Partial<CatalogItem> = {}): CatalogItem => ({
     id: 'e', key: 'ביצים', name: 'ביצים L', purchaseUnit: 'unit',
-    packageQty: 30, packagePrice: 39, supplier: '', priceUpdatedAt: null, note: '',
-    price: 1.3, priceUnit: "יח'", allergens: ['ביצים'], ...over,
+    packageQty: 30, packageCount: 1, purchaseTotal: 39, usablePct: null,
+    supplier: '', purchasedAt: null, priceUpdatedAt: null, note: '',
+    purchasePrice: 1.3, price: 1.3, priceUnit: "יח'", allergens: ['ביצים'], ...over,
   });
 
   it('a tray of 30 eggs at 39 costs 3 eggs at 3.90', () => {

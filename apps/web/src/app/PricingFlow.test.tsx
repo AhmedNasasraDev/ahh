@@ -42,11 +42,15 @@ const catalogRow = (owner: string, over: Row = {}): Row => ({
   name: 'חמאה 82%',
   purchase_unit: 'g',
   package_qty: 200,
-  package_price: 8.9,
+  package_count: 1,
+  purchase_total: 8.9,
+  usable_pct: null,
   supplier: 'תנובה',
+  purchased_at: '2026-09-01',
   price_updated_at: '2026-09-01T00:00:00Z',
   note: '',
   // What the generated columns hold for a 200 g pack at ₪8.90.
+  purchase_price: 44.5,
   price: 44.5,
   price_unit: 'ק"ג',
   g_per_100: null,
@@ -109,8 +113,8 @@ describe('requirement 2 — the central price reaches the recipe', () => {
     await user.selectOptions(screen.getByLabelText('יחידת רכישה'), 'kg');
     await user.clear(screen.getByLabelText('כמות באריזה'));
     await user.type(screen.getByLabelText('כמות באריזה'), '1');
-    await user.clear(screen.getByLabelText('מחיר האריזה'));
-    await user.type(screen.getByLabelText('מחיר האריזה'), '36');
+    await user.clear(screen.getByLabelText('סך הכול ששולם'));
+    await user.type(screen.getByLabelText('סך הכול ששולם'), '36');
     await user.click(screen.getByRole('button', { name: 'שמירת חומר הגלם' }));
 
     // The DATABASE derived the unit price, not the form.
@@ -298,8 +302,9 @@ describe('requirement 6 — one account cannot see or infer another\'s prices', 
 
     await b.saveCatalogItem({
       id: '', key: 'חמאה 82%', name: 'חמאה שלי', purchaseUnit: 'kg',
-      packageQty: 1, packagePrice: 99, supplier: '', priceUpdatedAt: null,
-      note: '', price: null, priceUnit: null, allergens: [],
+      packageQty: 1, packageCount: 1, purchaseTotal: 99, usablePct: null,
+      supplier: '', purchasedAt: null, priceUpdatedAt: null,
+      note: '', purchasePrice: null, price: null, priceUnit: null, allergens: [],
     });
 
     const mine = db['ingredient_catalog']!.filter((c) => c['owner_id'] === USER_B);

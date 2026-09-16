@@ -6,6 +6,10 @@ import userEvent from '@testing-library/user-event';
 import { IngredientsScreen } from './IngredientsScreen.js';
 import { fakeRepository, renderRoute } from '../test/render.js';
 import type { CatalogItem } from '../features/pricing/catalog.js';
+import type {
+  PurchaseInput,
+  PurchaseRecord,
+} from '../features/pricing/purchases.js';
 
 const item = (over: Partial<CatalogItem> = {}): CatalogItem => ({
   id: 'c1',
@@ -13,10 +17,14 @@ const item = (over: Partial<CatalogItem> = {}): CatalogItem => ({
   name: 'חמאה 82%',
   purchaseUnit: 'g',
   packageQty: 200,
-  packagePrice: 8.9,
+  packageCount: 1,
+  purchaseTotal: 8.9,
+  usablePct: null,
   supplier: 'תנובה',
+  purchasedAt: '2026-09-01',
   priceUpdatedAt: new Date().toISOString(),
   note: '',
+  purchasePrice: 44.5,
   price: 44.5,
   priceUnit: 'ק"ג',
   allergens: ['חלב'],
@@ -28,6 +36,8 @@ const show = (
     catalog?: CatalogItem[];
     canWrite?: boolean;
     onSave?(i: CatalogItem): void;
+    onPurchase?(p: PurchaseInput): void;
+    history?: PurchaseRecord[];
     pricingOn?: { id: string; name: string; rows: number; overridden: number }[];
   } = {},
 ) =>
@@ -38,6 +48,8 @@ const show = (
       catalog: opts.catalog ?? [],
       canWrite: opts.canWrite ?? true,
       onSaveCatalogItem: opts.onSave,
+      onRecordPurchase: opts.onPurchase,
+      history: opts.history,
       pricingOn: opts.pricingOn,
     }),
   });
@@ -66,7 +78,7 @@ describe('requirement 1 — one place per material', () => {
   });
 
   it('says "no price" rather than ₪0 for an unpriced material', async () => {
-    show({ catalog: [item({ packagePrice: null, price: null, priceUnit: null })] });
+    show({ catalog: [item({ purchaseTotal: null, price: null, priceUnit: null })] });
     // The distinction the whole stage turns on. ₪0 would put it into every
     // recipe's cost as free.
     expect(await screen.findByLabelText('אין מחיר לחמאה 82%')).toBeInTheDocument();
@@ -90,11 +102,11 @@ describe('requirement 3 — it asks what was bought', () => {
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'קמח לחם');
     await user.selectOptions(screen.getByLabelText('יחידת רכישה'), 'kg');
     await user.type(screen.getByLabelText('כמות באריזה'), '25');
-    await user.type(screen.getByLabelText('מחיר האריזה'), '110');
+    await user.type(screen.getByLabelText('סך הכול ששולם'), '110');
 
     // Shown while typing, before anything is saved: ₪4.40 a kilo.
-    expect(screen.getByLabelText('מחיר ליחידת בסיס')).toHaveTextContent('4.4');
-    expect(screen.getByLabelText('מחיר ליחידת בסיס')).toHaveTextContent('לק"ג');
+    expect(screen.getByLabelText('מחיר מחושב מהרכישה')).toHaveTextContent('4.4');
+    expect(screen.getByLabelText('מחיר מחושב מהרכישה')).toHaveTextContent('לק"ג');
   });
 
   it('derives a per-egg price from a tray of 30', async () => {
@@ -104,10 +116,10 @@ describe('requirement 3 — it asks what was bought', () => {
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'ביצים');
     await user.selectOptions(screen.getByLabelText('יחידת רכישה'), 'unit');
     await user.type(screen.getByLabelText('כמות באריזה'), '30');
-    await user.type(screen.getByLabelText('מחיר האריזה'), '39');
+    await user.type(screen.getByLabelText('סך הכול ששולם'), '39');
 
-    expect(screen.getByLabelText('מחיר ליחידת בסיס')).toHaveTextContent('1.3');
-    expect(screen.getByLabelText('מחיר ליחידת בסיס')).toHaveTextContent("ליח'");
+    expect(screen.getByLabelText('מחיר מחושב מהרכישה')).toHaveTextContent('1.3');
+    expect(screen.getByLabelText('מחיר מחושב מהרכישה')).toHaveTextContent("ליח'");
   });
 
   it('relabels the quantity field for the chosen purchase unit', async () => {
@@ -128,74 +140,76 @@ describe('requirement 3 — it asks what was bought', () => {
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'מלח');
     await user.type(screen.getByLabelText('כמות באריזה'), '1');
     // no package price typed
-    expect(screen.getByLabelText('מחיר ליחידת בסיס')).toHaveTextContent('אין עדיין מחיר');
-    expect(screen.getByLabelText('מחיר ליחידת בסיס')).toHaveTextContent('שדה ריק אינו אפס');
+    expect(screen.getByLabelText('מחיר מחושב מהרכישה')).toHaveTextContent('אין עדיין מחיר');
+    expect(screen.getByLabelText('מחיר מחושב מהרכישה')).toHaveTextContent('שדה ריק אינו אפס');
   });
 
-  it('saves the package, not a per-kilo price', async () => {
+  it('saves the purchase, not a per-kilo price', async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    show({ onSave });
+    const onPurchase = vi.fn();
+    show({ onPurchase });
     await user.click(await screen.findByRole('button', { name: 'הוספת חומר גלם' }));
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'קמח לחם');
     await user.type(screen.getByLabelText('כמות באריזה'), '25');
-    await user.type(screen.getByLabelText('מחיר האריזה'), '110');
+    await user.type(screen.getByLabelText('סך הכול ששולם'), '110');
     await user.click(screen.getByRole('button', { name: 'שמירת חומר הגלם' }));
 
-    await waitFor(() => expect(onSave).toHaveBeenCalled());
-    expect(onSave.mock.calls[0]![0]).toMatchObject({
+    // A new material is a PURCHASE (requirement C), not a bare row: it goes
+    // through `record_purchase`, so the history has it from the first day.
+    await waitFor(() => expect(onPurchase).toHaveBeenCalled());
+    expect(onPurchase.mock.calls[0]![0]).toMatchObject({
       key: 'קמח לחם',
       purchaseUnit: 'kg',
+      packageCount: 1,
       packageQty: 25,
-      packagePrice: 110,
+      purchaseTotal: 110,
+      usablePct: null,
     });
-    // and the DERIVED price came back from the store, not from the form
-    expect(onSave.mock.calls[0]![0].price).toBeCloseTo(4.4, 6);
   });
 
   it('keeps an empty price empty and a typed 0 as zero', async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    show({ onSave });
+    const onPurchase = vi.fn();
+    show({ onPurchase });
 
     await user.click(await screen.findByRole('button', { name: 'הוספת חומר גלם' }));
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'מלח');
     await user.type(screen.getByLabelText('כמות באריזה'), '1');
     await user.click(screen.getByRole('button', { name: 'שמירת חומר הגלם' }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
-    expect(onSave.mock.calls[0]![0].packagePrice).toBeNull();
+    await waitFor(() => expect(onPurchase).toHaveBeenCalledTimes(1));
+    expect(onPurchase.mock.calls[0]![0].purchaseTotal).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'הוספת חומר גלם' }));
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'מים');
     await user.type(screen.getByLabelText('כמות באריזה'), '1');
-    await user.type(screen.getByLabelText('מחיר האריזה'), '0');
+    await user.type(screen.getByLabelText('סך הכול ששולם'), '0');
     await user.click(screen.getByRole('button', { name: 'שמירת חומר הגלם' }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
-    expect(onSave.mock.calls[1]![0].packagePrice).toBe(0);
+    await waitFor(() => expect(onPurchase).toHaveBeenCalledTimes(2));
+    expect(onPurchase.mock.calls[1]![0].purchaseTotal).toBe(0);
   });
 
   it('refuses a package of nothing, which has no unit price', async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    show({ onSave });
+    const onPurchase = vi.fn();
+    show({ onPurchase });
     await user.click(await screen.findByRole('button', { name: 'הוספת חומר גלם' }));
     await user.type(screen.getByLabelText('שם חומר הגלם'), 'משהו');
     await user.type(screen.getByLabelText('כמות באריזה'), '0');
-    await user.type(screen.getByLabelText('מחיר האריזה'), '10');
+    await user.type(screen.getByLabelText('סך הכול ששולם'), '10');
     await user.click(screen.getByRole('button', { name: 'שמירת חומר הגלם' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('גדולה מאפס');
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onPurchase).not.toHaveBeenCalled();
   });
 
   it('refuses a material with no name', async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    show({ onSave });
+    const onPurchase = vi.fn();
+    show({ onPurchase });
     await user.click(await screen.findByRole('button', { name: 'הוספת חומר גלם' }));
     await user.click(screen.getByRole('button', { name: 'שמירת חומר הגלם' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('שם');
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onPurchase).not.toHaveBeenCalled();
   });
 });
 
@@ -252,16 +266,16 @@ describe('editing and removing', () => {
     expect(screen.getByLabelText('שם חומר הגלם')).toHaveValue('חמאה 82%');
     expect(screen.getByLabelText('יחידת רכישה')).toHaveValue('g');
     expect(screen.getByLabelText('כמות באריזה')).toHaveValue('200');
-    expect(screen.getByLabelText('מחיר האריזה')).toHaveValue('8.9');
+    expect(screen.getByLabelText('סך הכול ששולם')).toHaveValue('8.9');
     expect(screen.getByLabelText('ספק')).toHaveValue('תנובה');
   });
 
   it('loads an unpriced material with EMPTY fields, not zeros', async () => {
     const user = userEvent.setup();
-    show({ catalog: [item({ packagePrice: null, packageQty: null, price: null, priceUnit: null })] });
+    show({ catalog: [item({ purchaseTotal: null, packageQty: null, price: null, priceUnit: null })] });
     await user.click(await screen.findByRole('button', { name: 'עריכת חמאה 82%' }));
     expect(screen.getByLabelText('כמות באריזה')).toHaveValue('');
-    expect(screen.getByLabelText('מחיר האריזה')).toHaveValue('');
+    expect(screen.getByLabelText('סך הכול ששולם')).toHaveValue('');
   });
 
   it('asks before removing, and says what happens to the recipes', async () => {

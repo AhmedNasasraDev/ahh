@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema after migrations 0001-0006. Not used at runtime.",
+    "information_schema after migrations 0001-0014. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -66,17 +66,37 @@
     "id": "required",
     "key": "required",
     "name": "required",
+    "note": "required",
     "owner_id": "nullable",
+    "package_count": "required",
+    "package_qty": "nullable",
     "price": "nullable",
     "price_unit": "nullable",
-    "updated_at": "required",
-    "water_pct": "nullable",
-    "purchase_unit": "required",
-    "package_qty": "nullable",
-    "package_price": "nullable",
-    "supplier": "required",
     "price_updated_at": "nullable",
-    "note": "required"
+    "purchase_price": "nullable",
+    "purchase_total": "nullable",
+    "purchase_unit": "required",
+    "purchased_at": "nullable",
+    "supplier": "required",
+    "updated_at": "required",
+    "usable_pct": "nullable",
+    "water_pct": "nullable"
+  },
+  "ingredient_purchases": {
+    "created_at": "required",
+    "id": "required",
+    "key": "required",
+    "note": "required",
+    "owner_id": "required",
+    "package_count": "required",
+    "package_qty": "nullable",
+    "price": "nullable",
+    "purchase_price": "nullable",
+    "purchase_total": "nullable",
+    "purchase_unit": "required",
+    "purchased_at": "required",
+    "supplier": "required",
+    "usable_pct": "nullable"
   },
   "ingredients": {
     "flour": "required",
@@ -144,18 +164,24 @@
     "group_id": "nullable",
     "id": "required",
     "is_sub": "required",
+    "labor_cost": "nullable",
     "locked": "required",
     "manual_allergens": "required",
     "name": "required",
     "notes": "required",
+    "other_cost": "nullable",
     "owner_id": "required",
+    "packaging_cost": "nullable",
     "pan": "nullable",
     "room_temp": "nullable",
+    "sale_price": "nullable",
+    "sale_price_basis": "required",
     "saved_from_item_id": "nullable",
     "shelf_life": "required",
     "storage": "required",
     "tags": "required",
     "target_fc": "required",
+    "target_gm": "nullable",
     "thawing": "required",
     "unit_weight": "required",
     "updated_at": "required",
@@ -164,8 +190,7 @@
     "weight_after": "nullable",
     "weight_before": "nullable",
     "yield_actual": "nullable",
-    "yield_units": "required",
-    "sale_price": "nullable"
+    "yield_units": "required"
   },
   "steps": {
     "id": "required",
@@ -184,51 +209,19 @@
   },
   "_functions_comment": "Captured from the applied schema. `args` is the INPUT argument names in order: PostgREST passes RPC arguments BY NAME, so a drifted name is not a type error but a runtime 'function not found'. `security_definer` and the two execute flags are here so that a grant loosening is a failing check rather than something noticed months later — see migrations 0006 and 0010.",
   "_functions": {
-    "check_sub_recipe_link": {
-      "args": [],
-      "security_definer": true,
-      "anon_execute": false,
-      "authenticated_execute": false
-    },
-    "delete_recipe": {
-      "args": [
-        "p_recipe_id"
-      ],
-      "security_definer": false,
-      "anon_execute": false,
-      "authenticated_execute": true
-    },
     "handle_new_user": {
       "args": [],
       "security_definer": true,
       "anon_execute": false,
       "authenticated_execute": false
     },
-    "next_version_tag": {
-      "args": [
-        "p_recipe_id"
-      ],
+    "touch_updated_at": {
+      "args": [],
       "security_definer": false,
       "anon_execute": false,
-      "authenticated_execute": true
+      "authenticated_execute": false
     },
     "owns_recipe": {
-      "args": [
-        "p_recipe_id"
-      ],
-      "security_definer": false,
-      "anon_execute": false,
-      "authenticated_execute": true
-    },
-    "recipe_snapshot": {
-      "args": [
-        "p_recipe_id"
-      ],
-      "security_definer": false,
-      "anon_execute": false,
-      "authenticated_execute": true
-    },
-    "recipes_using": {
       "args": [
         "p_recipe_id"
       ],
@@ -247,9 +240,15 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
-    "restore_recipe_version": {
+    "check_sub_recipe_link": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "next_version_tag": {
       "args": [
-        "p_version_id"
+        "p_recipe_id"
       ],
       "security_definer": false,
       "anon_execute": false,
@@ -269,7 +268,23 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
-    "touch_updated_at": {
+    "delete_recipe": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "recipes_using": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "touch_price_updated_at": {
       "args": [],
       "security_definer": false,
       "anon_execute": false,
@@ -283,11 +298,65 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
-    "touch_price_updated_at": {
-      "args": [],
+    "recipe_snapshot": {
+      "args": [
+        "p_recipe_id"
+      ],
       "security_definer": false,
       "anon_execute": false,
-      "authenticated_execute": false
+      "authenticated_execute": true
+    },
+    "purchase_base_qty": {
+      "args": [
+        "p_unit",
+        "p_count",
+        "p_qty"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "record_purchase": {
+      "args": [
+        "p_key",
+        "p_name",
+        "p_purchase_unit",
+        "p_package_count",
+        "p_package_qty",
+        "p_purchase_total",
+        "p_usable_pct",
+        "p_supplier",
+        "p_purchased_at",
+        "p_note"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "purchase_history": {
+      "args": [
+        "p_key"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "apply_recipe_costing": {
+      "args": [
+        "p_id",
+        "p_recipe"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "restore_recipe_version": {
+      "args": [
+        "p_version_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
     }
   }
 }

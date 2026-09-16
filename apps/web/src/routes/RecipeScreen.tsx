@@ -17,6 +17,12 @@ import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState, type CalcState } from '../features/recipe/completeness.js';
 import { resolveFromCatalog, unpricedKeys } from '../features/pricing/catalog.js';
 import { foodCost } from '../features/pricing/foodCost.js';
+import {
+  costBreakdown,
+  profitability,
+  targetPrice,
+} from '../features/pricing/profitability.js';
+import { CostingPanel } from '../features/pricing/CostingPanel.js';
 import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import { VersionHistory } from '../features/recipe/VersionHistory.js';
 import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
@@ -249,6 +255,12 @@ export function RecipeScreen() {
   // Requirement 4. `calc` decides whether the cost figures mean anything;
   // `foodCost` decides which of them may be shown and computes the one ratio.
   const fc = foodCost(pricedRecipe ?? recipe, computed, calc);
+  // Stage 8: the full cost and the sale side. Built from the SAME `fc`, so the
+  // ingredient cost in the breakdown is the one the food-cost panel shows and
+  // the two can never disagree.
+  const breakdown = costBreakdown(fc, pricedRecipe ?? recipe);
+  const profit = profitability(pricedRecipe ?? recipe, computed, breakdown, fc);
+  const targets = targetPrice(pricedRecipe ?? recipe, computed, breakdown, fc);
   const toPrice = unpricedKeys(pricedRecipe ?? recipe, catalog);
 
   /**
@@ -641,6 +653,11 @@ export function RecipeScreen() {
               )}
             </section>
 
+            {/* ── stage-8 requirements E, F, G ──────────────────────────── */}
+            <section className={styles.fcBlock}>
+              <CostingPanel breakdown={breakdown} profit={profit} target={targets} />
+            </section>
+
             {/*
               Every figure in these three blocks is a sum over the ingredient
               rows, so `partial` marks all of them at once rather than each
@@ -687,7 +704,7 @@ export function RecipeScreen() {
                   partial={calc.partialFigures || calc.costLevel === 'partial'}
                   exact={['יעד פוד קוסט']}
                   items={[
-                    ['עלות כוללת', priced(formatNis(computed.cost))],
+                    ['עלות חומרי גלם', priced(formatNis(computed.cost))],
                     [
                       'עלות ליחידה',
                       computed.costPerUnit ? priced(formatNis(computed.costPerUnit)) : '—',

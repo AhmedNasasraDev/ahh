@@ -69,6 +69,7 @@ export function emptyDb(): FakeDb {
     profiles: [], recipes: [], ingredients: [], steps: [], issues: [],
     trials: [], batches: [], recipe_versions: [], private_notes: [], calibrations: [],
     ingredient_catalog: [],
+    ingredient_purchases: [],
   };
 }
 

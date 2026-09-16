@@ -21,6 +21,10 @@ import {
 } from 'react';
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import type { CatalogItem } from '../features/pricing/catalog.js';
+import type {
+  PurchaseInput,
+  PurchaseRecord,
+} from '../features/pricing/purchases.js';
 import { normalizeCalibrations } from '@recipe-notebook/engine';
 import { createLocalDemoRepository, firstRunPrefs } from '../data/localDemoRepository.js';
 import { createSupabaseRepository } from '../data/supabaseRepository.js';
@@ -81,6 +85,9 @@ export interface AppData {
   recipesPricingOn(key: string): Promise<
     Array<{ id: string; name: string; rows: number; overridden: number }>
   >;
+  /** Stage 8: records a purchase and moves the active price with it. */
+  recordPurchase(input: PurchaseInput): Promise<CatalogItem>;
+  purchaseHistory(key: string): Promise<PurchaseRecord[]>;
   clearError(): void;
 }
 
@@ -294,6 +301,23 @@ export function AppDataProvider({
     [repo],
   );
 
+  const recordPurchase = useCallback(
+    async (input: PurchaseInput): Promise<CatalogItem> => {
+      const saved = await repo.recordPurchase(input);
+      // Same replacement as a save: the new price is in effect everywhere at
+      // once, because there is only one place it lives.
+      setCatalog((list) => [...list.filter((c) => c.key !== saved.key), saved]);
+      setError(null);
+      return saved;
+    },
+    [repo],
+  );
+
+  const purchaseHistory = useCallback(
+    (key: string) => repo.purchaseHistory(key),
+    [repo],
+  );
+
   const value = useMemo<AppData>(
     () => ({
       ready,
@@ -315,6 +339,8 @@ export function AppDataProvider({
       saveCatalogItem,
       deleteCatalogItem,
       recipesPricingOn,
+      recordPurchase,
+      purchaseHistory,
       clearError: () => setError(null),
     }),
     [
@@ -336,6 +362,8 @@ export function AppDataProvider({
       saveCatalogItem,
       deleteCatalogItem,
       recipesPricingOn,
+      recordPurchase,
+      purchaseHistory,
     ],
   );
 

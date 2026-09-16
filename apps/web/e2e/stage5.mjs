@@ -1,4 +1,4 @@
-// Browser E2E for the stage-5, 6 and 7 surfaces, against the BUILT bundle.
+// Browser E2E for the stage-5, 6, 7 and 8 surfaces, against the BUILT bundle.
 //
 // Kept as one file rather than three because the harness — the static server,
 // the console and network guards, the onboarding walk — is the bulk of it, and
@@ -443,6 +443,55 @@ try {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   check('no horizontal overflow with the food cost panel open', fcOverflow <= 1, `${fcOverflow}px`);
+
+  // ── stage 8: the full cost and the sale side, in a real browser ────────
+  // The demo recipes price their rows directly, so the ingredient cost is
+  // real; nobody has entered packaging, labour or a sale price, so the panel
+  // has to show what is missing rather than a total that looks finished.
+  const costing = page.locator('[aria-label="עלות ורווחיות"]');
+  check('the recipe page shows the cost and profitability panel', (await costing.count()) > 0);
+
+  const costText = (await costing.innerText()).replace(/\s+/g, ' ');
+  check('it breaks the cost into its parts', /חומרי גלם/.test(costText) && /אריזה/.test(costText) && /עבודה/.test(costText));
+  check(
+    'margin and markup appear under their own names',
+    /רווח גולמי %/.test(costText) && /Markup %/.test(costText),
+    costText.slice(0, 160),
+  );
+  check(
+    'it names the cost parts nobody entered',
+    (await page.locator('[aria-label="מה לא הוזן בעלות"]').count()) > 0,
+  );
+  check(
+    'and says a blank field is not a zero',
+    /שדה ריק אינו אפס/.test(costText),
+  );
+  check(
+    'with no sale price there is no margin, and the reason is given',
+    (await page.locator('[aria-label="רווח גולמי אחוז"]').innerText()).trim() === '—' &&
+      /מחיר מכירה/.test(await page.locator('[aria-label="למה אין רווחיות"]').innerText()),
+  );
+  check(
+    'a computed target price is labelled a target, not "the right price"',
+    /ולא "המחיר הנכון"/.test(costText),
+  );
+  await page.screenshot({ path: `${OUT}/18-costing-phone.png`, fullPage: true });
+
+  const costOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  check('no horizontal overflow with the costing panel open', costOverflow <= 1, `${costOverflow}px`);
+
+  // ── stage 8: the purchase entry fields in the centre ───────────────────
+  await page.goto('http://127.0.0.1:8124/ingredients', { waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  const centre2 = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+  check(
+    'the centre explains that the purchase is entered as it was made',
+    /כמה שולם בסך הכול, כמה אריזות, ומה יש בכל אריזה/.test(centre2) ||
+      /אין עדיין חומרי גלם/.test(centre2),
+    centre2.slice(0, 160),
+  );
 
   check('no page errors anywhere in the run', errors.length === 0, errors.slice(0, 3).join(' | '));
   check(

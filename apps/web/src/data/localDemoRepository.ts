@@ -19,6 +19,7 @@
 
 import type { Calibration, MeasurementPrefs, Recipe } from '@recipe-notebook/engine';
 import type { CatalogItem } from '../features/pricing/catalog.js';
+import type { PurchaseRecord } from '../features/pricing/purchases.js';
 import { defaultPrefs, normalizeCalibrations } from '@recipe-notebook/engine';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from './demoRecipes.js';
 import * as mirror from './offlineMirror.js';
@@ -142,6 +143,16 @@ export function createLocalDemoRepository(): Repository {
     },
 
     async recipesPricingOn() {
+      return [];
+    },
+
+    // Same reason: a purchase is a business event of an account. There is no
+    // account here, so there is nothing to record and nothing to remember.
+    async recordPurchase(): Promise<CatalogItem> {
+      throw new WriteNotAllowedError(NO_BACKEND_REASON);
+    },
+
+    async purchaseHistory(): Promise<PurchaseRecord[]> {
       return [];
     },
 

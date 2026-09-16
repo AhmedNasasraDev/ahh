@@ -368,7 +368,7 @@ describe('requirements 11-17 — linking a sub-recipe from the editor', () => {
     // And the cost came from INSIDE the base, pro rata: the base is 200 g of
     // chocolate at ₪60/kg (₪12) plus 100 g of cream at ₪12/l (₪1.20) = ₪13.20
     // for 300 g, so 150 g of it is ₪6.60. Not a flat price, and not zero.
-    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    const costRow = screen.getByText('עלות חומרי גלם').closest('div')!;
     expect(costRow).toHaveTextContent('6.6');
 
     // The flour here has no price, so the TOTAL is partial and says so —

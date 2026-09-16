@@ -91,6 +91,10 @@ const POLICIES: Record<string, Policy> = {
   // what keeps one account's prices and suppliers out of another's reach.
   ingredient_catalog: (row, uid) =>
     Boolean(uid) && (row['owner_id'] === uid || row['owner_id'] === null),
+  // ingredient_purchases_own (0013): own rows ONLY, with no system-row
+  // exception. A purchase total and a supplier are private business data, and
+  // there is no such thing as a shared one.
+  ingredient_purchases: (row, uid) => Boolean(uid) && row['owner_id'] === uid,
   // shared reference data: SELECT to authenticated, and no write policy at all
   density_table: (_row, uid) => Boolean(uid),
   density_data_gaps: (_row, uid) => Boolean(uid),
@@ -112,32 +116,56 @@ const READ_ONLY_TABLES = new Set(['density_table', 'density_data_gaps']);
  * gives NO unit price, and a package price of 0 gives a unit price of 0.
  */
 function generated(table: string, row: Row): Row {
-  if (table !== 'ingredient_catalog') return {};
+  if (table !== 'ingredient_catalog' && table !== 'ingredient_purchases') return {};
 
-  const qty = row['package_qty'] === null || row['package_qty'] === undefined
-    ? null
-    : Number(row['package_qty']);
-  const price = row['package_price'] === null || row['package_price'] === undefined
-    ? null
-    : Number(row['package_price']);
+  const num = (v: unknown): number | null =>
+    v === null || v === undefined ? null : Number(v);
 
-  if (price === null || qty === null || qty <= 0) {
-    return { price: null, price_unit: null };
-  }
+  const qty = num(row['package_qty']);
+  const count = num(row['package_count']) ?? 1;
+  const total = num(row['purchase_total']);
+  const usable = num(row['usable_pct']);
+  const none = { purchase_price: null, price: null, price_unit: null };
+
+  if (total === null || qty === null || qty <= 0 || count <= 0) return none;
+  if (usable !== null && (usable <= 0 || usable > 100)) return none;
+
+  let base: number;
+  let unit: string;
   switch (row['purchase_unit']) {
     case 'kg':
-      return { price: price / qty, price_unit: 'ק"ג' };
+      base = count * qty;
+      unit = 'ק"ג';
+      break;
     case 'g':
-      return { price: (price / qty) * 1000, price_unit: 'ק"ג' };
+      base = (count * qty) / 1000;
+      unit = 'ק"ג';
+      break;
     case 'l':
-      return { price: price / qty, price_unit: 'ליטר' };
+      base = count * qty;
+      unit = 'ליטר';
+      break;
     case 'ml':
-      return { price: (price / qty) * 1000, price_unit: 'ליטר' };
+      base = (count * qty) / 1000;
+      unit = 'ליטר';
+      break;
     case 'unit':
-      return { price: price / qty, price_unit: "יח'" };
+      base = count * qty;
+      unit = "יח'";
+      break;
     default:
-      return { price: null, price_unit: null };
+      return none;
   }
+  if (base <= 0) return none;
+
+  const purchase = total / base;
+  return {
+    purchase_price: purchase,
+    // The USABLE cost — what a recipe's quantities actually refer to. With no
+    // declared yield it is the same number, not zero.
+    price: purchase / ((usable ?? 100) / 100),
+    price_unit: unit,
+  };
 }
 
 /**
@@ -168,6 +196,16 @@ const INSERT_DEFAULTS: Record<string, () => Row> = {
     group_id: null,
     // Stamped by the 0011 trigger when a package is priced.
     price_updated_at: NOW,
+    package_count: 1,
+    usable_pct: null,
+    purchased_at: null,
+  }),
+  ingredient_purchases: () => ({
+    created_at: NOW,
+    supplier: '',
+    note: '',
+    package_count: 1,
+    usable_pct: null,
   }),
 };
 
@@ -770,6 +808,110 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
       };
     }
 
+    if (name === 'record_purchase') {
+      if (!authUid) {
+        return {
+          data: null,
+          error: { message: 'אין משתמש מחובר', code: '42501' },
+        };
+      }
+      const key = String(args['p_key'] ?? '').trim();
+      if (!key) {
+        return {
+          data: null,
+          error: { message: 'לחומר גלם חייב להיות שם', code: '23514' },
+        };
+      }
+
+      const facts: Row = {
+        purchase_unit: args['p_purchase_unit'],
+        package_count: args['p_package_count'] ?? 1,
+        package_qty: args['p_package_qty'] ?? null,
+        purchase_total: args['p_purchase_total'] ?? null,
+        usable_pct: args['p_usable_pct'] ?? null,
+        supplier: args['p_supplier'] ?? '',
+        purchased_at: args['p_purchased_at'] ?? '2026-01-01',
+        note: args['p_note'] ?? '',
+      };
+
+      // The log first, exactly as migration 0013 does — a history that can be
+      // lost to a failure halfway through is not a history.
+      const logRow: Row = {
+        id: `pur-${(db['ingredient_purchases'] ?? []).length + 1}`,
+        owner_id: authUid,
+        key,
+        ...facts,
+        created_at: new Date().toISOString(),
+      };
+      Object.assign(logRow, generated('ingredient_purchases', logRow));
+      db['ingredient_purchases'] = [...(db['ingredient_purchases'] ?? []), logRow];
+
+      // Then the ACTIVE price, which is the catalog row and nothing else.
+      const existing = (db['ingredient_catalog'] ?? []).find(
+        (c) => c['owner_id'] === authUid && c['key'] === key,
+      );
+      if (existing) {
+        Object.assign(existing, facts, {
+          name: String(args['p_name'] ?? '').trim() || key,
+        });
+        Object.assign(existing, generated('ingredient_catalog', existing));
+      } else {
+        const made: Row = {
+          id: `cat-${(db['ingredient_catalog'] ?? []).length + 1}`,
+          owner_id: authUid,
+          group_id: null,
+          key,
+          name: String(args['p_name'] ?? '').trim() || key,
+          ...facts,
+          g_per_100: null,
+          water_pct: null,
+          allergens: [],
+          price_updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        Object.assign(made, generated('ingredient_catalog', made));
+        db['ingredient_catalog'] = [...(db['ingredient_catalog'] ?? []), made];
+      }
+      return { data: logRow['id'], error: null };
+    }
+
+    if (name === 'purchase_history') {
+      const key = String(args['p_key'] ?? '');
+      // RLS: only the caller's own purchases exist as far as this is concerned.
+      const rows = (db['ingredient_purchases'] ?? [])
+        .filter((r) => r['key'] === key && r['owner_id'] === authUid)
+        .sort((a, b) =>
+          String(a['purchased_at']).localeCompare(String(b['purchased_at'])) ||
+          String(a['created_at']).localeCompare(String(b['created_at'])),
+        );
+
+      const out = rows.map((r, i) => {
+        const prev = i === 0 ? null : (rows[i - 1]!['price'] as number | null);
+        const price = r['price'] as number | null;
+        return {
+          id: r['id'],
+          purchased_at: r['purchased_at'],
+          supplier: r['supplier'],
+          purchase_unit: r['purchase_unit'],
+          package_count: r['package_count'],
+          package_qty: r['package_qty'],
+          purchase_total: r['purchase_total'],
+          usable_pct: r['usable_pct'],
+          purchase_price: r['purchase_price'],
+          price,
+          prev_price: prev,
+          // No previous price, or a previous price of 0, gives no ratio — and
+          // a made-up percentage would be worse than none.
+          pct_change:
+            prev === null || prev === 0 || price === null
+              ? null
+              : ((price - prev) / prev) * 100,
+        };
+      });
+      return { data: out.reverse(), error: null };
+    }
+
     if (name === 'delete_recipe') {
       const target = String(args['p_recipe_id'] ?? '');
 
@@ -886,6 +1028,12 @@ export function recipeRow(id: string, ownerId: string, over: Row = {}): Row {
     room_temp: null,
     friction: null,
     target_fc: 0,
+    // stage 8: NOT NULL with a default, and the rest NULL until entered
+    sale_price_basis: 'batch',
+    packaging_cost: null,
+    labor_cost: null,
+    other_cost: null,
+    target_gm: null,
     shelf_life: '',
     storage: '',
     freezing: '',

@@ -79,6 +79,17 @@ export interface RecipeDraft {
   targetFC: string;
   /** stage 7: what the user charges. '' = not set, '0' = given away */
   salePrice: string;
+  /** stage 8: is `salePrice` for the whole batch or for one unit? */
+  salePriceBasis: 'batch' | 'unit';
+  /**
+   * stage 8, requirement E: the rest of the cost, ENTERED and never invented.
+   * '' = not entered, '0' = there is none. The screen says which.
+   */
+  packagingCost: string;
+  laborCost: string;
+  otherCost: string;
+  /** stage 8, requirement G: a target gross margin, in percent */
+  targetGM: string;
   shelfLife: string;
   storage: string;
   equipment: string;
@@ -164,6 +175,11 @@ export function emptyDraft(category = 'אחר'): RecipeDraft {
     yieldActual: '',
     targetFC: '',
     salePrice: '',
+    salePriceBasis: 'batch',
+    packagingCost: '',
+    laborCost: '',
+    otherCost: '',
+    targetGM: '',
     shelfLife: '',
     storage: '',
     equipment: '',
@@ -187,6 +203,11 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
     yieldActual: str(recipe.yieldActual),
     targetFC: str(recipe.targetFC),
     salePrice: str(recipe['salePrice']),
+    salePriceBasis: recipe['salePriceBasis'] === 'unit' ? 'unit' : 'batch',
+    packagingCost: str(recipe['packagingCost']),
+    laborCost: str(recipe['laborCost']),
+    otherCost: str(recipe['otherCost']),
+    targetGM: str(recipe['targetGM']),
     shelfLife: str(recipe.shelfLife),
     storage: str(recipe.storage),
     equipment: str(recipe.equipment),
@@ -256,6 +277,11 @@ export function draftToRecipe(draft: RecipeDraft): Recipe {
     yieldActual: draft.yieldActual.trim(),
     targetFC: draft.targetFC.trim(),
     salePrice: draft.salePrice.trim(),
+    salePriceBasis: draft.salePriceBasis,
+    packagingCost: draft.packagingCost.trim(),
+    laborCost: draft.laborCost.trim(),
+    otherCost: draft.otherCost.trim(),
+    targetGM: draft.targetGM.trim(),
     shelfLife: draft.shelfLife.trim(),
     storage: draft.storage.trim(),
     equipment: draft.equipment.trim(),
@@ -347,10 +373,35 @@ export function validateDraft(draft: RecipeDraft): DraftProblem[] {
     ['yieldActual', 'התשואה בפועל'],
     ['targetFC', 'יעד הפוד קוסט'],
     ['salePrice', 'מחיר המכירה'],
+    ['packagingCost', 'עלות האריזה'],
+    ['laborCost', 'עלות העבודה'],
+    ['otherCost', 'העלויות הנוספות'],
+    ['targetGM', 'יעד הרווח הגולמי'],
   ] as const) {
     const raw = draft[key].trim();
     if (raw && !Number.isFinite(Number(raw))) {
       problems.push({ field: key, message: `${label} אינה מספר.` });
+    }
+  }
+
+  // A gross margin of 100% would need an infinite price, and above it a
+  // negative one. Refused rather than turned into a number.
+  const gm = draft.targetGM.trim();
+  if (gm && Number.isFinite(Number(gm)) && (Number(gm) < 0 || Number(gm) >= 100)) {
+    problems.push({
+      field: 'targetGM',
+      message: 'יעד הרווח הגולמי צריך להיות בין 0 ל-100, ולא 100.',
+    });
+  }
+
+  for (const [key, label] of [
+    ['packagingCost', 'עלות האריזה'],
+    ['laborCost', 'עלות העבודה'],
+    ['otherCost', 'העלויות הנוספות'],
+  ] as const) {
+    const raw = draft[key].trim();
+    if (raw && Number.isFinite(Number(raw)) && Number(raw) < 0) {
+      problems.push({ field: key, message: `${label} אינה יכולה להיות שלילית.` });
     }
   }
 

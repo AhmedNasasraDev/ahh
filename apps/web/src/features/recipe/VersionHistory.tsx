@@ -370,7 +370,7 @@ function VersionViewer({
           </div>
           {pro && (
             <div className={styles.factRow}>
-              <dt>עלות כוללת</dt>
+              <dt>עלות חומרי גלם</dt>
               <dd className="ltr">
                 {calc.level === 'none' || calc.costLevel === 'none'
                   ? '—'

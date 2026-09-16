@@ -22,10 +22,14 @@ const item = (over: Partial<CatalogItem> = {}): CatalogItem => ({
   name: 'חמאה 82%',
   purchaseUnit: 'g',
   packageQty: 200,
-  packagePrice: 8.9,
+  packageCount: 1,
+  purchaseTotal: 8.9,
+  usablePct: null,
   supplier: 'תנובה',
+  purchasedAt: '2026-09-01',
   priceUpdatedAt: '2026-09-01T00:00:00Z',
   note: '',
+  purchasePrice: 44.5,
   price: 44.5,
   priceUnit: 'ק"ג',
   allergens: ['חלב'],
@@ -36,34 +40,39 @@ const item = (over: Partial<CatalogItem> = {}): CatalogItem => ({
 describe('requirement 3 — the real purchase scenarios', () => {
   // The four the instructions name, verbatim.
   it('flour: a 25 kg sack for 110 is 4.40 per kilo', () => {
-    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: 25, packagePrice: 110 })).toEqual({
+    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: 25, purchaseTotal: 110 })).toEqual({
+      // With no declared yield the purchase cost and the usable cost are the
+      // same number — not zero, and not absent.
+      purchase: 4.4,
       price: 4.4,
       unit: 'ק"ג',
     });
   });
 
   it('butter: a 200 g pack for 8.90 is 44.50 per kilo', () => {
-    const out = basePriceOf({ purchaseUnit: 'g', packageQty: 200, packagePrice: 8.9 })!;
+    const out = basePriceOf({ purchaseUnit: 'g', packageQty: 200, purchaseTotal: 8.9 })!;
     expect(out.unit).toBe('ק"ג');
     expect(out.price).toBeCloseTo(44.5, 6);
   });
 
   it('cream: 1 litre for 18 is 18 per litre', () => {
-    expect(basePriceOf({ purchaseUnit: 'l', packageQty: 1, packagePrice: 18 })).toEqual({
+    expect(basePriceOf({ purchaseUnit: 'l', packageQty: 1, purchaseTotal: 18 })).toEqual({
+      purchase: 18,
       price: 18,
       unit: 'ליטר',
     });
   });
 
   it('eggs: a tray of 30 for 39 is 1.30 per egg', () => {
-    const out = basePriceOf({ purchaseUnit: 'unit', packageQty: 30, packagePrice: 39 })!;
+    const out = basePriceOf({ purchaseUnit: 'unit', packageQty: 30, purchaseTotal: 39 })!;
     expect(out.unit).toBe("יח'");
     expect(out.price).toBeCloseTo(1.3, 6);
   });
 
   it('and a 100 ml bottle for 45 is 450 per litre', () => {
     // The one that catches a factor-of-1000 slip in the other direction.
-    expect(basePriceOf({ purchaseUnit: 'ml', packageQty: 100, packagePrice: 45 })).toEqual({
+    expect(basePriceOf({ purchaseUnit: 'ml', packageQty: 100, purchaseTotal: 45 })).toEqual({
+      purchase: 450,
       price: 450,
       unit: 'ליטר',
     });
@@ -73,7 +82,7 @@ describe('requirement 3 — the real purchase scenarios', () => {
     // The same package numbers under five purchase units must give five
     // different answers. If they did not, the unit would be decoration.
     const answers = (['kg', 'g', 'l', 'ml', 'unit'] as const).map(
-      (u) => basePriceOf({ purchaseUnit: u, packageQty: 2, packagePrice: 10 })!,
+      (u) => basePriceOf({ purchaseUnit: u, packageQty: 2, purchaseTotal: 10 })!,
     );
     expect(answers.map((a) => `${a.price} ${a.unit}`)).toEqual([
       '5 ק"ג',
@@ -87,20 +96,21 @@ describe('requirement 3 — the real purchase scenarios', () => {
 
 describe('an unpriced material is not a free one (requirement 8)', () => {
   it('has no price when the package price is unknown', () => {
-    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: 25, packagePrice: null })).toBeNull();
+    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: 25, purchaseTotal: null })).toBeNull();
   });
 
   it('has no price when the package size is unknown', () => {
-    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: null, packagePrice: 110 })).toBeNull();
+    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: null, purchaseTotal: 110 })).toBeNull();
   });
 
   it('has no price for a package of nothing, rather than dividing by zero', () => {
-    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: 0, packagePrice: 110 })).toBeNull();
+    expect(basePriceOf({ purchaseUnit: 'kg', packageQty: 0, purchaseTotal: 110 })).toBeNull();
   });
 
   it('but an explicit price of 0 IS a price, of zero', () => {
     // Water from the tap, a donated sack. Free is not unpriced.
-    expect(basePriceOf({ purchaseUnit: 'l', packageQty: 1, packagePrice: 0 })).toEqual({
+    expect(basePriceOf({ purchaseUnit: 'l', packageQty: 1, purchaseTotal: 0 })).toEqual({
+      purchase: 0,
       price: 0,
       unit: 'ליטר',
     });
@@ -135,7 +145,7 @@ describe('requirement 2 — one price, and every recipe follows it', () => {
     const before = resolveFromCatalog(recipe(), [butter]);
     // ₪36/kg, the instructions' own example
     const after = resolveFromCatalog(recipe(), [
-      item({ purchaseUnit: 'kg', packageQty: 1, packagePrice: 36, price: 36, priceUnit: 'ק"ג' }),
+      item({ purchaseUnit: 'kg', packageQty: 1, purchaseTotal: 36, price: 36, priceUnit: 'ק"ג' }),
     ]);
     expect(compute(before, [before], { prefs }).cost).toBeCloseTo(11.125, 6);
     expect(compute(after, [after], { prefs }).cost).toBeCloseTo(9, 6);
@@ -144,7 +154,7 @@ describe('requirement 2 — one price, and every recipe follows it', () => {
   it('one price change moves EVERY recipe that inherits it', () => {
     const a = recipe({ id: 'a', ingredients: [{ id: 'i', name: 'חמאה 82%', qty: 100, unit: 'g' }] });
     const b = recipe({ id: 'b', ingredients: [{ id: 'i', name: 'חמאה 82%', qty: 500, unit: 'g' }] });
-    const dear = item({ packagePrice: 17.8, price: 89, priceUnit: 'ק"ג' });
+    const dear = item({ purchaseTotal: 17.8, price: 89, priceUnit: 'ק"ג' });
 
     const costOf = (r: Recipe, cat: CatalogItem[]) => {
       const res = resolveFromCatalog(r, cat);
@@ -209,7 +219,7 @@ describe('requirement 2 — one price, and every recipe follows it', () => {
 
 describe('a material with no central price', () => {
   it('leaves the row unpriced rather than costing it at 0', () => {
-    const unpriced = item({ packagePrice: null, price: null, priceUnit: null });
+    const unpriced = item({ purchaseTotal: null, price: null, priceUnit: null });
     const r = {
       id: 'r',
       ingredients: [{ id: 'i1', name: 'חמאה 82%', qty: 250, unit: 'g' }],
@@ -230,7 +240,7 @@ describe('a material with no central price', () => {
       ],
       steps: [],
     } as unknown as Recipe;
-    const out = unpricedKeys(r, [item({ packagePrice: null, price: null, priceUnit: null })]);
+    const out = unpricedKeys(r, [item({ purchaseTotal: null, price: null, priceUnit: null })]);
     expect(out).toEqual([
       // in the centre, but with no price on it
       { key: 'חמאה 82%', name: 'חמאה 82%', inCentre: true },

@@ -91,6 +91,21 @@ export type RecipeRow = {
   target_fc: number;
   /** stage 7: what the user charges. null = not set; 0 = given away */
   sale_price: number | null;
+  /**
+   * stage 8: is `sale_price` the price of the whole batch or of one unit?
+   * Stored rather than guessed — guessing is the difference between a 5% and a
+   * 500% food cost.
+   */
+  sale_price_basis: 'batch' | 'unit';
+  /**
+   * stage 8, requirement E: the cost breakdown, ENTERED and never invented.
+   * null = not entered; 0 = there is none, and the screen says which.
+   */
+  packaging_cost: number | null;
+  labor_cost: number | null;
+  other_cost: number | null;
+  /** stage 8, requirement G: a target gross margin, in percent. < 100 */
+  target_gm: number | null;
   shelf_life: string;
   storage: string;
   freezing: string;
@@ -201,19 +216,33 @@ export type IngredientCatalogRow = {
   name: string;
   /** what was actually bought — the source of truth for the price (0011) */
   purchase_unit: PurchaseUnit;
-  /** how much is in one package, in `purchase_unit`. null = unknown */
+  /** how much is in ONE package, in `purchase_unit`. null = unknown */
   package_qty: number | null;
-  /** what one package costs. null = unpriced; 0 = free, and they differ */
-  package_price: number | null;
+  /** how many packages were bought. 6 packs of 500 g is `6` (0013) */
+  package_count: number;
+  /** what the whole purchase cost. null = unpriced; 0 = free, and they differ */
+  purchase_total: number | null;
+  /**
+   * usable share after cleaning/trimming, in percent. null = nobody declared a
+   * yield, and then the usable cost IS the purchase cost — it is NOT 0% (0013).
+   */
+  usable_pct: number | null;
   supplier: string;
+  /** the date of the purchase, as the user entered it (0013) */
+  purchased_at: string | null;
   /** stamped only when the package actually changes — see 0011 */
   price_updated_at: string | null;
   note: string;
   /**
-   * GENERATED STORED in the database, from the package above. Read-only: an
-   * insert or update that includes either of these is rejected by Postgres,
-   * which is the point — they cannot drift from the package they came from.
+   * GENERATED STORED in the database, from the purchase above. Read-only: an
+   * insert or update that includes any of these is rejected by Postgres,
+   * which is the point — they cannot drift from the purchase they came from.
+   *
+   * `purchase_price` is the cost per base unit AS BOUGHT; `price` is the cost
+   * per USABLE base unit, and it is the one the engine reads. With no declared
+   * yield the two are the same number.
    */
+  purchase_price: number | null;
   price: number | null;
   price_unit: PriceUnit | null;
   g_per_100: number | null;
@@ -224,14 +253,46 @@ export type IngredientCatalogRow = {
 };
 
 /**
- * The columns a client may actually write. `price` and `price_unit` are
- * generated, so they are absent here on purpose — the type is what stops a
- * caller trying.
+ * The columns a client may actually write. `purchase_price`, `price` and
+ * `price_unit` are generated, so they are absent here on purpose — the type is
+ * what stops a caller trying.
  */
 export type IngredientCatalogWrite = Omit<
   IngredientCatalogRow,
-  'id' | 'price' | 'price_unit' | 'created_at' | 'updated_at' | 'price_updated_at'
+  | 'id'
+  | 'purchase_price'
+  | 'price'
+  | 'price_unit'
+  | 'created_at'
+  | 'updated_at'
+  | 'price_updated_at'
 >;
+
+/**
+ * One recorded purchase (migration 0013, requirement C). Append-only: a new
+ * price never overwrites the previous one, it is a new row here, and the
+ * ACTIVE price is unambiguously the `ingredient_catalog` row.
+ *
+ * Keyed by `key`, not by catalog id, so a purchase survives the material
+ * being renamed or re-created.
+ */
+export type IngredientPurchaseRow = {
+  id: string;
+  owner_id: string;
+  key: string;
+  purchase_unit: PurchaseUnit;
+  package_count: number;
+  package_qty: number | null;
+  purchase_total: number | null;
+  usable_pct: number | null;
+  supplier: string;
+  purchased_at: string;
+  note: string;
+  created_at: string;
+  /** GENERATED STORED, exactly as in the catalog */
+  purchase_price: number | null;
+  price: number | null;
+};
 
 export type DensityTableRow = {
   key: string;
@@ -272,6 +333,7 @@ export type Database = {
       recipe_versions: Table<RecipeVersionRow>;
       private_notes: Table<PrivateNoteRow>;
       ingredient_catalog: Table<IngredientCatalogRow>;
+      ingredient_purchases: Table<IngredientPurchaseRow>;
       density_table: Table<DensityTableRow>;
       density_data_gaps: Table<{ name: string }>;
     };
@@ -310,6 +372,47 @@ export type Database = {
         Args: { p_key: string };
         Returns: Array<{ id: string; name: string; rows: number; overridden: number }>;
       };
+      // migration 0013 — the purchase as it was actually made (requirements A, C)
+      record_purchase: {
+        Args: {
+          p_key: string;
+          p_name: string;
+          p_purchase_unit: PurchaseUnit;
+          p_package_count: number;
+          p_package_qty: number | null;
+          p_purchase_total: number | null;
+          p_usable_pct: number | null;
+          p_supplier: string;
+          p_purchased_at: string | null;
+          p_note: string;
+        };
+        Returns: string;
+      };
+      purchase_history: {
+        Args: { p_key: string };
+        Returns: Array<{
+          id: string;
+          purchased_at: string;
+          supplier: string;
+          purchase_unit: PurchaseUnit;
+          package_count: number;
+          package_qty: number | null;
+          purchase_total: number | null;
+          usable_pct: number | null;
+          purchase_price: number | null;
+          price: number | null;
+          /** the USABLE price of the purchase before this one. null = the first */
+          prev_price: number | null;
+          /** null when there is no previous price, or it was 0 (no ratio) */
+          pct_change: number | null;
+        }>;
+      };
+      purchase_base_qty: {
+        Args: { p_unit: PurchaseUnit; p_count: number; p_qty: number | null };
+        Returns: number | null;
+      };
+      // migration 0014 — an internal helper of save_recipe/restore_recipe_version
+      apply_recipe_costing: { Args: { p_id: string; p_recipe: Json }; Returns: undefined };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

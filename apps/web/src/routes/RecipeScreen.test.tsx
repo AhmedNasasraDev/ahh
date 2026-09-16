@@ -290,7 +290,7 @@ describe('requirement 8 — a partial calculation is never shown as a whole one'
     await screen.findByRole('heading', { name: CUP_CAKE.name! });
     await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
 
-    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    const costRow = screen.getByText('עלות חומרי גלם').closest('div')!;
     expect(within(costRow).getByText('חלקי')).toBeInTheDocument();
     const yieldRow = screen.getByText('תשואה תאורטית').closest('div')!;
     expect(within(yieldRow).getByText('חלקי')).toBeInTheDocument();
@@ -321,7 +321,7 @@ describe('requirement 8 — a partial calculation is never shown as a whole one'
 
     // A cost of ₪0.00 would read as "this recipe is free", which is the exact
     // failure mode requirement 8 exists to prevent.
-    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    const costRow = screen.getByText('עלות חומרי גלם').closest('div')!;
     expect(within(costRow).getByText('—')).toBeInTheDocument();
     expect(within(costRow).queryByText(/₪/)).not.toBeInTheDocument();
 
@@ -377,7 +377,7 @@ describe('a fully weighed recipe with no prices has no cost, not a cost of zero'
     await screen.findByRole('heading', { name: UNPRICED.name! });
     await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
 
-    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    const costRow = screen.getByText('עלות חומרי גלם').closest('div')!;
     expect(within(costRow).getByText('—')).toBeInTheDocument();
     expect(within(costRow).queryByText(/₪/)).not.toBeInTheDocument();
   });
@@ -424,7 +424,7 @@ describe('a partly priced recipe says so and marks the cost', () => {
     await screen.findByRole('heading', { name: HALF_PRICED.name! });
     await user.click(screen.getByRole('button', { name: 'נתוני ייצור ועלויות' }));
 
-    const costRow = screen.getByText('עלות כוללת').closest('div')!;
+    const costRow = screen.getByText('עלות חומרי גלם').closest('div')!;
     expect(within(costRow).getByText(/₪/)).toBeInTheDocument();
     expect(within(costRow).getByText('חלקי')).toBeInTheDocument();
   });

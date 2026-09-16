@@ -1,13 +1,13 @@
-// The ingredient centre (stage-7 requirements 1-5).
+// The ingredient centre (stage-7 requirements 1-5, stage-8 requirements A-D).
 //
-// One place where a material is managed, and the only place its price exists.
-// The three things this screen is careful about:
+// One place where a material is managed, and the only place its ACTIVE price
+// exists. What this screen is careful about:
 //
-// 1. IT ASKS WHAT WAS BOUGHT, NOT WHAT THINGS COST PER KILO. Nobody buys
-//    "per kilogram" — they buy a 25 kg sack for ₪110, a 200 g pack for ₪8.90,
-//    a tray of 30 eggs for ₪39. The per-base-unit price is DERIVED and shown
-//    back, never typed. `basePriceOf` mirrors the generated column so the
-//    figure appears while the user is still typing.
+// 1. IT ASKS WHAT WAS BOUGHT, IN THE SHAPE IT WAS BOUGHT. Not "price per kilo"
+//    — a total paid, a number of packages, and what is in one package. Six
+//    packs of 500 g for ₪72 is entered as 6, 500, 72, and the ₪24/kg is
+//    DERIVED and shown back. Nobody does that division at the counter, and a
+//    user who has to do it will do it wrong.
 //
 // 2. AN UNPRICED MATERIAL IS NOT A FREE ONE. An empty price field stays empty
 //    and the material reports "no price"; a typed 0 is a real price of zero.
@@ -15,10 +15,21 @@
 //    device the recipe form uses, because '' → null and '0' → 0 is a
 //    distinction that a `number | undefined` field cannot keep.
 //
-// 3. CHANGING A PRICE SAYS WHAT IT MOVES. Requirement 5: the user sees which
-//    recipes are affected, from `recipes_pricing_on` — which counts only the
-//    lines that INHERIT the price, because a line with its own price does not
-//    move and claiming it does would be wrong.
+// 3. A PRICE CHANGE IS AN EVENT, NOT AN OVERWRITE (requirement C). Changing
+//    what was bought records a PURCHASE: the history keeps the old price, the
+//    date and the supplier, and the active price moves in the same
+//    transaction. Editing only a name or an allergen is not a purchase and
+//    does not pretend to be one.
+//
+// 4. PURCHASE COST IS NOT USABLE COST (requirement D). A 10 kg box of celery
+//    for ₪200 that yields 8 kg usable costs ₪25 per usable kilo, not ₪20. The
+//    yield is OPTIONAL — an empty field means nobody has declared one, and
+//    then the two costs are the same number rather than zero.
+//
+// 5. CHANGING A PRICE SAYS WHAT IT MOVES. Requirement 5 of stage 7: the user
+//    sees which recipes are affected, from `recipes_pricing_on` — which counts
+//    only the lines that INHERIT the price, because a line with its own price
+//    does not move and claiming it does would be wrong.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -27,10 +38,16 @@ import { useAppData } from '../app/AppDataProvider.js';
 import {
   PURCHASE_UNITS,
   basePriceOf,
+  conversionsOf,
   purchaseUnitLabel,
   suggestedAllergens,
   type CatalogItem,
 } from '../features/pricing/catalog.js';
+import {
+  changeWord,
+  formatPct,
+  type PurchaseRecord,
+} from '../features/pricing/purchases.js';
 import type { PurchaseUnit } from '../lib/database.types.js';
 import styles from './IngredientsScreen.module.css';
 
@@ -39,20 +56,30 @@ interface Draft {
   key: string;
   name: string;
   purchaseUnit: PurchaseUnit;
+  packageCount: string;
   packageQty: string;
-  packagePrice: string;
+  purchaseTotal: string;
+  usablePct: string;
   supplier: string;
+  purchasedAt: string;
   note: string;
   allergens: string[];
 }
+
+const today = (): string => new Date().toISOString().slice(0, 10);
 
 const emptyDraft = (): Draft => ({
   key: '',
   name: '',
   purchaseUnit: 'kg',
+  // One package is the common case and is a fact, not a guess: "5 kg for ₪200"
+  // is one package of 5 kg. The user changes it when they bought several.
+  packageCount: '1',
   packageQty: '',
-  packagePrice: '',
+  purchaseTotal: '',
+  usablePct: '',
   supplier: '',
+  purchasedAt: today(),
   note: '',
   allergens: [],
 });
@@ -61,10 +88,13 @@ const draftOf = (item: CatalogItem): Draft => ({
   key: item.key,
   name: item.name,
   purchaseUnit: item.purchaseUnit,
+  packageCount: String(item.packageCount ?? 1),
   // null becomes '', which is what keeps "unknown" out of the numbers.
   packageQty: item.packageQty === null ? '' : String(item.packageQty),
-  packagePrice: item.packagePrice === null ? '' : String(item.packagePrice),
+  purchaseTotal: item.purchaseTotal === null ? '' : String(item.purchaseTotal),
+  usablePct: item.usablePct === null ? '' : String(item.usablePct),
   supplier: item.supplier,
+  purchasedAt: item.purchasedAt ?? today(),
   note: item.note,
   allergens: [...item.allergens],
 });
@@ -97,9 +127,53 @@ const ageNote = (iso: string | null): string => {
   return months === 1 ? 'עודכן לפני חודש' : `עודכן לפני ${months} חודשים`;
 };
 
+/** How a purchase reads back: "6 × 500 גרם ב-₪72". */
+const packWords = (
+  count: number,
+  qty: number | null,
+  unit: PurchaseUnit,
+  total: number | null,
+): string => {
+  if (qty === null || total === null) return '';
+  const amount = count > 1 ? `${count} × ${qty}` : String(qty);
+  return `${amount} ${purchaseUnitLabel(unit)} ב-${formatNis(total)}`;
+};
+
+/**
+ * Did the PURCHASE change, as opposed to the name or an allergen?
+ *
+ * Requirement C hangs on this answer. A changed purchase is an event that must
+ * be recorded with its date and supplier; a corrected spelling is not, and
+ * appending a purchase for it would fill the history with prices that were
+ * never paid.
+ */
+function purchaseChanged(draft: Draft, item: CatalogItem | undefined): boolean {
+  if (!item) return true;
+  return (
+    draft.purchaseUnit !== item.purchaseUnit ||
+    numOrNull(draft.packageCount) !== item.packageCount ||
+    numOrNull(draft.packageQty) !== item.packageQty ||
+    numOrNull(draft.purchaseTotal) !== item.purchaseTotal ||
+    numOrNull(draft.usablePct) !== item.usablePct ||
+    draft.supplier.trim() !== item.supplier ||
+    // The date counts only for a material that already HAS one. A row created
+    // before purchases were recorded has none, and the form shows today's
+    // date by default — treating that as a change would append a purchase
+    // that never happened every time someone fixed a spelling.
+    (item.purchasedAt !== null && (draft.purchasedAt || null) !== item.purchasedAt)
+  );
+}
+
 export function IngredientsScreen() {
-  const { catalog, saveCatalogItem, deleteCatalogItem, recipesPricingOn, capabilities } =
-    useAppData();
+  const {
+    catalog,
+    saveCatalogItem,
+    deleteCatalogItem,
+    recipesPricingOn,
+    recordPurchase,
+    purchaseHistory,
+    capabilities,
+  } = useAppData();
 
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -109,6 +183,7 @@ export function IngredientsScreen() {
   const [affected, setAffected] = useState<
     Array<{ id: string; name: string; rows: number; overridden: number }>
   >([]);
+  const [history, setHistory] = useState<readonly PurchaseRecord[]>([]);
 
   const canWrite = capabilities.canWrite;
   const sorted = useMemo(
@@ -116,16 +191,29 @@ export function IngredientsScreen() {
     [catalog],
   );
 
+  const current = useMemo(
+    () => catalog.find((c) => c.key === editing),
+    [catalog, editing],
+  );
+
   // What the price WILL be, from what is typed. Shown live, so the user sees
-  // ₪4.40 לק"ג while typing "25" and "110" and can tell they got it right.
+  // ₪40 לק"ג while typing "5" and "200" and can tell they got it right.
   const derived = useMemo(
     () =>
       basePriceOf({
         purchaseUnit: draft.purchaseUnit,
         packageQty: numOrNull(draft.packageQty),
-        packagePrice: numOrNull(draft.packagePrice),
+        packageCount: numOrNull(draft.packageCount),
+        purchaseTotal: numOrNull(draft.purchaseTotal),
+        usablePct: numOrNull(draft.usablePct),
       }),
-    [draft.purchaseUnit, draft.packageQty, draft.packagePrice],
+    [
+      draft.purchaseUnit,
+      draft.packageQty,
+      draft.packageCount,
+      draft.purchaseTotal,
+      draft.usablePct,
+    ],
   );
 
   const loadAffected = useCallback(
@@ -135,10 +223,22 @@ export function IngredientsScreen() {
     [recipesPricingOn],
   );
 
+  const loadHistory = useCallback(
+    async (key: string) => {
+      setHistory(key ? await purchaseHistory(key) : []);
+    },
+    [purchaseHistory],
+  );
+
   useEffect(() => {
-    if (editing) void loadAffected(editing);
-    else setAffected([]);
-  }, [editing, loadAffected]);
+    if (editing) {
+      void loadAffected(editing);
+      void loadHistory(editing);
+    } else {
+      setAffected([]);
+      setHistory([]);
+    }
+  }, [editing, loadAffected, loadHistory]);
 
   const startNew = () => {
     setEditing('');
@@ -159,37 +259,73 @@ export function IngredientsScreen() {
       setProblem('לחומר גלם חייב להיות שם.');
       return;
     }
+    const count = numOrNull(draft.packageCount);
+    if (count === null || count <= 0) {
+      setProblem('מספר האריזות חייב להיות גדול מאפס.');
+      return;
+    }
     const qty = numOrNull(draft.packageQty);
     if (qty !== null && qty <= 0) {
       setProblem('הכמות באריזה חייבת להיות גדולה מאפס. אריזה של כלום אינה מחיר.');
       return;
     }
-    const price = numOrNull(draft.packagePrice);
-    if (price !== null && price < 0) {
-      setProblem('מחיר אריזה אינו יכול להיות שלילי.');
+    const total = numOrNull(draft.purchaseTotal);
+    if (total !== null && total < 0) {
+      setProblem('סכום הרכישה אינו יכול להיות שלילי.');
+      return;
+    }
+    const usable = numOrNull(draft.usablePct);
+    if (usable !== null && (usable <= 0 || usable > 100)) {
+      setProblem(
+        'אחוז הניצולת צריך להיות גדול מאפס ועד 100. ניצולת של 0 פירושה שלא נשאר כלום, ואין לה עלות לחשב.',
+      );
       return;
     }
 
+    const key = draft.key.trim() || ingredientKeyOf({ name });
     setBusy(true);
     try {
-      await saveCatalogItem({
-        id: '',
-        // The identity is the engine's own, so a recipe row written as
-        // "חמאה 82% " matches the material "חמאה 82%" — the same key
-        // calibration matching uses (B4).
-        key: draft.key.trim() || ingredientKeyOf({ name }),
-        name,
-        purchaseUnit: draft.purchaseUnit,
-        packageQty: qty,
-        packagePrice: price,
-        supplier: draft.supplier.trim(),
-        priceUpdatedAt: null,
-        note: draft.note.trim(),
-        // Ignored by the repository: the database derives them.
-        price: null,
-        priceUnit: null,
-        allergens: draft.allergens,
-      });
+      if (purchaseChanged(draft, current)) {
+        // A purchase. Appended to the history and applied to the active price
+        // in ONE transaction, so the two can never disagree.
+        await recordPurchase({
+          key,
+          name,
+          purchaseUnit: draft.purchaseUnit,
+          packageCount: count,
+          packageQty: qty,
+          purchaseTotal: total,
+          usablePct: usable,
+          supplier: draft.supplier.trim(),
+          purchasedAt: draft.purchasedAt || null,
+          note: draft.note.trim(),
+        });
+      } else {
+        // Not a purchase — a correction. No history row, because no money
+        // changed hands.
+        await saveCatalogItem({
+          id: current?.id ?? '',
+          // The identity is the engine's own, so a recipe row written as
+          // "חמאה 82% " matches the material "חמאה 82%" — the same key
+          // calibration matching uses (B4).
+          key,
+          name,
+          purchaseUnit: draft.purchaseUnit,
+          packageQty: qty,
+          packageCount: count,
+          purchaseTotal: total,
+          usablePct: usable,
+          supplier: draft.supplier.trim(),
+          purchasedAt: draft.purchasedAt || null,
+          priceUpdatedAt: null,
+          note: draft.note.trim(),
+          // Ignored by the repository: the database derives them.
+          purchasePrice: null,
+          price: null,
+          priceUnit: null,
+          allergens: draft.allergens,
+        });
+      }
       setEditing(null);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'השמירה נכשלה.');
@@ -218,6 +354,7 @@ export function IngredientsScreen() {
   );
 
   const unitDef = PURCHASE_UNITS.find((u) => u.id === draft.purchaseUnit)!;
+  const hasYield = derived !== null && numOrNull(draft.usablePct) !== null;
 
   return (
     <div className={styles.page}>
@@ -274,6 +411,11 @@ export function IngredientsScreen() {
             />
           </div>
 
+          <p className={styles.hint}>
+            מזינים את הרכישה כפי שהיא נעשתה: כמה שולם בסך הכול, כמה אריזות, ומה
+            יש בכל אריזה. המחיר ליחידה מחושב כאן ואין צורך לחשב אותו.
+          </p>
+
           <div className={styles.grid}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ic-unit">
@@ -297,6 +439,20 @@ export function IngredientsScreen() {
             </div>
 
             <div className={styles.field}>
+              <label className={styles.label} htmlFor="ic-count">
+                מספר אריזות
+              </label>
+              <input
+                id="ic-count"
+                className={`${styles.input} ltr`}
+                inputMode="decimal"
+                value={draft.packageCount}
+                onChange={(e) => setDraft((d) => ({ ...d, packageCount: e.target.value }))}
+                aria-label="מספר אריזות"
+              />
+            </div>
+
+            <div className={styles.field}>
               <label className={styles.label} htmlFor="ic-qty">
                 {unitDef.qtyLabel}
               </label>
@@ -309,28 +465,82 @@ export function IngredientsScreen() {
                 aria-label="כמות באריזה"
               />
             </div>
+          </div>
 
+          <div className={styles.grid}>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="ic-price">
-                מחיר האריזה ₪
+              <label className={styles.label} htmlFor="ic-total">
+                סה&quot;כ ששולם ₪
               </label>
               <input
-                id="ic-price"
+                id="ic-total"
                 className={`${styles.input} ltr`}
                 inputMode="decimal"
-                value={draft.packagePrice}
-                onChange={(e) => setDraft((d) => ({ ...d, packagePrice: e.target.value }))}
-                aria-label="מחיר האריזה"
+                value={draft.purchaseTotal}
+                onChange={(e) => setDraft((d) => ({ ...d, purchaseTotal: e.target.value }))}
+                aria-label="סך הכול ששולם"
+              />
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="ic-usable">
+                ניצולת %, אם יש פחת
+              </label>
+              <input
+                id="ic-usable"
+                className={`${styles.input} ltr`}
+                inputMode="decimal"
+                value={draft.usablePct}
+                onChange={(e) => setDraft((d) => ({ ...d, usablePct: e.target.value }))}
+                aria-label="אחוז ניצולת"
+              />
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="ic-date">
+                תאריך הרכישה
+              </label>
+              <input
+                id="ic-date"
+                type="date"
+                className={`${styles.input} ltr`}
+                value={draft.purchasedAt}
+                onChange={(e) => setDraft((d) => ({ ...d, purchasedAt: e.target.value }))}
+                aria-label="תאריך הרכישה"
               />
             </div>
           </div>
 
-          {/* The derived figure, live. Never typed, never stored by the client. */}
-          <p className={styles.derived} role="status" aria-label="מחיר ליחידת בסיס">
-            {derived
-              ? `${formatNis(derived.price)} ל${derived.unit}`
-              : 'אין עדיין מחיר — צריך גם כמות באריזה וגם מחיר אריזה. שדה ריק אינו אפס.'}
-          </p>
+          {/* The derived figures, live. Never typed, never stored by the client. */}
+          <div className={styles.derived} role="status" aria-label="מחיר מחושב מהרכישה">
+            {derived ? (
+              <>
+                <p className={styles.derivedMain}>
+                  {`${formatNis(derived.price)} ל${derived.unit}`}
+                  {hasYield && <span className={styles.derivedTag}> (לפי הניצולת)</span>}
+                </p>
+                <ul className={styles.conversions} aria-label="המחיר בקנה מידה אחר">
+                  {conversionsOf(derived.price, derived.unit).map((c) => (
+                    <li key={c.label} className="ltr">
+                      {`${formatNis(c.value)} / ${c.label}`}
+                    </li>
+                  ))}
+                </ul>
+                {hasYield && (
+                  <p className={styles.yieldNote}>
+                    {`עלות הקנייה ${formatNis(derived.purchase)} ל${derived.unit}, ` +
+                      `אבל אחרי הפחת העלות האמיתית של מה שנכנס למתכון היא ` +
+                      `${formatNis(derived.price)} ל${derived.unit}.`}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className={styles.derivedMain}>
+                אין עדיין מחיר — צריך גם כמות באריזה וגם סכום ששולם. שדה ריק אינו
+                אפס.
+              </p>
+            )}
+          </div>
 
           <div className={styles.grid}>
             <div className={styles.field}>
@@ -394,7 +604,46 @@ export function IngredientsScreen() {
             </p>
           </div>
 
-          {/* Requirement 5: what this price change will move. */}
+          {/* Requirement C: the previous prices, and what changed. */}
+          {history.length > 0 && (
+            <div className={styles.affected} aria-label="היסטוריית רכישות">
+              <p className={styles.affectedTitle}>
+                {history.length === 1 ? 'רכישה אחת רשומה' : `${history.length} רכישות רשומות`}:
+              </p>
+              <ul className={styles.historyList}>
+                {history.map((h) => (
+                  <li key={h.id} className={styles.historyRow}>
+                    <span className={styles.historyWhen}>{when(h.purchasedAt)}</span>
+                    <span className={`${styles.historyPrice} ltr`}>
+                      {h.price === null
+                        ? 'בלי מחיר'
+                        : `${formatNis(h.price)} / ${purchaseUnitLabel(h.purchaseUnit)}`}
+                    </span>
+                    {h.supplier && <span className={styles.historyWho}>{h.supplier}</span>}
+                    <span className={styles.historyPack}>
+                      {packWords(h.packageCount, h.packageQty, h.purchaseUnit, h.purchaseTotal)}
+                    </span>
+                    {h.pctChange !== null && h.prevPrice !== null && (
+                      <span
+                        className={styles.historyChange}
+                        aria-label={`${changeWord(h.pctChange)} ב-${formatPct(Math.abs(h.pctChange))} לעומת ${formatNis(h.prevPrice)}`}
+                      >
+                        <span aria-hidden="true" className="ltr">
+                          {formatPct(h.pctChange)}
+                        </span>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.hint}>
+                המחיר הפעיל הוא המחיר של הרכישה האחרונה. גרסאות היסטוריות של
+                מתכונים ממשיכות להשתמש במחיר שהיה בזמן הגרסה.
+              </p>
+            </div>
+          )}
+
+          {/* Requirement 5 of stage 7: what this price change will move. */}
           {affected.length > 0 && (
             <div className={styles.affected} aria-label="מתכונים שהמחיר הזה משפיע עליהם">
               <p className={styles.affectedTitle}>
@@ -445,7 +694,7 @@ export function IngredientsScreen() {
 
       {sorted.length === 0 ? (
         <p className={styles.empty}>
-          אין עדיין חומרי גלם. אחרי שיוזן חומר גלם עם מחיר אריזה, כל מתכון
+          אין עדיין חומרי גלם. אחרי שיוזן חומר גלם עם רכישה ומחיר, כל מתכון
           שמשתמש בו יקבל את המחיר אוטומטית.
         </p>
       ) : (
@@ -468,9 +717,19 @@ export function IngredientsScreen() {
               </div>
 
               <p className={styles.itemMeta}>
-                {item.packageQty !== null && item.packagePrice !== null && (
+                {item.packageQty !== null && item.purchaseTotal !== null && (
                   <span className={styles.itemPack}>
-                    {`${item.packageQty} ${purchaseUnitLabel(item.purchaseUnit)} ב-${formatNis(item.packagePrice)}`}
+                    {packWords(
+                      item.packageCount,
+                      item.packageQty,
+                      item.purchaseUnit,
+                      item.purchaseTotal,
+                    )}
+                  </span>
+                )}
+                {item.usablePct !== null && item.purchasePrice !== null && (
+                  <span>
+                    {` · ניצולת ${item.usablePct}% — עלות קנייה ${formatNis(item.purchasePrice)} ל${item.priceUnit}`}
                   </span>
                 )}
                 {item.supplier && <span> · {item.supplier}</span>}

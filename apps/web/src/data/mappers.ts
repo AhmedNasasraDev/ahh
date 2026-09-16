@@ -297,6 +297,17 @@ export function bundleToRecipe(bundle: RecipeBundle): Recipe {
   // undefined rather than zero. `numOrUndef` keeps the two apart.
   const salePrice = numOrUndef(r.sale_price);
   if (salePrice !== undefined) recipe.salePrice = salePrice;
+  // Stage 8: the basis is always present (the column is NOT NULL), the costs
+  // are absent until entered.
+  recipe.salePriceBasis = r.sale_price_basis === 'unit' ? 'unit' : 'batch';
+  const packagingCost = numOrUndef(r.packaging_cost);
+  if (packagingCost !== undefined) recipe.packagingCost = packagingCost;
+  const laborCost = numOrUndef(r.labor_cost);
+  if (laborCost !== undefined) recipe.laborCost = laborCost;
+  const otherCost = numOrUndef(r.other_cost);
+  if (otherCost !== undefined) recipe.otherCost = otherCost;
+  const targetGM = numOrUndef(r.target_gm);
+  if (targetGM !== undefined) recipe.targetGM = targetGM;
 
   // §1.1 / §18.11: NULL yield_actual means theoretical. Leave it absent.
   const yieldActual = numOrUndef(r.yield_actual);
@@ -379,6 +390,14 @@ export function recipeToRow(recipe: Recipe, ownerId: string): RecipeInsert {
     // an explicit 0 must stay 0. `numOrZero` here would turn "not set" into
     // "given away", which changes whether a food cost exists at all.
     sale_price: toNullableNumber(recipe['salePrice']),
+    // Stage 8, requirement E/F. All NULL-preserving for the same reason: "not
+    // entered" and "there is none" are different facts, and a cost of 0 that
+    // was never entered would make a total look complete when it is not.
+    sale_price_basis: recipe['salePriceBasis'] === 'unit' ? 'unit' : 'batch',
+    packaging_cost: toNullableNumber(recipe['packagingCost']),
+    labor_cost: toNullableNumber(recipe['laborCost']),
+    other_cost: toNullableNumber(recipe['otherCost']),
+    target_gm: toNullableNumber(recipe['targetGM']),
     shelf_life: toText(recipe.shelfLife),
     storage: toText(recipe.storage),
     freezing: toText(recipe.freezing),
@@ -410,10 +429,14 @@ export function catalogRowToItem(row: IngredientCatalogRow): CatalogItem {
     purchaseUnit: row.purchase_unit,
     // NULL-preserving: an unpriced package is not a package costing 0.
     packageQty: numOrNullable(row.package_qty),
-    packagePrice: numOrNullable(row.package_price),
+    packageCount: numOrZero(row.package_count) || 1,
+    purchaseTotal: numOrNullable(row.purchase_total),
+    usablePct: numOrNullable(row.usable_pct),
     supplier: row.supplier,
+    purchasedAt: row.purchased_at,
     priceUpdatedAt: row.price_updated_at,
     note: row.note,
+    purchasePrice: numOrNullable(row.purchase_price),
     price: numOrNullable(row.price),
     priceUnit: row.price_unit,
     allergens: [...(row.allergens ?? [])],
@@ -431,8 +454,11 @@ export function catalogItemToRow(
     name: toText(item.name),
     purchase_unit: item.purchaseUnit,
     package_qty: item.packageQty,
-    package_price: item.packagePrice,
+    package_count: item.packageCount,
+    purchase_total: item.purchaseTotal,
+    usable_pct: item.usablePct,
     supplier: toText(item.supplier),
+    purchased_at: item.purchasedAt,
     note: toText(item.note),
     g_per_100: null,
     water_pct: null,

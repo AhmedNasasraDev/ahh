@@ -46,15 +46,25 @@ export interface CatalogItem {
   key: string;
   name: string;
   purchaseUnit: PurchaseUnit;
-  /** how much is in one package. null = unknown, and then there is no price */
+  /** how much is in ONE package. null = unknown, and then there is no price */
   packageQty: number | null;
-  /** what one package costs. null = unpriced. 0 = free. NOT the same thing */
-  packagePrice: number | null;
+  /** how many packages were bought. 6 packs of 500 g is 6 */
+  packageCount: number;
+  /** what the WHOLE purchase cost. null = unpriced. 0 = free. NOT the same */
+  purchaseTotal: number | null;
+  /**
+   * usable share after cleaning, in percent. null = no yield declared, and
+   * then the usable cost is the purchase cost. null is NOT 0%.
+   */
+  usablePct: number | null;
   supplier: string;
+  /** the date of the purchase, as the user entered it */
+  purchasedAt: string | null;
   /** when the package last changed — not when the row was last touched */
   priceUpdatedAt: string | null;
   note: string;
   /** DERIVED by the database, read-only here. null when it cannot be computed */
+  purchasePrice: number | null;
   price: number | null;
   priceUnit: PriceUnit | null;
   allergens: string[];
@@ -81,12 +91,17 @@ export const purchaseUnitLabel = (u: PurchaseUnit): string =>
 /**
  * The per-base-unit price, computed the same way the database computes it.
  *
- * This is a MIRROR of the generated column in migration 0011, and the
+ * This is a MIRROR of the generated columns in migration 0013, and the
  * duplication is deliberate and narrow: the form has to show the resulting
  * ₪/kg while the user is still typing, before anything is saved. The database
  * remains the authority — `CatalogItem.price` is always the stored generated
  * value, never this — and `catalog.test.ts` pins the two against the same
  * cases so they cannot drift.
+ *
+ * `purchase` is the cost per base unit AS BOUGHT; `price` is the cost per
+ * USABLE base unit. With no declared yield they are the same number, because
+ * "no yield declared" means nothing is known to be lost — not that nothing is
+ * usable.
  *
  * Returns null, never 0, when it cannot be computed. An unpriced material has
  * no price; it is not free.
@@ -94,22 +109,83 @@ export const purchaseUnitLabel = (u: PurchaseUnit): string =>
 export function basePriceOf(item: {
   purchaseUnit: PurchaseUnit;
   packageQty: number | null;
-  packagePrice: number | null;
-}): { price: number; unit: PriceUnit } | null {
-  const { purchaseUnit, packageQty, packagePrice } = item;
-  if (packagePrice === null || packageQty === null || packageQty <= 0) return null;
+  packageCount?: number | null;
+  purchaseTotal: number | null;
+  usablePct?: number | null;
+}): { purchase: number; price: number; unit: PriceUnit } | null {
+  const { purchaseUnit, packageQty, purchaseTotal } = item;
+  const count = item.packageCount ?? 1;
+  if (purchaseTotal === null || packageQty === null) return null;
+  if (packageQty <= 0 || count <= 0) return null;
 
-  switch (purchaseUnit) {
+  const usable = item.usablePct ?? 100;
+  // 0% usable means nothing comes out, so there is no usable cost to state;
+  // above 100% means the cleaning created matter. Both are refused rather
+  // than turned into a number.
+  if (usable <= 0 || usable > 100) return null;
+
+  const base = baseQtyOf(purchaseUnit, count, packageQty);
+  if (base === null || base <= 0) return null;
+
+  const purchase = purchaseTotal / base;
+  return {
+    purchase,
+    price: purchase / (usable / 100),
+    unit: perUnitOf(purchaseUnit),
+  };
+}
+
+/** The total bought, normalised to the base unit: kilograms, litres or items. */
+export function baseQtyOf(
+  unit: PurchaseUnit,
+  count: number,
+  qty: number,
+): number | null {
+  switch (unit) {
     case 'kg':
-      return { price: packagePrice / packageQty, unit: 'ק"ג' };
-    case 'g':
-      return { price: (packagePrice / packageQty) * 1000, unit: 'ק"ג' };
     case 'l':
-      return { price: packagePrice / packageQty, unit: 'ליטר' };
-    case 'ml':
-      return { price: (packagePrice / packageQty) * 1000, unit: 'ליטר' };
     case 'unit':
-      return { price: packagePrice / packageQty, unit: "יח'" };
+      return count * qty;
+    case 'g':
+    case 'ml':
+      return (count * qty) / 1000;
+  }
+}
+
+const perUnitOf = (u: PurchaseUnit): PriceUnit =>
+  u === 'kg' || u === 'g' ? 'ק"ג' : u === 'l' || u === 'ml' ? 'ליטר' : "יח'";
+
+/**
+ * The scales a price is worth showing at (requirement B).
+ *
+ * Every entry is the SAME number rendered at a different scale, derived here
+ * and stored nowhere, so ₪/kg, ₪/100g and ₪/g cannot disagree with each other
+ * or with the receipt.
+ *
+ * Only meaningful conversions appear. A price per item has exactly one scale —
+ * "₪0.13 per 100 eggs" is not a smaller egg, it is nonsense — and a litre is
+ * never converted to a kilogram, because that needs a density this function
+ * does not have and must not invent.
+ */
+export function conversionsOf(
+  price: number,
+  unit: PriceUnit,
+): Array<{ label: string; value: number }> {
+  switch (unit) {
+    case 'ק"ג':
+      return [
+        { label: 'ק"ג', value: price },
+        { label: '100 גר\'', value: price / 10 },
+        { label: 'גרם', value: price / 1000 },
+      ];
+    case 'ליטר':
+      return [
+        { label: 'ליטר', value: price },
+        { label: '100 מ"ל', value: price / 10 },
+        { label: 'מ"ל', value: price / 1000 },
+      ];
+    case "יח'":
+      return [{ label: "יח'", value: price }];
   }
 }
 
