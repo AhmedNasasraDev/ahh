@@ -889,6 +889,32 @@ export type Database = {
         Returns: undefined;
       };
       delete_production_plan: { Args: { p_plan_id: string }; Returns: undefined };
+      /*
+        migration 0036 — teaching, and §8 on a group item.
+
+        publish_recipe_to_lesson      → the new item's id. ONE call because
+                                        0025's invariant makes it two writes:
+                                        the recipe has to be marked as the
+                                        group's and the item has to point at
+                                        it. Split across two client calls, a
+                                        failure between them leaves a recipe
+                                        that refuses to change group for a
+                                        reason nobody can see.
+        unpublish_recipe_from_lesson  → void. Removes the item, and hands the
+                                        recipe back to the personal notebook
+                                        when it was the last one.
+        save_item_note                → void. `save_private_note` cannot serve
+                                        this: it refuses a recipe the caller
+                                        does not own, which is what a group
+                                        recipe is. So the note hangs off the
+                                        ITEM and stays as private as ever.
+      */
+      publish_recipe_to_lesson: {
+        Args: { p_lesson_id: string; p_recipe_id: string; p_name: string | null };
+        Returns: string;
+      };
+      unpublish_recipe_from_lesson: { Args: { p_item_id: string }; Returns: undefined };
+      save_item_note: { Args: { p_item_id: string; p_body: string }; Returns: undefined };
       /** §8, migration 0022. An empty body removes the note. */
       save_private_note: {
         Args: { p_recipe_id: string; p_body: string };

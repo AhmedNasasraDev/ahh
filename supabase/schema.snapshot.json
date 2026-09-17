@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema and pg_proc after migrations 0001-0035. Not used at runtime.",
+    "information_schema and pg_proc after migrations 0001-0036. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -617,6 +617,16 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "publish_recipe_to_lesson": {
+      "args": [
+        "p_lesson_id",
+        "p_recipe_id",
+        "p_name"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "purchase_base_qty": {
       "args": [
         "p_unit",
@@ -761,6 +771,15 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "save_item_note": {
+      "args": [
+        "p_item_id",
+        "p_body"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "save_private_note": {
       "args": [
         "p_recipe_id",
@@ -833,6 +852,14 @@
       "security_definer": false,
       "anon_execute": false,
       "authenticated_execute": false
+    },
+    "unpublish_recipe_from_lesson": {
+      "args": [
+        "p_item_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
     },
     "withdraw_group_join": {
       "args": [

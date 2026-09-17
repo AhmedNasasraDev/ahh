@@ -27,8 +27,8 @@ describe('the ranks are the ranks in migration 0030', () => {
   it('matches role_rank() case for case', () => {
     const body = sql0030.slice(sql0030.indexOf('function public.role_rank'));
     const fromSql: Record<string, number> = {};
-    for (const [, role, rank] of body.matchAll(/when '(\w+)' then (\d+)/g)) {
-      fromSql[role] = Number(rank);
+    for (const m of body.matchAll(/when '(\w+)' then (\d+)/g)) {
+      fromSql[m[1] as string] = Number(m[2]);
     }
     expect(fromSql).toEqual({ owner: 4, admin: 3, instructor: 2, member: 1 });
     expect(ROLE_RANK).toEqual(fromSql);
