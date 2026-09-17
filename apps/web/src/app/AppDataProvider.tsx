@@ -31,6 +31,8 @@ import { createLocalDemoRepository, firstRunPrefs } from '../data/localDemoRepos
 import { createSupabaseRepository } from '../data/supabaseRepository.js';
 import {
   WriteNotAllowedError,
+  type GroupRepository,
+  type IdentityRepository,
   type Repository,
   type RepositoryCapabilities,
   type SaveOptions,
@@ -54,6 +56,21 @@ export interface AppData {
   setPrefs(patch: Partial<MeasurementPrefs>): Promise<void>;
   setCalibrations(list: readonly Calibration[]): Promise<void>;
   getRecipe(id: string): Recipe | null;
+  /**
+   * Reads ONE recipe from the repository, by id.
+   *
+   * `getRecipe` above looks in the list this provider holds, which is the
+   * ACCOUNT's own recipes — and that is the right answer for every screen that
+   * came before §10. A group recipe is not in that list: it belongs to the
+   * instructor, and `recipes_group_read` is what lets this account see it. So
+   * screen 17 needs a real read, and asking the in-memory list would have
+   * shown "המתכון אינו נטען" for every group recipe there is.
+   *
+   * Found by lint, of all things: `await`ing the synchronous `getRecipe`
+   * inside a `Promise.all` is an `await-thenable` error, and the error was
+   * pointing at a real defect rather than at a style.
+   */
+  fetchRecipe(id: string): Promise<Recipe | null>;
   /**
    * Persists a recipe and returns it as the server stored it — with the real
    * id, which a newly created recipe does not have until now.
@@ -116,6 +133,37 @@ export interface AppData {
   savePlan(plan: ProductionPlan): Promise<ProductionPlan>;
   deletePlan(id: string): Promise<void>;
   setPlanLocked(id: string, locked: boolean, snapshot: unknown): Promise<void>;
+  /**
+   * §10 — groups, courses, invitations, members, the chat and the account's
+   * own name and picture.
+   *
+   * Passed through as ONE object rather than as forty wrapped methods, which
+   * is a deliberate exception to how this provider exposes everything else.
+   * Two reasons:
+   *
+   *   · nothing outside a group screen depends on a group. The catalog is in
+   *     context because every recipe computation reads a price from it; a
+   *     course list is an input to one screen, so holding it here would mean
+   *     reloading it on every render of the notebook.
+   *   · a wrapper that only forwards its arguments is a place for a bug and
+   *     nowhere for a decision. Forty of them would be forty chances to drop
+   *     a parameter, and not one line of behaviour.
+   *
+   * The object comes straight off the repository, which is memoised, so its
+   * identity is stable and it can sit in a `useEffect` dependency list.
+   */
+  groups: GroupRepository & IdentityRepository;
+  /**
+   * The signed-in account's id, or null when there is no session.
+   *
+   * §10 needs it and nothing before §10 did: a chat has to know which
+   * messages are the reader's own — for the edit button, for the alignment,
+   * and for the unread divider, which must not be drawn above your own
+   * sentence. Every USE of it is cosmetic; the enforcement is `author_id =
+   * auth.uid()` in the insert policy and `old.author_id = auth.uid()` in the
+   * update guard, neither of which trusts anything from here.
+   */
+  userId: string | null;
   clearError(): void;
 }
 
@@ -141,13 +189,16 @@ function describeBackend(caps: RepositoryCapabilities): string {
 export function AppDataProvider({
   children,
   repository,
+  userId: userIdOverride,
 }: {
   children: ReactNode;
   /** injected in tests */
   repository?: Repository;
+  /** injected in tests, alongside `repository` — there is no AuthProvider there */
+  userId?: string | null;
 }) {
   const auth = useOptionalAuth();
-  const userId = auth?.user?.id ?? null;
+  const userId = userIdOverride ?? auth?.user?.id ?? null;
   const client = auth?.client ?? null;
 
   /**
@@ -259,6 +310,8 @@ export function AppDataProvider({
     (id: string) => recipes.find((r) => r.id === id) ?? null,
     [recipes],
   );
+
+  const fetchRecipe = useCallback((id: string) => repo.getRecipe(id), [repo]);
 
   const saveRecipe = useCallback(
     async (recipe: Recipe, options?: SaveOptions): Promise<Recipe> => {
@@ -398,6 +451,7 @@ export function AppDataProvider({
       setPrefs,
       setCalibrations,
       getRecipe,
+      fetchRecipe,
       saveRecipe,
       deleteRecipe,
       listVersions,
@@ -420,6 +474,9 @@ export function AppDataProvider({
       savePlan,
       deletePlan,
       setPlanLocked,
+      // §10, straight off the repository — see the note on AppData.groups.
+      groups: repo,
+      userId,
       clearError: () => setError(null),
     }),
     [
@@ -432,6 +489,7 @@ export function AppDataProvider({
       setPrefs,
       setCalibrations,
       getRecipe,
+      fetchRecipe,
       saveRecipe,
       deleteRecipe,
       listVersions,
@@ -454,6 +512,8 @@ export function AppDataProvider({
       savePlan,
       deletePlan,
       setPlanLocked,
+      repo,
+      userId,
     ],
   );
 

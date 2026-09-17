@@ -346,6 +346,21 @@ export interface GroupRepository {
   listInvites(groupId: string): Promise<InviteView[]>;
   /** Returns the TOKEN; the caller builds the link with `inviteLink`. */
   createInvite(groupId: string, email: string | null, label: string): Promise<string>;
+  /**
+   * Asks the server to email an invitation.
+   *
+   * A SEPARATE call from `createInvite`, and that is a product decision as
+   * much as a technical one: an invitation is usable the moment it exists (the
+   * link can be handed over in a lesson), and a creation that failed because a
+   * mail service is not configured would be a worse outcome than a link with
+   * no email.
+   *
+   * So this can legitimately answer "not sent", and the caller must SAY so.
+   * `reason` is a sentence in Hebrew for the person reading the screen, not a
+   * code: "the mail service is not connected yet" is something an instructor
+   * can act on by copying the link.
+   */
+  sendInviteEmail(inviteId: string): Promise<{ sent: boolean; reason?: string }>;
   revokeInvite(inviteId: string): Promise<void>;
   /** Revokes and issues a replacement. Returns the NEW token. */
   resendInvite(inviteId: string): Promise<string>;
@@ -354,6 +369,18 @@ export interface GroupRepository {
   rejectInvite(token: string): Promise<void>;
 
   listJoinRequests(groupId: string): Promise<JoinRequestView[]>;
+  /**
+   * The caller's OWN requests, across every group.
+   *
+   * `requests_read` admits `user_id = auth.uid()` as well as the group's
+   * staff, so this works for somebody who is not a member of anything — which
+   * is the whole point: it is what lets the groups screen say "your request is
+   * waiting" after a reload instead of forgetting it happened.
+   *
+   * It carries no group NAME, because a non-member cannot read the group row
+   * and inventing one would be a fabrication. The screen says so.
+   */
+  myJoinRequests(): Promise<JoinRequestView[]>;
   /** §6: a code creates a REQUEST, never membership. Returns the group NAME. */
   requestJoin(code: string, note: string): Promise<string>;
   approveJoin(groupId: string, userId: string): Promise<void>;

@@ -72,6 +72,9 @@ export function createLocalDemoGroups(): GroupRepository & IdentityRepository {
     async createInvite() {
       return refuse();
     },
+    async sendInviteEmail() {
+      return { sent: false, reason: NO_GROUPS };
+    },
     async revokeInvite() {
       return refuse();
     },
@@ -92,6 +95,9 @@ export function createLocalDemoGroups(): GroupRepository & IdentityRepository {
     },
 
     async listJoinRequests() {
+      return [];
+    },
+    async myJoinRequests() {
       return [];
     },
     async requestJoin() {

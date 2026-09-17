@@ -143,7 +143,6 @@ const ONLINE = (): void => {};
 
 const row = (over: Partial<GroupMessageRow> & { seq: number }): GroupMessageRow => ({
   id: `m${over.seq}`,
-  seq: over.seq,
   group_id: 'g1',
   channel_id: null,
   author_id: 'them',

@@ -22,6 +22,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PROFILES, UNIT_GROUPS, unit } from '@recipe-notebook/engine';
 import { useAppData } from '../app/AppDataProvider.js';
+import { IdentityCard } from '../features/groups/IdentityCard.js';
 import { useAuth } from '../auth/AuthProvider.js';
 import styles from './SettingsScreen.module.css';
 
@@ -123,6 +124,14 @@ export function SettingsScreen() {
       </section>
 
       {/* ── §4 step 2: the unit list ───────────────────────────────────── */}
+      {/*
+        §10.1 — the name and picture a group sees. Here rather than on a group
+        screen because they belong to the ACCOUNT: they are the same in every
+        group, and a person who is in no group yet still needs somewhere to set
+        them before they join one.
+      */}
+      <IdentityCard />
+
       <section className={styles.card} aria-label="יחידות מדידה">
         <h2 className={styles.cardTitle}>יחידות מדידה</h2>
         <p className={styles.note}>

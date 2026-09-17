@@ -1,0 +1,275 @@
+.page {
+  display: grid;
+  gap: 14px;
+}
+
+.head {
+  display: grid;
+  gap: 6px;
+}
+
+.back {
+  justify-self: start;
+  font-size: var(--fs-meta);
+  color: var(--c-green);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-screen-title);
+  font-weight: 700;
+}
+
+.kind,
+.meta,
+.note,
+.summary,
+.hint,
+.state,
+.permsHint {
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  color: var(--c-muted);
+}
+
+.meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.role {
+  color: var(--c-green);
+}
+
+.code {
+  padding: 8px 10px;
+  border-radius: var(--r-check);
+  background: var(--c-green-bg);
+  color: var(--c-green-ink);
+  font-size: var(--fs-meta);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.notice,
+.problem {
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+}
+
+.notice {
+  background: var(--c-neutral-bg);
+  color: var(--c-ink);
+}
+
+.problem {
+  background: var(--c-red-bg);
+  color: var(--c-red);
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tab {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-ink);
+  font: inherit;
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.tabOn {
+  border-color: var(--c-green);
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+.badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  text-align: center;
+}
+
+.tab:not(.tabOn) .badge {
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+.courses,
+.course {
+  display: grid;
+  gap: 10px;
+}
+
+.course {
+  padding: 12px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  background: var(--c-paper);
+}
+
+.courseHead,
+.lessonHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  font-weight: 700;
+}
+
+.h3 {
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.lessons,
+.items {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.lesson {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--r-check);
+  background: var(--c-white);
+}
+
+.done,
+.pendingTag {
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-label);
+}
+
+.done {
+  background: var(--c-green-bg);
+  color: var(--c-green-ink);
+}
+
+.pendingTag {
+  background: var(--c-neutral-bg);
+  color: var(--c-muted);
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border-radius: var(--r-check);
+  background: var(--c-app-bg);
+}
+
+.itemLink {
+  font-size: var(--fs-body);
+  color: var(--c-ink);
+  text-decoration: underline;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  background: var(--c-white);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-meta);
+  color: var(--c-muted);
+}
+
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  color: var(--c-ink);
+  font: inherit;
+  font-size: var(--fs-body);
+}
+
+.primary,
+.secondary {
+  justify-self: start;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--r-control);
+  font: inherit;
+  font-size: var(--fs-body);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.primary {
+  border: 1px solid var(--c-green);
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+.secondary {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-ink);
+}
+
+.link {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: var(--c-green);
+  font: inherit;
+  font-size: var(--fs-meta);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.primary:disabled,
+.link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

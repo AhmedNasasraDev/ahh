@@ -501,6 +501,52 @@ export function createSupabaseGroups({
       return data as string;
     },
 
+    async sendInviteEmail(inviteId) {
+      requireOnline('שליחת המייל');
+      /*
+        An Edge Function, because the mail provider's API key must never reach
+        the browser. The function reads the invitation with the service role,
+        checks that the CALLER is staff of that group, and sends.
+
+        A failure here is reported, never swallowed: the invitation exists
+        either way, and an instructor who thinks a mail went out when it did
+        not will wait for a student who was never told.
+      */
+      /*
+        Read as `unknown` and narrowed by hand. `functions.invoke`'s generic is
+        a promise about a payload the server controls — trusting it would let a
+        response shaped `{ sent: "yes" }` reach `data.sent === true` as an
+        `any`, which is exactly the check that must not be fooled.
+      */
+      const invoked = (await client.functions.invoke('send-group-invite', {
+        body: { invite_id: inviteId },
+      })) as { data?: unknown; error?: unknown };
+      const error = invoked.error;
+      const payload =
+        typeof invoked.data === 'object' && invoked.data !== null
+          ? (invoked.data as { sent?: unknown; reason?: unknown })
+          : null;
+      const data = {
+        sent: payload?.sent === true,
+        reason: typeof payload?.reason === 'string' ? payload.reason : undefined,
+      };
+
+      if (error) {
+        return {
+          sent: false,
+          reason:
+            'שליחת המייל נכשלה. ההזמנה עצמה נוצרה — אפשר להעתיק את הקישור ולשלוח אותו.',
+        };
+      }
+      if (data.sent) return { sent: true };
+      return {
+        sent: false,
+        reason:
+          data.reason ??
+          'שירות המייל אינו מחובר בפרויקט הזה. ההזמנה נוצרה — אפשר להעתיק את הקישור ולשלוח אותו.',
+      };
+    },
+
     async revokeInvite(inviteId) {
       requireOnline('ביטול ההזמנה');
       const { error } = await client.rpc('revoke_group_invite', { p_invite_id: inviteId });
@@ -537,6 +583,16 @@ export function createSupabaseGroups({
         .select('*')
         .eq('group_id', groupId)
         .order('created_at', { ascending: true });
+      if (error) throw new GroupRepositoryError('טעינת הבקשות נכשלה', error);
+      return (data ?? []).map(requestFromRow);
+    },
+
+    async myJoinRequests() {
+      const { data, error } = await client
+        .from('group_join_requests')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       if (error) throw new GroupRepositoryError('טעינת הבקשות נכשלה', error);
       return (data ?? []).map(requestFromRow);
     },

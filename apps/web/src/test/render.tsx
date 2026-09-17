@@ -45,6 +45,15 @@ export interface FakeRepoOptions {
   signedUrlFails?: boolean;
   /** §10 — the in-memory group world. See test/fakeGroups.ts. */
   groups?: FakeGroupOptions;
+  /**
+   * Which backend the screens should believe they are talking to.
+   *
+   * Defaults to 'local-demo', which is what every test before §10 assumed.
+   * The group screens READ this — a session with no server is told so once
+   * instead of being given buttons that always fail — so a group test has to
+   * be able to say 'supabase'.
+   */
+  source?: RepositoryCapabilities['source'];
   /** the account these tests act as; also the chat's author id */
   userId?: string;
 }
@@ -72,7 +81,7 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
   const notes: Record<string, string> = { ...(opts.notes ?? {}) };
   let images: RecipeImage[] = [...(opts.images ?? [])];
   const caps: RepositoryCapabilities = {
-    source: 'local-demo',
+    source: opts.source ?? 'local-demo',
     online: true,
     canWrite: opts.canWrite ?? false,
     servingFromCache: false,
@@ -273,11 +282,13 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
 /** Renders a single route with the providers the app supplies in production. */
 export function renderRoute(
   ui: ReactElement,
-  { path = '/', route = '/', repository = fakeRepository() } = {},
+  { path = '/', route = '/', repository = fakeRepository(), userId = 'me' } = {},
 ) {
   return render(
     <MemoryRouter initialEntries={[route]}>
-      <AppDataProvider repository={repository}>
+      {/* `userId` is injected because there is no AuthProvider here; 'me' is
+          also what fakeGroups treats as the signed-in account. */}
+      <AppDataProvider repository={repository} userId={userId}>
         <Routes>
           <Route path={path} element={ui} />
         </Routes>

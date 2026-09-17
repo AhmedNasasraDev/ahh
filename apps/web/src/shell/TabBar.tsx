@@ -20,7 +20,16 @@ interface TabDef {
 const TABS: readonly TabDef[] = [
   { to: '/home', label: 'בית', owns: ['/home'], ready: true },
   { to: '/notebook', label: 'מחברת', owns: ['/notebook', '/recipe', '/paste'], ready: true },
-  { to: '/groups', label: 'קבוצות', owns: ['/groups', '/group', '/perms'], ready: false },
+  {
+    to: '/groups',
+    label: 'קבוצות',
+    owns: ['/groups', '/group', '/perms'],
+    // STAGE-12: was `false`. §10 is now built — the list, the group, the group
+    // recipe and the permissions screen — so the tab stops saying "בהכנה" in
+    // the same commit that gave it somewhere to go. A tab marked pending that
+    // leads to four working screens is the same dishonesty as the reverse.
+    ready: true,
+  },
   {
     to: '/more',
     label: 'עוד',

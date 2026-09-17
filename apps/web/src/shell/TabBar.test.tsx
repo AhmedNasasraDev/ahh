@@ -49,22 +49,28 @@ describe('the tab bar tells the truth about what is built', () => {
     }
   });
 
-  it('marks exactly the unbuilt tabs as pending, and no others', () => {
+  it('marks nothing as pending, because nothing is', () => {
     render(
       <MemoryRouter initialEntries={['/notebook']}>
         <TabBar />
       </MemoryRouter>,
     );
-    // STAGE-11: one, not three. "עוד" had been flagged "בהכנה" since stage 2
-    // while growing four working screens underneath it, and "בית" is now built.
-    // Only קבוצות is genuinely unbuilt, and it still says so.
-    expect(screen.getAllByText('בהכנה')).toHaveLength(1);
+    /*
+      STAGE-12: none, where stage 11 had one. §10 is built — קבוצות now leads
+      to the group list, a group, a group recipe and the permissions screen —
+      so the label came off in the same commit that gave the tab somewhere to
+      go.
+
+      The assertion is kept as "exactly zero" rather than deleted: it is the
+      one that catches the opposite mistake, a tab quietly marked pending
+      again, or a new tab shipped with a label nobody removed.
+    */
+    expect(screen.queryAllByText('בהכנה')).toHaveLength(0);
 
     const pendingOf = (label: string) =>
       screen.getByRole('link', { name: new RegExp(`^${label}`) }).textContent ?? '';
-    expect(pendingOf('קבוצות')).toContain('בהכנה');
-    expect(pendingOf('בית')).not.toContain('בהכנה');
-    expect(pendingOf('מחברת')).not.toContain('בהכנה');
-    expect(pendingOf('עוד')).not.toContain('בהכנה');
+    for (const label of ['בית', 'מחברת', 'קבוצות', 'עוד']) {
+      expect(pendingOf(label)).not.toContain('בהכנה');
+    }
   });
 });

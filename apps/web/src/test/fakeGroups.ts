@@ -77,6 +77,9 @@ export interface FakeGroupOptions {
   onDeleteMessage?(id: string): void;
   onSetItemPerms?(itemId: string, perms: ItemPerms): void;
   onCreateInvite?(groupId: string, email: string | null, label: string): void;
+  onSendInviteEmail?(inviteId: string): void;
+  /** what the mail attempt should report; default `{ sent: true }` */
+  inviteEmail?: { sent: boolean; reason?: string };
   onSetMemberRole?(userId: string, role: GroupRole): void;
   onRemoveMember?(userId: string): void;
   onPublishRecipe?(lessonId: string, recipeId: string, name: string): void;
@@ -130,7 +133,12 @@ export function createFakeGroups(
       code: g.code,
       joinBy: g.joinBy,
       myRole: g.myRole,
-      members: g.roster?.length ?? 1,
+      /*
+        At least one: the caller is in this group, so the real count cannot be
+        zero — `members_read` always returns their own row. A fake that said 0
+        would let a screen render "0 חברים" for a group somebody is standing in.
+      */
+      members: Math.max(1, g.roster?.length ?? 0),
       unread: groupMessages.filter(
         (m) => m.seq > read && m.authorId !== me && m.deletedAt === null,
       ).length,
@@ -300,6 +308,11 @@ export function createFakeGroups(
       return token;
     },
 
+    async sendInviteEmail(inviteId) {
+      opts.onSendInviteEmail?.(inviteId);
+      return opts.inviteEmail ?? { sent: true };
+    },
+
     async revokeInvite(inviteId) {
       invites = invites.map((i) =>
         i.id === inviteId && i.status === 'pending'
@@ -355,6 +368,10 @@ export function createFakeGroups(
 
     async listJoinRequests(groupId) {
       return requests.filter((r) => r.groupId === groupId);
+    },
+
+    async myJoinRequests() {
+      return requests.filter((r) => r.userId === me);
     },
 
     async requestJoin(code) {

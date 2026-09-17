@@ -19,7 +19,11 @@ import { PasteScreen } from './routes/PasteScreen.js';
 import { HomeScreen } from './routes/HomeScreen.js';
 import { SettingsScreen } from './routes/SettingsScreen.js';
 import { ToolsScreen } from './routes/ToolsScreen.js';
-import { NotImplementedScreen } from './routes/NotImplementedScreen.js';
+import { GroupsScreen } from './routes/GroupsScreen.js';
+import { GroupScreen } from './routes/GroupScreen.js';
+import { PermsScreen } from './routes/PermsScreen.js';
+import { GroupRecipeScreen } from './routes/GroupRecipeScreen.js';
+import { JoinScreen } from './routes/JoinScreen.js';
 
 /**
  * Routing mirrors spec §2 one screen at a time. `state.screen` in the prototype
@@ -63,7 +67,13 @@ export function App() {
                 <Route path="/recipe/:recipeId/edit" element={<RecipeEditScreen />} />
                 <Route path="/recipe/:recipeId" element={<RecipeScreen />} />
                 <Route path="/home" element={<HomeScreen />} />
-                <Route path="/groups" element={<NotImplementedScreen screen="קבוצות" />} />
+                {/* §2 screens 15-18. `/groups` was a NotImplementedScreen
+                    until §10 existed; the tab bar stopped saying "בהכנה" in
+                    the same commit, so the two cannot disagree. */}
+                <Route path="/groups" element={<GroupsScreen />} />
+                <Route path="/group/:groupId" element={<GroupScreen />} />
+                <Route path="/group/:groupId/perms" element={<PermsScreen />} />
+                <Route path="/group/:groupId/item/:itemId" element={<GroupRecipeScreen />} />
                 <Route path="/ingredients" element={<IngredientsScreen />} />
                 <Route path="/plans" element={<PlansScreen />} />
                 <Route path="/plan/:planId" element={<PlanScreen />} />
@@ -107,6 +117,22 @@ export function App() {
                 element={
                   <OnboardingGate>
                     <OrderScreen />
+                  </OnboardingGate>
+                }
+              />
+              {/*
+                The invitation link, OUTSIDE the shell. A person arriving here
+                may not be a member of anything yet, so a tab bar offering
+                "קבוצות" would lead them nowhere; and the decision on this
+                screen is the only thing on it. It keeps the onboarding gate,
+                because redeeming an invitation writes to the database as the
+                signed-in account.
+              */}
+              <Route
+                path="/join/:token"
+                element={
+                  <OnboardingGate>
+                    <JoinScreen />
                   </OnboardingGate>
                 }
               />
