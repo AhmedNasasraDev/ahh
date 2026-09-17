@@ -32,7 +32,7 @@ do $$
 declare
   a uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   b uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-  ra uuid; rb uuid; txt text; cnt int;
+  ra uuid; ra2 uuid; rb uuid; txt text; cnt int;
 begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', a, 'role','authenticated')::text, true);
@@ -101,19 +101,33 @@ begin
     insert into n values (11,'anon cannot call it at all','refused','refused');
   end;
   -- ── the same isolation, asked of the TABLE rather than of the function ──
-  -- The RPC is one door; RLS is the wall. Both are checked, because a future
-  -- change to either one must not be able to open the other.
+  --
+  -- The RPC is one door; RLS is the wall. Both are checked, because a change
+  -- to either one must not be able to open the other.
+  --
+  -- TRAP, and the first version of this section fell into it: an UNQUALIFIED
+  -- `update public.private_notes` as B is not an attack on A — RLS scopes it
+  -- to B's OWN note, so it legitimately matches one row, and the probe read
+  -- that as a breach. And `ra` was deleted two checks ago, which took A's note
+  -- with it, so there was nothing of A's left to fail to reach either. The
+  -- probes below give A a fresh note and name A's rows explicitly, so a pass
+  -- means what it says.
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', a, 'role','authenticated')::text, true);
+  execute 'set local role authenticated';
+  ra2 := public.save_recipe('{"name":"סוד מקצועי"}'::jsonb,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb);
+  perform public.save_private_note(ra2, 'לא לעיניים זרות');
+
   perform set_config('request.jwt.claims',
     json_build_object('sub', b, 'role','authenticated')::text, true);
-  execute 'set local role authenticated';
-  update public.private_notes set body = 'נחטף';
+  update public.private_notes set body = 'נחטף' where user_id = a;
   get diagnostics cnt = row_count;
-  insert into n values (12,'B''s direct UPDATE of the notes table matches no row','0', cnt::text);
-  delete from public.private_notes;
+  insert into n values (12,'B''s direct UPDATE of A''s note matches no row','0', cnt::text);
+  delete from public.private_notes where user_id = a;
   get diagnostics cnt = row_count;
-  insert into n values (13,'B''s direct DELETE matches no row','0', cnt::text);
+  insert into n values (13,'B''s direct DELETE of A''s note matches no row','0', cnt::text);
   begin
-    insert into public.private_notes (user_id, recipe_id, body) values (a, rb, 'נשתל');
+    insert into public.private_notes (user_id, recipe_id, body) values (a, ra2, 'נשתל');
     insert into n values (14,'B cannot plant a note as A','refused','INSERTED');
   exception when others then
     insert into n values (14,'B cannot plant a note as A','refused','refused');
@@ -131,10 +145,12 @@ begin
 
   execute 'reset role';
   perform set_config('request.jwt.claims',
-    json_build_object('sub', b, 'role','authenticated')::text, true);
+    json_build_object('sub', a, 'role','authenticated')::text, true);
   execute 'set local role authenticated';
-  select count(*) into cnt from public.private_notes where recipe_id = rb;
-  insert into n values (16,'and B''s own note survived all of it','1', cnt::text);
+  select coalesce(string_agg(body, '|'), '(none)') into txt
+    from public.private_notes where recipe_id = ra2;
+  insert into n values (16,'and A''s note came through all of it unchanged',
+    'לא לעיניים זרות', txt);
 
   execute 'reset role';
   perform set_config('n.note','probes complete',true);
