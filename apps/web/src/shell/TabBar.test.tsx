@@ -55,15 +55,15 @@ describe('the tab bar tells the truth about what is built', () => {
         <TabBar />
       </MemoryRouter>,
     );
-    // STAGE-11: two, not three. "עוד" had been flagged "בהכנה" since stage 2
-    // while growing four working screens underneath it; בית and קבוצות really
-    // are unbuilt, and still say so.
-    expect(screen.getAllByText('בהכנה')).toHaveLength(2);
+    // STAGE-11: one, not three. "עוד" had been flagged "בהכנה" since stage 2
+    // while growing four working screens underneath it, and "בית" is now built.
+    // Only קבוצות is genuinely unbuilt, and it still says so.
+    expect(screen.getAllByText('בהכנה')).toHaveLength(1);
 
     const pendingOf = (label: string) =>
       screen.getByRole('link', { name: new RegExp(`^${label}`) }).textContent ?? '';
-    expect(pendingOf('בית')).toContain('בהכנה');
     expect(pendingOf('קבוצות')).toContain('בהכנה');
+    expect(pendingOf('בית')).not.toContain('בהכנה');
     expect(pendingOf('מחברת')).not.toContain('בהכנה');
     expect(pendingOf('עוד')).not.toContain('בהכנה');
   });

@@ -12,6 +12,9 @@ import { IngredientsScreen } from './routes/IngredientsScreen.js';
 import { PlansScreen } from './routes/PlansScreen.js';
 import { PlanScreen } from './routes/PlanScreen.js';
 import { MoreScreen } from './routes/MoreScreen.js';
+import { CookScreen } from './routes/CookScreen.js';
+import { PasteScreen } from './routes/PasteScreen.js';
+import { HomeScreen } from './routes/HomeScreen.js';
 import { SettingsScreen } from './routes/SettingsScreen.js';
 import { ToolsScreen } from './routes/ToolsScreen.js';
 import { NotImplementedScreen } from './routes/NotImplementedScreen.js';
@@ -49,12 +52,15 @@ export function App() {
                 }
               >
                 <Route path="/notebook" element={<NotebookScreen />} />
+                {/* §2 screen 6. Inside the shell: it belongs to the notebook
+                    tab, which is where a new recipe comes from. */}
+                <Route path="/paste" element={<PasteScreen />} />
                 {/* `/recipe/new` before `/recipe/:recipeId`, so "new" is not
                     read as a recipe id. */}
                 <Route path="/recipe/new" element={<RecipeEditScreen />} />
                 <Route path="/recipe/:recipeId/edit" element={<RecipeEditScreen />} />
                 <Route path="/recipe/:recipeId" element={<RecipeScreen />} />
-                <Route path="/home" element={<NotImplementedScreen screen="בית" />} />
+                <Route path="/home" element={<HomeScreen />} />
                 <Route path="/groups" element={<NotImplementedScreen screen="קבוצות" />} />
                 <Route path="/ingredients" element={<IngredientsScreen />} />
                 <Route path="/plans" element={<PlansScreen />} />
@@ -66,6 +72,20 @@ export function App() {
                 <Route path="/settings" element={<SettingsScreen />} />
                 <Route path="/tools" element={<ToolsScreen />} />
               </Route>
+              {/*
+                §2: "מסכי מתכון, עריכה, Cook Mode, תווית והזמנה הם מסכי עומק
+                ללא טאבים". Cook Mode is therefore OUTSIDE the AppShell — it
+                takes the whole screen, dark, with its own way out. It still
+                needs the onboarding gate and the data provider above it.
+              */}
+              <Route
+                path="/recipe/:recipeId/cook"
+                element={
+                  <OnboardingGate>
+                    <CookScreen />
+                  </OnboardingGate>
+                }
+              />
               <Route path="*" element={<Navigate to="/notebook" replace />} />
             </Routes>
           </AppDataProvider>

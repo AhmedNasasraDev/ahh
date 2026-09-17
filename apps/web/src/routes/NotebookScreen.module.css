@@ -199,3 +199,38 @@
   background: var(--c-green-ink);
   color: var(--c-white);
 }
+
+/* ── §2 screen 6: the way into pasting ──────────────────────────────────── */
+.newGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  flex: none;
+}
+
+.pasteBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-compact);
+  padding-inline: 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-meta-lg);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.emptyAlt {
+  margin-block-start: 10px;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  color: var(--c-green);
+  font-size: var(--fs-meta-lg);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

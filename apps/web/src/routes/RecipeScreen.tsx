@@ -27,6 +27,7 @@ import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import { VersionHistory } from '../features/recipe/VersionHistory.js';
 import { PanCard } from '../features/recipe/PanCard.js';
 import { PrivateNote } from '../features/recipe/PrivateNote.js';
+import { writeLastOpened } from '../data/offlineMirror.js';
 import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
 import styles from '../features/recipe/recipe.module.css';
 
@@ -145,6 +146,12 @@ export function RecipeScreen() {
       cancelled = true;
     };
   }, [recipeId, recipesUsing]);
+
+  // §2 screen 2: the home screen's "המשך מאיפה שעצרת" reads this. Device
+  // storage, not the account — see the comment on `writeLastOpened`.
+  useEffect(() => {
+    if (recipeId) void writeLastOpened(recipeId);
+  }, [recipeId]);
 
   // §8: the account's own note for this recipe. `null` until it is known, so
   // the box does not flash empty over text that is on its way.
@@ -402,6 +409,19 @@ export function RecipeScreen() {
       </header>
 
       <CalcNotice state={calc} />
+
+      {/*
+        §14 Cook Mode. Its own row above the edit actions and not inside them:
+        this is the button you press to START WORKING, and it should not be one
+        of four identical boxes next to "מחיקה". A recipe with no steps has
+        nothing to cook, and the link is then not offered at all rather than
+        leading to a screen that apologises.
+      */}
+      {(recipe.steps ?? []).some((st) => st.text || st.minutes) && (
+        <Link to={`/recipe/${recipe.id}/cook`} className={styles.cookBtn}>
+          מצב הכנה
+        </Link>
+      )}
 
       {/* ── stage 4: edit / duplicate / delete ─────────────────────────── */}
       <div className={styles.actionRow} role="group" aria-label="פעולות על המתכון">

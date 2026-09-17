@@ -1167,3 +1167,20 @@
   font-size: 13px;
   color: var(--c-muted);
 }
+
+/* ── §14 the way into Cook Mode ─────────────────────────────────────────── */
+.cookBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  margin-block-end: var(--gap-between-groups);
+  margin-inline: var(--pad-card);
+  border-radius: var(--r-control);
+  background: var(--c-ink);
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  text-decoration: none;
+}

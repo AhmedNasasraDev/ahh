@@ -7,7 +7,6 @@ import styles from './NotImplementedScreen.module.css';
  */
 export function NotImplementedScreen({ screen }: { screen: string }) {
   const planned: Record<string, string[]> = {
-    בית: ['קטגוריות', 'המתכון האחרון', 'מתכוני בסיס לפי עלות לק"ג'],
     קבוצות: [
       'קבוצות פרטיות, קורסים ושיעורים',
       'הרשאות פר־מתכון ואכיפה בשרת',

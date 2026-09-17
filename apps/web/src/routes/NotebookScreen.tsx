@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { compute, formatGrams, formatNis, type Computed } from '@recipe-notebook/engine';
 import { useAppData } from '../app/AppDataProvider.js';
 import { resolveFromCatalog } from '../features/pricing/catalog.js';
@@ -16,7 +16,24 @@ import styles from './NotebookScreen.module.css';
 export function NotebookScreen() {
   const { recipes, categories, prefs, capabilities, catalog } = useAppData();
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('הכל');
+
+  /*
+    The category filter is addressable: `/notebook?category=לחמים`.
+    It was component state, which is why the home screen had nowhere to link a
+    category tile TO. A filter in the URL is also the thing a user expects to
+    survive a back button and a shared link.
+  */
+  const [params, setParams] = useSearchParams();
+  const fromUrl = params.get('category');
+  const category = fromUrl && categories.includes(fromUrl) ? fromUrl : 'הכל';
+  const setCategory = (next: string) => {
+    const p = new URLSearchParams(params);
+    if (next === 'הכל') p.delete('category');
+    else p.set('category', next);
+    // `replace`: choosing four categories in a row should not put four entries
+    // in the history for the back button to walk through.
+    setParams(p, { replace: true });
+  };
 
   const pro = prefs.pro === true;
 
@@ -78,9 +95,16 @@ export function NotebookScreen() {
             read-only visitor with no explanation of where recipes come from —
             the editor itself says plainly that saving is unavailable.
           */}
-          <Link to="/recipe/new" className={styles.newBtn}>
-            + מתכון חדש
-          </Link>
+          <span className={styles.newGroup}>
+            <Link to="/recipe/new" className={styles.newBtn}>
+              + מתכון חדש
+            </Link>
+            {/* §2 screen 6. Second, and quieter: typing a recipe is the normal
+                path and pasting one is the shortcut. */}
+            <Link to="/paste" className={styles.pasteBtn}>
+              הדבקה
+            </Link>
+          </span>
         </div>
       </header>
 
@@ -128,6 +152,11 @@ export function NotebookScreen() {
             <Link to="/recipe/new" className={styles.emptyCta}>
               יצירת המתכון הראשון
             </Link>
+            {capabilities.canWrite && (
+              <Link to="/paste" className={styles.emptyAlt}>
+                או הדבקת מתכון מטקסט
+              </Link>
+            )}
           </div>
         )
       ) : (

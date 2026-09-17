@@ -1,0 +1,299 @@
+/* §14 Cook Mode. The one dark screen in the app.
+   §14 names the surface (#171A18, which is --c-ink) and both type sizes, and
+   they are already tokens: --fs-cook-body 25px, --fs-cook-step 54px.
+   Every pair below is light-on-dark, so the contrast guard in tokens.test.ts
+   measures them the other way round from the rest of the app. */
+
+.wrap {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-between-groups);
+  padding: 14px 18px 22px;
+  background: var(--c-ink);
+  color: var(--c-white);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+}
+
+.recipeName {
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  color: var(--c-white);
+  text-align: end;
+  min-width: 0;
+}
+
+.exit {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  padding-inline: 12px;
+  border-radius: var(--r-control);
+  color: var(--c-white);
+  font-size: var(--fs-secondary);
+  text-decoration: none;
+  flex: none;
+}
+
+/* ── the progress bar: one segment per step ───────────────────────────── */
+.bar {
+  display: flex;
+  gap: 4px;
+}
+
+.seg,
+.segDone,
+.segNow {
+  flex: 1;
+  /* A 44px target with an 8px bar inside it: the bar is thin, the tap is not. */
+  min-height: var(--hit-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+.seg::after,
+.segDone::after,
+.segNow::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 8px;
+  border-radius: 999px;
+  background: #3a423d;
+}
+
+.segDone::after {
+  background: var(--c-green);
+}
+
+.segNow::after {
+  background: var(--c-white);
+  height: 12px;
+}
+
+.count {
+  font-size: var(--fs-secondary);
+  color: #c9d2cc;
+}
+
+/* ── the step ─────────────────────────────────────────────────────────── */
+.stepBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+  flex: 1;
+}
+
+.stepBox:focus {
+  outline: none;
+}
+.stepBox:focus-visible {
+  outline: 2px solid var(--c-white);
+  outline-offset: 6px;
+  border-radius: var(--r-card);
+}
+
+.stepNum {
+  font-family: var(--font-display);
+  font-size: var(--fs-cook-step);
+  line-height: 1;
+  color: #6f7c74;
+}
+
+.stepText {
+  font-size: var(--fs-cook-body);
+  line-height: 1.5;
+  color: var(--c-white);
+}
+
+.stepMeta {
+  font-size: var(--fs-secondary);
+  color: #c9d2cc;
+}
+
+.mark,
+.markOn {
+  margin-block-start: 6px;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 1px solid #4a5550;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.markOn {
+  border-color: var(--c-green);
+  background: var(--c-green);
+}
+
+.timerStart {
+  min-height: var(--hit-min);
+  padding: 10px 16px;
+  border: 1px solid #4a5550;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* ── the parallel timers ──────────────────────────────────────────────── */
+.timers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+
+.timer,
+.timerDone {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-in-group);
+  padding: 8px 12px;
+  border: 1px solid #4a5550;
+  border-radius: var(--r-card);
+  background: #202623;
+}
+
+/* §14: "מסומנים באדום בסיום" */
+.timerDone {
+  border-color: var(--c-red);
+  background: #3a1f1f;
+}
+
+.timerStep {
+  font-size: var(--fs-meta-lg);
+  color: #c9d2cc;
+  flex: none;
+}
+
+.timerClock {
+  font-size: var(--fs-body-lg);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-white);
+  flex: 1;
+}
+
+.timerActions {
+  display: flex;
+  gap: var(--gap-tight);
+  flex: none;
+}
+
+.timerBtn {
+  min-height: var(--hit-compact);
+  padding: 0 12px;
+  border: 1px solid #4a5550;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+  cursor: pointer;
+}
+
+/* ── the ingredients, on demand ───────────────────────────────────────── */
+.ings {
+  border-block-start: 1px solid #3a423d;
+  padding-block-start: 10px;
+}
+
+.ingsSummary {
+  min-height: var(--hit-min);
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-secondary);
+  color: var(--c-white);
+  cursor: pointer;
+}
+
+.ingsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  padding-block-start: 6px;
+}
+
+.ingRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-in-group);
+  font-size: var(--fs-secondary);
+  color: #e6ebe8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the footer ───────────────────────────────────────────────────────── */
+.foot {
+  display: flex;
+  gap: var(--gap-in-group);
+}
+
+.navBtn {
+  flex: 1;
+  min-height: 52px;
+  border: 1px solid #4a5550;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.navBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.finish {
+  flex: 1;
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-control);
+  background: var(--c-green);
+  color: var(--c-white);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ── nothing to cook ──────────────────────────────────────────────────── */
+.missing {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--gap-in-group);
+  padding: 22px 18px;
+  background: var(--c-ink);
+  color: var(--c-white);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+}
+
+.missingTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-screen-title);
+  color: var(--c-white);
+}

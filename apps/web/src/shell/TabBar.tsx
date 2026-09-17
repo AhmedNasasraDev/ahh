@@ -18,8 +18,8 @@ interface TabDef {
 }
 
 const TABS: readonly TabDef[] = [
-  { to: '/home', label: 'בית', owns: ['/home'], ready: false },
-  { to: '/notebook', label: 'מחברת', owns: ['/notebook', '/recipe'], ready: true },
+  { to: '/home', label: 'בית', owns: ['/home'], ready: true },
+  { to: '/notebook', label: 'מחברת', owns: ['/notebook', '/recipe', '/paste'], ready: true },
   { to: '/groups', label: 'קבוצות', owns: ['/groups', '/group', '/perms'], ready: false },
   {
     to: '/more',

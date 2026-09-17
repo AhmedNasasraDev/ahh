@@ -22,6 +22,7 @@ const KEY = {
   recipe: (id: string) => `rn.recipe.v1.${id}`,
   recipeIndex: 'rn.recipeIndex.v1',
   cookProgress: (recipeId: string) => `rn.cook.v1.${recipeId}`,
+  lastOpened: 'rn.lastOpened.v1',
 } as const;
 
 async function safeGet<T>(key: string): Promise<T | null> {
@@ -112,6 +113,21 @@ export const writeCookProgress = (progress: CookProgress): Promise<boolean> =>
 export const clearCookProgress = (recipeId: string): Promise<void> =>
   safeDel(KEY.cookProgress(recipeId));
 
+// ── the last recipe opened on this device (§2 screen 2) ────────────────────
+//
+// DEVICE state, deliberately, and the home screen says so in those words. The
+// alternative is a `last_opened` column on `recipes`, which would mean an
+// account-wide write on every recipe view — a write whose only purpose is to
+// decorate one card, and which would make "where you stopped" follow you onto
+// a shared kitchen tablet. `clearMirror()` on sign-out takes this with
+// everything else, which is the behaviour a shared device needs.
+
+export const readLastOpened = (): Promise<string | null> =>
+  safeGet<string>(KEY.lastOpened);
+
+export const writeLastOpened = (recipeId: string): Promise<boolean> =>
+  safeSet(KEY.lastOpened, recipeId);
+
 /**
  * Wipes the whole mirror.
  *
@@ -139,6 +155,7 @@ export async function clearMirror(): Promise<void> {
     safeDel(KEY.prefs),
     safeDel(KEY.calibrations),
     safeDel(KEY.recipeIndex),
+    safeDel(KEY.lastOpened),
     ...index.flatMap((r) => [safeDel(KEY.recipe(r.id)), safeDel(KEY.cookProgress(r.id))]),
   ]);
 }
