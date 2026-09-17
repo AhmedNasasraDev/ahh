@@ -216,6 +216,21 @@ export interface PrefsRepository {
   savePrefs(prefs: MeasurementPrefs): Promise<MeasurementPrefs>;
 }
 
+/**
+ * §8 — personal notes. Separate from `Recipe.notes` in every sense: a private
+ * note belongs to the ACCOUNT rather than to the recipe, it never travels with
+ * a shared copy, an order sheet or a label, and HANDOFF §3 says no policy, view
+ * or report may let anyone else read it — an instructor included.
+ *
+ * `null` from `getPrivateNote` means there is no note. The empty string is not
+ * a note either: saving one removes the row (migration 0022), because for text
+ * "empty" and "absent" are the same statement.
+ */
+export interface PrivateNoteRepository {
+  getPrivateNote(recipeId: string): Promise<string | null>;
+  savePrivateNote(recipeId: string, body: string): Promise<void>;
+}
+
 export interface CalibrationRepository {
   listCalibrations(): Promise<Calibration[]>;
   saveCalibrations(list: readonly Calibration[]): Promise<Calibration[]>;
@@ -226,6 +241,7 @@ export interface Repository
     PlanRepository,
     PrefsRepository,
     CalibrationRepository,
+    PrivateNoteRepository,
     CatalogRepository {
   capabilities(): RepositoryCapabilities;
   /** categories available for the picker (§1.1 `category` comes from CATEGORIES) */

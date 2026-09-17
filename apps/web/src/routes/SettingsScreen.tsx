@@ -1,0 +1,343 @@
+// §2 screen 20 — "הגדרות": profile, units, language, privacy, reset onboarding,
+// and the account.
+//
+// WHY IT EXISTS NOW
+//
+// Two of the three onboarding steps end with the sentence "אפשר לשנות בכל רגע
+// בהגדרות", and there was no such screen. So the profile and the unit list —
+// which decide what the whole app shows (§3) and which units every recipe is
+// offered in — were answered once, before the user had seen a single recipe,
+// and then frozen. The pickers below are the onboarding's own, reading and
+// writing the same `prefs`, because this is one setting with two doors.
+//
+// WHAT IS DELIBERATELY NOT HERE
+//
+// Language: §17 lists Arabic as "בהכנה", and a switcher that changes nothing is
+// the shape of dishonesty AC #17 rules out. The row states the fact instead.
+// Privacy: §12 is a set of rules the system enforces, not preferences to
+// toggle — so it is stated, at the place where the account lives, and there is
+// nothing to switch.
+
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { PROFILES, UNIT_GROUPS, unit } from '@recipe-notebook/engine';
+import { useAppData } from '../app/AppDataProvider.js';
+import { useAuth } from '../auth/AuthProvider.js';
+import styles from './SettingsScreen.module.css';
+
+export function SettingsScreen() {
+  const { prefs, setPrefs, capabilities } = useAppData();
+  const { status, user, signOut, changePassword } = useAuth();
+  const navigate = useNavigate();
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [again, setAgain] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwDone, setPwDone] = useState(false);
+
+  const units = prefs.units ?? [];
+
+  // §3: switching profile overwrites the unit list ONLY while the user has not
+  // touched it. Identical to the onboarding, and for the same reason — a chosen
+  // unit list is a decision, and a profile change must not quietly undo it.
+  const pickProfile = (id: 'home' | 'pro' | 'study') => {
+    const p = PROFILES.find((x) => x.id === id);
+    if (!p) return;
+    void setPrefs({
+      profile: p.id,
+      pro: p.pro,
+      ...(prefs.touchedUnits ? {} : { units: [...p.units] }),
+    });
+  };
+
+  const toggleUnit = (id: string) => {
+    const nextUnits = units.includes(id) ? units.filter((u) => u !== id) : [...units, id];
+    void setPrefs({ units: nextUnits, touchedUnits: true });
+  };
+
+  const onSignOut = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      await signOut();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ההתנתקות נכשלה.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onChangePassword = async () => {
+    setPwError(null);
+    setPwDone(false);
+    if (next !== again) {
+      setPwError('שתי הסיסמאות החדשות אינן זהות.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePassword(current, next);
+      setPwDone(true);
+      setCurrent('');
+      setNext('');
+      setAgain('');
+      setPwOpen(false);
+    } catch (e) {
+      setPwError(e instanceof Error ? e.message : 'שינוי הסיסמה נכשל.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={styles.wrap}>
+      <header className={styles.head}>
+        <h1 className={styles.title}>הגדרות</h1>
+      </header>
+
+      {/* ── §3 profile ─────────────────────────────────────────────────── */}
+      <section className={styles.card} aria-label="פרופיל">
+        <h2 className={styles.cardTitle}>פרופיל</h2>
+        <p className={styles.note}>
+          הפרופיל קובע מה מוצג כברירת מחדל. הוא אינו נועל שום יכולת — כל מה
+          שמקצועי נשאר זמין בכל פרופיל.
+        </p>
+        <div className={styles.options} role="group" aria-label="בחירת פרופיל">
+          {PROFILES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={prefs.profile === p.id ? styles.optionOn : styles.option}
+              aria-pressed={prefs.profile === p.id}
+              onClick={() => pickProfile(p.id)}
+            >
+              <span className={styles.optionName}>{p.he}</span>
+              <span className={styles.optionDesc}>{p.desc}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ── §4 step 2: the unit list ───────────────────────────────────── */}
+      <section className={styles.card} aria-label="יחידות מדידה">
+        <h2 className={styles.cardTitle}>יחידות מדידה</h2>
+        <p className={styles.note}>
+          היחידות שיוצעו בעריכת מתכון ובהמרות. אפשר לבחור כמה שרוצים.
+        </p>
+        {UNIT_GROUPS.map((g) => (
+          <div key={g.id} className={styles.unitGroup}>
+            <h3 className={styles.groupTitle}>{g.he}</h3>
+            <div className={styles.pills} role="group" aria-label={g.he}>
+              {g.ids.map((id) => {
+                const u = unit(id);
+                const on = units.includes(id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={on ? styles.pillOn : styles.pill}
+                    aria-pressed={on}
+                    onClick={() => toggleUnit(id)}
+                  >
+                    {u?.he ?? id}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {units.length === 0 && (
+          <p className={styles.warn} role="status">
+            לא נבחרה אף יחידה. בלי יחידה אחת לפחות אין במה להציג כמויות, וכדאי
+            לבחור גרם.
+          </p>
+        )}
+        <Link to="/tools" className={styles.linkBtn}>
+          כלי המדידה שלי — גודל כוס, כף וכפית
+        </Link>
+      </section>
+
+      {/* ── §15 / §17 language ─────────────────────────────────────────── */}
+      <section className={styles.card} aria-label="שפה">
+        <h2 className={styles.cardTitle}>שפה</h2>
+        <p className={styles.note}>
+          הממשק בעברית, בכתיבה מימין לשמאל. ערבית מתוכננת ואינה זמינה עוד — ולכן
+          אין כאן מתג שלא יעשה דבר.
+        </p>
+      </section>
+
+      {/* ── §12 privacy, stated where the account lives ────────────────── */}
+      <section className={styles.card} aria-label="פרטיות">
+        <h2 className={styles.cardTitle}>פרטיות</h2>
+        <ul className={styles.rules}>
+          <li>המחברת שלכם פרטית. אין לאף חשבון אחר גישה אליה.</li>
+          <li>ההערות האישיות והכיולים שייכים לחשבון ואינם נשלחים לאף מקום.</li>
+          <li>שיתוף קורה רק ביוזמתכם, ואין כרגע מסלול שיתוף פעיל במערכת.</li>
+        </ul>
+        <p className={styles.note}>
+          אלה חוקים שהמערכת אוכפת במסד הנתונים עצמו, ולא הגדרות שניתן לכבות.
+        </p>
+      </section>
+
+      {/* ── §4 reset onboarding ────────────────────────────────────────── */}
+      <section className={styles.card} aria-label="שאלות הפתיחה">
+        <h2 className={styles.cardTitle}>שאלות הפתיחה</h2>
+        <p className={styles.note}>
+          אפשר לעבור שוב על שלוש שאלות הפתיחה. ההעדפות הקיימות נשמרות עד שיוחלפו,
+          והמתכונים אינם נוגעים בכלל.
+        </p>
+        <button
+          type="button"
+          className={styles.secondary}
+          onClick={() => {
+            void setPrefs({ done: false });
+            navigate('/onboarding');
+          }}
+        >
+          לעבור שוב על שאלות הפתיחה
+        </button>
+      </section>
+
+      {/* ── the account ────────────────────────────────────────────────── */}
+      <section className={styles.card} aria-label="החשבון שלי">
+        <h2 className={styles.cardTitle}>החשבון שלי</h2>
+
+        {status === 'signed-in' && user ? (
+          <>
+            <p className={styles.email}>
+              <span className="ltr">{user.email}</span>
+            </p>
+            <p className={styles.note}>
+              המתכונים, ההערות הפרטיות והכיולים שמורים לחשבון הזה. ההתנתקות גם
+              מוחקת את ההעתק המקומי מהמכשיר.
+            </p>
+
+            {pwDone && (
+              <p className={styles.ok} role="status">
+                הסיסמה הוחלפה.
+              </p>
+            )}
+
+            {!pwOpen ? (
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => {
+                  setPwOpen(true);
+                  setPwDone(false);
+                }}
+              >
+                שינוי סיסמה
+              </button>
+            ) : (
+              <div className={styles.pwForm}>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="pw-current">
+                    הסיסמה הנוכחית
+                  </label>
+                  <input
+                    id="pw-current"
+                    className={styles.input}
+                    type="password"
+                    autoComplete="current-password"
+                    value={current}
+                    onChange={(e) => setCurrent(e.target.value)}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="pw-next">
+                    סיסמה חדשה
+                  </label>
+                  <input
+                    id="pw-next"
+                    className={styles.input}
+                    type="password"
+                    autoComplete="new-password"
+                    value={next}
+                    onChange={(e) => setNext(e.target.value)}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="pw-again">
+                    הסיסמה החדשה שוב
+                  </label>
+                  <input
+                    id="pw-again"
+                    className={styles.input}
+                    type="password"
+                    autoComplete="new-password"
+                    value={again}
+                    onChange={(e) => setAgain(e.target.value)}
+                  />
+                </div>
+
+                {pwError && (
+                  <p className={styles.error} role="alert">
+                    {pwError}
+                  </p>
+                )}
+
+                <div className={styles.pwActions}>
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    disabled={busy || current === '' || next === ''}
+                    onClick={() => void onChangePassword()}
+                  >
+                    {busy ? 'רגע…' : 'עדכון הסיסמה'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    onClick={() => {
+                      setPwOpen(false);
+                      setPwError(null);
+                      setCurrent('');
+                      setNext('');
+                      setAgain('');
+                    }}
+                  >
+                    ביטול
+                  </button>
+                </div>
+                <p className={styles.note}>
+                  נדרשת גם הסיסמה הנוכחית. חלון פתוח לבדו אינו מספיק כדי להחליף
+                  סיסמה של חשבון.
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={styles.signOut}
+              onClick={() => void onSignOut()}
+              disabled={busy}
+            >
+              {busy ? 'רגע…' : 'התנתקות'}
+            </button>
+          </>
+        ) : (
+          <p className={styles.note}>
+            {capabilities.source === 'local-demo'
+              ? 'אין חיבור לשרת בהתקנה הזאת, ולכן אין חשבון. ההעדפות כאן נשמרות על המכשיר הזה בלבד.'
+              : 'לא מחוברים לחשבון.'}
+          </p>
+        )}
+
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+
+      <Link to="/more" className={styles.back}>
+        ← עוד
+      </Link>
+    </div>
+  );
+}

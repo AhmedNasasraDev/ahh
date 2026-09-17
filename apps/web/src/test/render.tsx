@@ -33,6 +33,9 @@ export interface FakeRepoOptions {
   onSavePlan?(plan: ProductionPlan): void;
   /** history rows a test wants to exist before it records anything */
   history?: readonly PurchaseRecord[];
+  /** §8: personal notes the account already has, keyed by recipe id */
+  notes?: Readonly<Record<string, string>>;
+  onSavePrivateNote?(recipeId: string, body: string): void;
 }
 
 /**
@@ -55,6 +58,7 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
   let plans: ProductionPlan[] = [...(opts.plans ?? [])];
   const purchases: Array<{ key: string; record: PurchaseRecord }> = [];
   let recipes = [...(opts.recipes ?? DEMO_RECIPES)];
+  const notes: Record<string, string> = { ...(opts.notes ?? {}) };
   const caps: RepositoryCapabilities = {
     source: 'local-demo',
     online: true,
@@ -201,6 +205,14 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
         ...(opts.history ?? []),
         ...purchases.filter((r) => r.key === key).map((r) => r.record),
       ].reverse(),
+    // §8. Mirrors migration 0022: an empty body is not a note, it is the
+    // absence of one, so saving one removes it.
+    getPrivateNote: async (recipeId: string) => notes[recipeId] ?? null,
+    savePrivateNote: async (recipeId: string, body: string) => {
+      if (body.trim() === '') delete notes[recipeId];
+      else notes[recipeId] = body;
+      opts.onSavePrivateNote?.(recipeId, body);
+    },
     listCalibrations: async () => calib,
     saveCalibrations: async (list) => {
       calib = [...list];

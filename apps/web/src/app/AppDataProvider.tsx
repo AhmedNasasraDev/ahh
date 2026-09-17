@@ -95,6 +95,13 @@ export interface AppData {
    * plan is not an input to anyone else's figures, unlike the catalog, and
    * loading every plan to open one would be waste.
    */
+  /**
+   * §8 personal notes. Fetched per recipe rather than held here, for the same
+   * reason as a plan: nobody else's figure depends on it, and pulling every
+   * note to open one recipe would be waste.
+   */
+  getPrivateNote(recipeId: string): Promise<string | null>;
+  savePrivateNote(recipeId: string, body: string): Promise<void>;
   listPlans(): Promise<PlanSummary[]>;
   getPlan(id: string): Promise<ProductionPlan | null>;
   savePlan(plan: ProductionPlan): Promise<ProductionPlan>;
@@ -330,6 +337,12 @@ export function AppDataProvider({
     [repo],
   );
 
+  const getPrivateNote = useCallback((id: string) => repo.getPrivateNote(id), [repo]);
+  const savePrivateNote = useCallback(
+    (id: string, body: string) => repo.savePrivateNote(id, body),
+    [repo],
+  );
+
   const listPlans = useCallback(() => repo.listPlans(), [repo]);
   const getPlan = useCallback((id: string) => repo.getPlan(id), [repo]);
   const savePlan = useCallback(
@@ -370,6 +383,8 @@ export function AppDataProvider({
       recipesPricingOn,
       recordPurchase,
       purchaseHistory,
+      getPrivateNote,
+      savePrivateNote,
       listPlans,
       getPlan,
       savePlan,
@@ -398,6 +413,8 @@ export function AppDataProvider({
       recipesPricingOn,
       recordPurchase,
       purchaseHistory,
+      getPrivateNote,
+      savePrivateNote,
       listPlans,
       getPlan,
       savePlan,

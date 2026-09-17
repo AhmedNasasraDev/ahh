@@ -484,6 +484,11 @@ export type Database = {
         Returns: undefined;
       };
       delete_production_plan: { Args: { p_plan_id: string }; Returns: undefined };
+      /** §8, migration 0022. An empty body removes the note. */
+      save_private_note: {
+        Args: { p_recipe_id: string; p_body: string };
+        Returns: undefined;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

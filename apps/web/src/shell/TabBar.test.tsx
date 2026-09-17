@@ -49,12 +49,22 @@ describe('the tab bar tells the truth about what is built', () => {
     }
   });
 
-  it('marks the three unbuilt tabs as pending rather than pretending', () => {
+  it('marks exactly the unbuilt tabs as pending, and no others', () => {
     render(
       <MemoryRouter initialEntries={['/notebook']}>
         <TabBar />
       </MemoryRouter>,
     );
-    expect(screen.getAllByText('בהכנה')).toHaveLength(3);
+    // STAGE-11: two, not three. "עוד" had been flagged "בהכנה" since stage 2
+    // while growing four working screens underneath it; בית and קבוצות really
+    // are unbuilt, and still say so.
+    expect(screen.getAllByText('בהכנה')).toHaveLength(2);
+
+    const pendingOf = (label: string) =>
+      screen.getByRole('link', { name: new RegExp(`^${label}`) }).textContent ?? '';
+    expect(pendingOf('בית')).toContain('בהכנה');
+    expect(pendingOf('קבוצות')).toContain('בהכנה');
+    expect(pendingOf('מחברת')).not.toContain('בהכנה');
+    expect(pendingOf('עוד')).not.toContain('בהכנה');
   });
 });

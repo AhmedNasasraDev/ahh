@@ -27,6 +27,8 @@ import { OnboardingScreen } from '../routes/OnboardingScreen.js';
 import { NotebookScreen } from '../routes/NotebookScreen.js';
 import { RecipeScreen } from '../routes/RecipeScreen.js';
 import { MoreScreen } from '../routes/MoreScreen.js';
+import { SettingsScreen } from '../routes/SettingsScreen.js';
+import { ToolsScreen } from '../routes/ToolsScreen.js';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import {
   createFakeSupabase,
@@ -59,6 +61,8 @@ function AppUnderTest({ client, route = '/notebook' }: { client: unknown; route?
                 <Route path="/notebook" element={<NotebookScreen />} />
                 <Route path="/recipe/:recipeId" element={<RecipeScreen />} />
                 <Route path="/more" element={<MoreScreen />} />
+                <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/tools" element={<ToolsScreen />} />
               </Route>
               <Route path="*" element={<Navigate to="/notebook" replace />} />
             </Routes>
@@ -248,7 +252,9 @@ describe('requirement 2 — signing out', () => {
     db['profiles']!.push(newProfileRow(USER_A, { onboarding_done: true }));
     const { client, auth } = project(db, USER_A);
 
-    render(<AppUnderTest client={client} route="/more" />);
+    // STAGE-11: the account block moved from "עוד" to הגדרות, which is where
+    // §2 screen 20 puts it. The behaviour under test is unchanged.
+    render(<AppUnderTest client={client} route="/settings" />);
     expect(await screen.findByText('ahmed@test.invalid')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'התנתקות' }));

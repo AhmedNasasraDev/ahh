@@ -11,16 +11,23 @@ export function NotImplementedScreen({ screen }: { screen: string }) {
     קבוצות: [
       'קבוצות פרטיות, קורסים ושיעורים',
       'הרשאות פר־מתכון ואכיפה בשרת',
-      'דורש חשבונות, חברות ו-RLS — ולכן שלב מאוחר יותר',
+      'דורש טבלאות חברות, הזמנות ואכיפה בשרת — ולכן שלב נפרד',
     ],
-    עוד: ['יום ייצור', 'רכש ומלאי', 'כלי המדידה שלי וכיול אישי', 'הגדרות'],
   };
 
   return (
     <div className={styles.wrap}>
       <h1 className={styles.title}>{screen}</h1>
+      {/*
+        STAGE-11: the body text used to say "בשלב הזה מומשו שאלות הפתיחה,
+        המחברת ודף המתכון", which stopped being true five stages ago. A
+        placeholder that misreports what the app can do is not honest just
+        because it admits to being a placeholder.
+      */}
       <p className={styles.body}>
-        המסך הזה עוד לא נבנה. בשלב הזה מומשו שאלות הפתיחה, המחברת ודף המתכון.
+        המסך הזה עוד לא נבנה. מה שכן עובד: המחברת ודף המתכון, עריכה וגרסאות,
+        מרכז חומרי הגלם והמחירים, עלויות ורווחיות, תכנון ייצור ורכש, כלי המדידה
+        וההגדרות.
       </p>
       <ul className={styles.list}>
         {(planned[screen] ?? []).map((item) => (

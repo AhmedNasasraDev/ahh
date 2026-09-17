@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema after migrations 0001-0018. Not used at runtime.",
+    "information_schema after migrations 0001-0022. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -378,6 +378,15 @@
     "restore_recipe_version": {
       "args": [
         "p_version_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "save_private_note": {
+      "args": [
+        "p_recipe_id",
+        "p_body"
       ],
       "security_definer": false,
       "anon_execute": false,

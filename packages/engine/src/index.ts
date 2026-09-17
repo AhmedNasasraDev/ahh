@@ -119,6 +119,20 @@ export {
 
 // parsing
 export {
+  GN,
+  GN_SIZES,
+  PAN_KINDS,
+  PAN_SUGGEST_THRESHOLD,
+  panArea,
+  panFactor,
+  panIsEmpty,
+  panKindLabel,
+  panLabel,
+  panWorthAdapting,
+  type PanComparison,
+  type PanKindDef,
+} from './pan.js';
+export {
   SMART_PARSE_PROMPT,
   parseLocal,
   parseQuantity,

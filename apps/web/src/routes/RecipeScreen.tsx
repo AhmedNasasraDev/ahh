@@ -25,6 +25,8 @@ import {
 import { CostingPanel } from '../features/pricing/CostingPanel.js';
 import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import { VersionHistory } from '../features/recipe/VersionHistory.js';
+import { PanCard } from '../features/recipe/PanCard.js';
+import { PrivateNote } from '../features/recipe/PrivateNote.js';
 import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
 import styles from '../features/recipe/recipe.module.css';
 
@@ -87,7 +89,12 @@ export function RecipeScreen() {
     restoreVersion,
     recipesUsing,
     catalog,
+    getPrivateNote,
+    savePrivateNote,
   } = useAppData();
+
+  /** §8: null while it is being read, then '' or the text. */
+  const [note, setNote] = useState<string | null>(null);
 
   const [scaleMode, setScaleMode] = useState<ScaleMode>('recipe');
   const [scaleValue, setScaleValue] = useState('');
@@ -139,6 +146,27 @@ export function RecipeScreen() {
     };
   }, [recipeId, recipesUsing]);
 
+  // §8: the account's own note for this recipe. `null` until it is known, so
+  // the box does not flash empty over text that is on its way.
+  useEffect(() => {
+    if (!recipeId) return;
+    let cancelled = false;
+    setNote(null);
+    void getPrivateNote(recipeId)
+      .then((body) => {
+        if (!cancelled) setNote(body ?? '');
+      })
+      // A note that cannot be read must not take the recipe page down with it.
+      // An empty box is the right fallback: it is what the user sees anyway
+      // when there is no note, and the save path reports its own failures.
+      .catch(() => {
+        if (!cancelled) setNote('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [recipeId, getPrivateNote]);
+
   // Baseline at factor 1, then the scaled pass. Both come from the one engine.
   /**
    * The recipe and the notebook, with prices resolved from the ingredient
@@ -189,6 +217,18 @@ export function RecipeScreen() {
   // Requirement 8: how much of this calculation is real, before any figure is
   // put on screen.
   const calc = calcState(computed);
+  /**
+   * Were BOTH weights entered? `bakeLoss` needs the pair, and `weightBefore`
+   * alone gives a loss of 100% against a missing `weightAfter`. A blank field
+   * is not a weight of zero.
+   */
+  const weighedForLoss =
+    recipe.weightBefore !== null &&
+    recipe.weightBefore !== undefined &&
+    recipe.weightBefore !== '' &&
+    recipe.weightAfter !== null &&
+    recipe.weightAfter !== undefined &&
+    recipe.weightAfter !== '';
 
   /**
    * A figure that is a sum over the ingredient rows.
@@ -541,6 +581,29 @@ export function RecipeScreen() {
         </p>
       </section>
 
+      {/*
+        ── §7 the pan ────────────────────────────────────────────────────
+        Placed straight after scaling because that is what it drives: pressing
+        "התאמה" sets weight scaling at the adapted yield, which is §7's
+        "ההתאמה קובעת מצב סקיילינג משקל — כלומר חישוב, לא דריסה".
+      */}
+      <PanCard
+        recipePan={recipe.pan ?? null}
+        baselineYield={baseline.actualYield}
+        onAdapt={(grams) => {
+          setScaleMode('weight');
+          setScaleValue(String(Math.round(grams)));
+        }}
+      />
+
+      {/* ── §8 the personal note ───────────────────────────────────────── */}
+      <PrivateNote
+        recipeId={recipe.id}
+        initial={note}
+        canWrite={capabilities.canWrite}
+        onSave={(body) => savePrivateNote(recipe.id, body)}
+      />
+
       {/* ── §5.4 ingredient table ──────────────────────────────────────── */}
       <section className={styles.card}>
         <div className={styles.cardHeadRow}>
@@ -688,8 +751,29 @@ export function RecipeScreen() {
               items={[
                 ['תשואה תאורטית', derived(formatGrams(computed.theoretical))],
                 ['תשואה מעשית', derived(formatGrams(computed.actualYield))],
-                ['פחת ייצור', derived(`${computed.prodLoss.toFixed(1)}%`)],
-                ['פחת אפייה', derived(`${computed.bakeLoss.toFixed(1)}%`)],
+                /*
+                  STAGE-11 FIX, the project's own null-vs-zero rule applied to
+                  the two rows that broke it. `prodLoss` is 0 when nobody
+                  measured the actual yield, and `bakeLoss` is 0 when nobody
+                  weighed the batch before and after — and both were printed as
+                  "0.0%", which tells a baker there was no loss. There is a
+                  difference between "no loss" and "not measured", and the row
+                  now says which, exactly as the two rows below it already did.
+                */
+                [
+                  'פחת ייצור',
+                  recipe.yieldActual === null ||
+                  recipe.yieldActual === undefined ||
+                  recipe.yieldActual === ''
+                    ? '— לא נמדדה תשואה בפועל'
+                    : derived(`${computed.prodLoss.toFixed(1)}%`),
+                ],
+                [
+                  'פחת אפייה',
+                  weighedForLoss
+                    ? derived(`${computed.bakeLoss.toFixed(1)}%`)
+                    : '— לא נשקל לפני ואחרי',
+                ],
                 [
                   'משקל לשקילה ליחידה',
                   computed.scaleWeight ? derived(formatGrams(computed.scaleWeight)) : '—',

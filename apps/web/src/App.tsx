@@ -12,6 +12,8 @@ import { IngredientsScreen } from './routes/IngredientsScreen.js';
 import { PlansScreen } from './routes/PlansScreen.js';
 import { PlanScreen } from './routes/PlanScreen.js';
 import { MoreScreen } from './routes/MoreScreen.js';
+import { SettingsScreen } from './routes/SettingsScreen.js';
+import { ToolsScreen } from './routes/ToolsScreen.js';
 import { NotImplementedScreen } from './routes/NotImplementedScreen.js';
 
 /**
@@ -58,6 +60,11 @@ export function App() {
                 <Route path="/plans" element={<PlansScreen />} />
                 <Route path="/plan/:planId" element={<PlanScreen />} />
                 <Route path="/more" element={<MoreScreen />} />
+                {/* §2 screens 20 and 21. `tabOf()` has listed them as owned by
+                    "עוד" since stage 2; until now the paths had no route and
+                    fell through the catch-all to the notebook. */}
+                <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/tools" element={<ToolsScreen />} />
               </Route>
               <Route path="*" element={<Navigate to="/notebook" replace />} />
             </Routes>

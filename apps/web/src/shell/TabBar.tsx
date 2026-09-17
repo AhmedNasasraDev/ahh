@@ -33,7 +33,12 @@ const TABS: readonly TabDef[] = [
     // bar told a user standing in their production plans that they were in the
     // notebook. Found by comparing the screenshots of the two routes.
     owns: ['/more', '/settings', '/tools', '/plan', '/plans', '/stock', '/ingredients'],
-    ready: false,
+    // STAGE-11: was `false` — and had been since stage 2, while the tab had
+    // grown the ingredient centre, the production plans, the settings and the
+    // measuring tools underneath it. A tab marked "בהכנה" that leads to four
+    // working screens is the same dishonesty as the reverse, pointing the
+    // other way.
+    ready: true,
   },
 ];
 

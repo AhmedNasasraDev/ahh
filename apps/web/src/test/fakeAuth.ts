@@ -43,6 +43,10 @@ export interface FakeAuthClient {
   /** what a test asserts against: the session the client currently holds */
   session(): FakeSession | null;
   signOutCalls: number;
+  /** how many times a password was actually written */
+  passwordChanges: number;
+  /** the password an account currently has, for asserting a change took */
+  passwordOf(email: string): string | undefined;
   /** pushes an external change, e.g. a sign-out in another tab */
   emit(event: string, session: FakeSession | null): void;
 }
@@ -56,6 +60,7 @@ export function createFakeAuth(opts: FakeAuthOptions = {}): FakeAuthClient {
   const listeners = new Set<Listener>();
   const out = {
     signOutCalls: 0,
+    passwordChanges: 0,
   };
 
   const emit = (event: string, next: FakeSession | null) => {
@@ -122,6 +127,31 @@ export function createFakeAuth(opts: FakeAuthOptions = {}): FakeAuthClient {
       return { data: { user, session: next }, error: null };
     },
 
+    /**
+     * Stage 11. GoTrue's own `updateUser` changes the password from a live
+     * session alone; the app's `changePassword` re-authenticates first, so this
+     * double records the new password and the tests can then prove the old one
+     * stops working and the new one starts.
+     */
+    async updateUser({ password }: { password?: string }) {
+      const current = session;
+      if (!current) {
+        return { data: { user: null }, error: { message: 'Auth session missing!' } };
+      }
+      if (password !== undefined) {
+        if (password.length < 6) {
+          return {
+            data: { user: null },
+            error: { message: 'Password should be at least 6 characters' },
+          };
+        }
+        const account = accounts[current.user.email];
+        if (account) account.password = password;
+        out.passwordChanges += 1;
+      }
+      return { data: { user: current.user }, error: null };
+    },
+
     async signOut() {
       out.signOutCalls += 1;
       emit('SIGNED_OUT', null);
@@ -135,6 +165,10 @@ export function createFakeAuth(opts: FakeAuthOptions = {}): FakeAuthClient {
     get signOutCalls() {
       return out.signOutCalls;
     },
+    get passwordChanges() {
+      return out.passwordChanges;
+    },
+    passwordOf: (email: string) => accounts[email]?.password,
     emit,
   };
 }

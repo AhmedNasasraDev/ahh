@@ -171,7 +171,7 @@ export interface Step {
   kind?: StepKind;
 }
 
-/** Spec §1.1 Pan. Geometry only; panFactor still lives in the prototype. */
+/** Spec §1.1 Pan. Geometry only; the arithmetic is in `pan.ts` (§7). */
 export interface Pan {
   kind: 'round' | 'rect' | 'loaf' | 'gn' | 'muffin' | 'none';
   diameter?: number | string;

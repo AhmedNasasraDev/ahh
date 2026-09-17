@@ -220,9 +220,19 @@ export function PlanScreen() {
 
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
+  /*
+    STAGE-11: both of these branches rendered without a heading, so a plan that
+    could not be loaded produced the only page in the app with no <h1> — a
+    screen reader landing on it had nothing to announce, and the crawl that
+    walks every route found it by the empty heading. The message and the way
+    out were already right; only the title was missing.
+  */
   if (loadError) {
     return (
       <div className={styles.page}>
+        <header className={styles.head}>
+          <h1 className={styles.title}>תוכנית ייצור</h1>
+        </header>
         <p className={styles.error} role="alert">
           {loadError}
         </p>
@@ -236,6 +246,9 @@ export function PlanScreen() {
   if (!plan) {
     return (
       <div className={styles.page}>
+        <header className={styles.head}>
+          <h1 className={styles.title}>תוכנית ייצור</h1>
+        </header>
         <p className={styles.empty} role="status">
           טוען…
         </p>

@@ -131,3 +131,37 @@
   font-size: var(--fs-meta-lg);
   font-weight: 600;
 }
+
+/* ── the menu §2 screen 19 asks for ────────────────────────────────────── */
+.menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  border-block-end: 1px solid var(--c-line);
+  color: var(--c-ink);
+  /* The whole card is the link, so the default underline would run under two
+     lines of explanation. The green title carries the affordance instead, the
+     same way a recipe card does in the notebook. */
+  text-decoration: none;
+}
+
+.entryTitle {
+  font-family: var(--font-body);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--c-green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.entryBody {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.7;
+}

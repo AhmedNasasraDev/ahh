@@ -597,6 +597,35 @@ export function createSupabaseRepository({
 
     // ── calibrations (§1.2, engine B4/B5) ──────────────────────────────────
 
+    // ── §8 personal notes ──────────────────────────────────────────────────
+
+    async getPrivateNote(recipeId: string): Promise<string | null> {
+      const { data, error } = await client
+        .from('private_notes')
+        .select('body')
+        .eq('user_id', userId)
+        .eq('recipe_id', recipeId)
+        .maybeSingle();
+
+      if (error) throw new SupabaseRepositoryError('טעינת ההערה האישית נכשלה', error);
+      // No row is not an error, and it is not an empty note either — it is the
+      // absence of one, which the caller distinguishes.
+      const body = (data as { body?: string } | null)?.body;
+      return body === undefined || body === '' ? null : body;
+    },
+
+    async savePrivateNote(recipeId: string, body: string): Promise<void> {
+      requireOnline('ההערה האישית');
+      // One RPC rather than an upsert from here: the uniqueness of one note per
+      // recipe is a PARTIAL index, and PostgREST cannot name an index predicate
+      // in an upsert. Migration 0022 has the whole reason.
+      const { error } = await client.rpc('save_private_note', {
+        p_recipe_id: recipeId,
+        p_body: body,
+      });
+      if (error) throw new SupabaseRepositoryError('שמירת ההערה האישית נכשלה', error);
+    },
+
     async listCalibrations(): Promise<Calibration[]> {
       const { data, error } = await client
         .from('calibrations')

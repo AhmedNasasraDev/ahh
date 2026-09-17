@@ -1150,6 +1150,41 @@ export function createFakeSupabase(opts: FakeSupabaseOptions): FakeSupabase {
       return { data: null, error: null };
     }
 
+    // §8, migration 0022. Modelled including the two things the real function
+    // does that a plain upsert would not: it refuses a recipe that is not the
+    // caller's, and an empty body removes the row rather than storing one.
+    if (name === 'save_private_note') {
+      const recipeId = String(args['p_recipe_id'] ?? '');
+      const body = String(args['p_body'] ?? '');
+      const recipe = (db['recipes'] ?? []).find((r) => r['id'] === recipeId);
+      if (!recipe || recipe['owner_id'] !== authUid) {
+        return {
+          data: null,
+          error: { message: 'המתכון אינו של החשבון הזה', code: '42501' },
+        };
+      }
+      const rows = db['private_notes'] ?? [];
+      const at = rows.findIndex(
+        (n) => n['user_id'] === authUid && n['recipe_id'] === recipeId,
+      );
+      if (body.trim() === '') {
+        if (at >= 0) rows.splice(at, 1);
+      } else if (at >= 0) {
+        rows[at] = { ...rows[at], body, updated_at: NOW };
+      } else {
+        rows.push({
+          id: `note-${rows.length + 1}`,
+          user_id: authUid,
+          recipe_id: recipeId,
+          group_item_id: null,
+          body,
+          updated_at: NOW,
+        });
+      }
+      db['private_notes'] = rows;
+      return { data: null, error: null };
+    }
+
     throw new Error(`fakeSupabase: rpc('${name}') is not modelled`);
   };
 

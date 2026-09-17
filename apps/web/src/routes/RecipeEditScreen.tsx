@@ -28,11 +28,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  GN_SIZES,
+  PAN_KINDS,
   UNITS,
   compute,
   formatGrams,
   formatNis,
   ingredientKeyOf,
+  panLabel,
   unitLabel,
   type Recipe,
 } from '@recipe-notebook/engine';
@@ -57,6 +60,7 @@ import {
   emptyStep,
   isDirty,
   moveRow,
+  panFromDraft,
   patchIngredientRow,
   validateDraft,
   type IngredientDraft,
@@ -155,6 +159,9 @@ export function RecipeEditScreen() {
   );
   const calc = calcState(computed);
   const pro = prefs.pro === true;
+  /** §7: which geometry fields the chosen pan kind asks for, and no others. */
+  const panFields: readonly string[] =
+    PAN_KINDS.find((k) => k.id === draft.pan.kind)?.fields ?? [];
 
   const patch = (p: Partial<RecipeDraft>) => setDraft((d) => ({ ...d, ...p }));
 
@@ -860,6 +867,144 @@ export function RecipeEditScreen() {
               </p>
             </div>
 
+            {/*
+              STAGE-11 COMPLETION (§1.1). These two weights are the only inputs
+              of `bakeLoss`, which the recipe page has been displaying since
+              stage 2 — as "פחת אפייה 0.0%" on every recipe in the notebook,
+              because the form never asked for them. A baker reading 0% loss on
+              a bread is being told something false. They are also the inputs of
+              "משקל לשקילה ליחידה", which is how much dough to weigh out so the
+              BAKED unit comes out at its target weight.
+            */}
+            <div className={styles.row2}>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="r-wbefore">
+                  משקל לפני אפייה, גרם
+                </label>
+                <input
+                  id="r-wbefore"
+                  className={`${styles.input} ltr`}
+                  inputMode="decimal"
+                  value={draft.weightBefore}
+                  onChange={(e) => patch({ weightBefore: e.target.value })}
+                  placeholder="ריק = לא נשקל"
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="r-wafter">
+                  משקל אחרי אפייה, גרם
+                </label>
+                <input
+                  id="r-wafter"
+                  className={`${styles.input} ltr`}
+                  inputMode="decimal"
+                  value={draft.weightAfter}
+                  onChange={(e) => patch({ weightAfter: e.target.value })}
+                  placeholder="ריק = לא נשקל"
+                />
+              </div>
+            </div>
+            <p className={styles.hint}>
+              מהשניים האלה מחושב פחת האפייה, וממנו המשקל שצריך לשקול ליחידה כדי
+              שהיחידה האפויה תצא במשקל היעד. בלי שני המשקלים אין פחת — והמסך אומר
+              זאת ולא מציג אפס.
+            </p>
+
+            {/*
+              §13 — desired dough temperature. The four temperatures below are
+              the inputs of `waterTemp`, which `compute()` has always solved and
+              the recipe page has always been ready to show; with no form the
+              answer was permanently null and the row never appeared.
+
+              The toggle is not decoration: `compute()` returns null for the
+              water temperature unless `doughMode` is on, precisely so that a
+              recipe with three blank temperatures does not read as "use water
+              at 0°C".
+            */}
+            <div className={styles.field}>
+              <label className={styles.checkRow}>
+                <input
+                  type="checkbox"
+                  checked={draft.doughMode}
+                  onChange={(e) => patch({ doughMode: e.target.checked })}
+                />
+                <span>מתכון בצק — חישוב טמפרטורת מים</span>
+              </label>
+              {/*
+                The explanation sits OUTSIDE the label on purpose. Nested in
+                it, it became part of the checkbox's accessible name — and that
+                name then contained the words "חימום המערבל", which is also the
+                label of one of the four inputs below, so two controls answered
+                to the same phrase.
+              */}
+              <p className={styles.hint}>
+                לפי טמפרטורת בצק מבוקשת, טמפ&apos; הקמח, טמפ&apos; החדר וחימום
+                המערבל (§13).
+              </p>
+            </div>
+
+            {draft.doughMode && (
+              <>
+                <div className={styles.row2}>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="r-ddt">
+                      טמפ&apos; בצק מבוקשת, °C
+                    </label>
+                    <input
+                      id="r-ddt"
+                      className={`${styles.input} ltr`}
+                      inputMode="decimal"
+                      value={draft.ddt}
+                      onChange={(e) => patch({ ddt: e.target.value })}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="r-flourtemp">
+                      טמפ&apos; הקמח, °C
+                    </label>
+                    <input
+                      id="r-flourtemp"
+                      className={`${styles.input} ltr`}
+                      inputMode="decimal"
+                      value={draft.flourTemp}
+                      onChange={(e) => patch({ flourTemp: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className={styles.row2}>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="r-roomtemp">
+                      טמפ&apos; החדר, °C
+                    </label>
+                    <input
+                      id="r-roomtemp"
+                      className={`${styles.input} ltr`}
+                      inputMode="decimal"
+                      value={draft.roomTemp}
+                      onChange={(e) => patch({ roomTemp: e.target.value })}
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="r-friction">
+                      חימום המערבל, °C
+                    </label>
+                    <input
+                      id="r-friction"
+                      className={`${styles.input} ltr`}
+                      inputMode="decimal"
+                      value={draft.friction}
+                      onChange={(e) => patch({ friction: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <p className={styles.hint}>
+                  טמפרטורת המים המחושבת מופיעה בכרטיס &quot;נוסחה&quot; בדף
+                  המתכון. שדה שנשאר ריק נספר כאפס בנוסחה הזאת, ולכן כדאי למלא את
+                  ארבעתם.
+                </p>
+              </>
+            )}
+
             {pro && (
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="r-fc">
@@ -993,6 +1138,149 @@ export function RecipeEditScreen() {
               </>
             )}
           </div>
+        )}
+      </section>
+
+      {/*
+        ── §7 the pan ────────────────────────────────────────────────────
+        The `pan` column, both mappers and `save_recipe` have carried this
+        since stage 1; §7 specifies the arithmetic; the prototype implemented
+        it. What was missing was anywhere to say which pan the recipe is
+        written for — without which the recipe page cannot offer to adapt it to
+        the pan the user actually owns.
+      */}
+      <section className={styles.card}>
+        <h2 className={styles.cardTitle}>תבנית</h2>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="r-pan-kind">
+            סוג התבנית של המתכון
+          </label>
+          <select
+            id="r-pan-kind"
+            className={styles.input}
+            value={draft.pan.kind}
+            onChange={(e) =>
+              patch({
+                pan: {
+                  ...draft.pan,
+                  kind: e.target.value as RecipeDraft['pan']['kind'],
+                },
+              })
+            }
+          >
+            <option value="">— לא צוין —</option>
+            {PAN_KINDS.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.he}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {panFields.includes('diameter') && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="r-pan-d">
+              קוטר, ס&quot;מ
+            </label>
+            <input
+              id="r-pan-d"
+              className={`${styles.input} ltr`}
+              inputMode="decimal"
+              value={draft.pan.diameter}
+              onChange={(e) => patch({ pan: { ...draft.pan, diameter: e.target.value } })}
+            />
+          </div>
+        )}
+
+        {(panFields.includes('width') || panFields.includes('length')) && (
+          <div className={styles.row2}>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="r-pan-w">
+                רוחב, ס&quot;מ
+              </label>
+              <input
+                id="r-pan-w"
+                className={`${styles.input} ltr`}
+                inputMode="decimal"
+                value={draft.pan.width}
+                onChange={(e) => patch({ pan: { ...draft.pan, width: e.target.value } })}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="r-pan-l">
+                אורך, ס&quot;מ
+              </label>
+              <input
+                id="r-pan-l"
+                className={`${styles.input} ltr`}
+                inputMode="decimal"
+                value={draft.pan.length}
+                onChange={(e) => patch({ pan: { ...draft.pan, length: e.target.value } })}
+              />
+            </div>
+          </div>
+        )}
+
+        {panFields.includes('gn') && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="r-pan-gn">
+              מידת GN
+            </label>
+            <select
+              id="r-pan-gn"
+              className={styles.input}
+              value={draft.pan.gn}
+              onChange={(e) => patch({ pan: { ...draft.pan, gn: e.target.value } })}
+            >
+              <option value="">— לא צוין —</option>
+              {GN_SIZES.map((g) => (
+                <option key={g} value={g}>
+                  GN {g}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {panFields.includes('cavities') && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="r-pan-cav">
+              מספר שקעים
+            </label>
+            <input
+              id="r-pan-cav"
+              className={`${styles.input} ltr`}
+              inputMode="decimal"
+              value={draft.pan.cavities}
+              onChange={(e) => patch({ pan: { ...draft.pan, cavities: e.target.value } })}
+            />
+          </div>
+        )}
+
+        {panFields.includes('height') && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="r-pan-h">
+              גובה, ס&quot;מ
+            </label>
+            <input
+              id="r-pan-h"
+              className={`${styles.input} ltr`}
+              inputMode="decimal"
+              value={draft.pan.height}
+              onChange={(e) => patch({ pan: { ...draft.pan, height: e.target.value } })}
+            />
+            <p className={styles.hint}>
+              עם גובה בשתי התבניות ההשוואה נעשית לפי נפח. בלעדיו — לפי שטח בלבד,
+              וההמלצה תאמר זאת במפורש.
+            </p>
+          </div>
+        )}
+
+        {draft.pan.kind !== '' && draft.pan.kind !== 'none' && panLabel(panFromDraft(draft.pan)) === '' && (
+          <p className={styles.hint}>
+            נבחר סוג תבנית בלי מידות, ולכן אי אפשר להשוות אותה לתבנית אחרת. אפשר
+            להשלים את המידות או לבחור &quot;לא צוין&quot;.
+          </p>
         )}
       </section>
 
@@ -1146,6 +1434,52 @@ export function RecipeEditScreen() {
               onChange={(e) => patch({ storage: e.target.value })}
             />
           </div>
+        </div>
+        <div className={styles.row2}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="r-freezing">
+              הקפאה
+            </label>
+            <input
+              id="r-freezing"
+              className={styles.input}
+              value={draft.freezing}
+              onChange={(e) => patch({ freezing: e.target.value })}
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="r-thawing">
+              הפשרה
+            </label>
+            <input
+              id="r-thawing"
+              className={styles.input}
+              value={draft.thawing}
+              onChange={(e) => patch({ thawing: e.target.value })}
+            />
+          </div>
+        </div>
+        {/*
+          §1.1 manualAllergens. The allergen list is derived from the
+          ingredient names, and the table cannot know everything — a filling
+          bought ready-made, a shared production line, a supplier's change.
+          Without this field the user could see an allergen missing from the
+          list and had no way to add it.
+        */}
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="r-allergens">
+            אלרגנים להוספה ידנית
+          </label>
+          <input
+            id="r-allergens"
+            className={styles.input}
+            value={draft.manualAllergens}
+            onChange={(e) => patch({ manualAllergens: e.target.value })}
+            placeholder="מופרדים בפסיק"
+          />
+          <p className={styles.hint}>
+            נוספים לאלרגנים שהמערכת מזהה מתוך שמות הרכיבים, ואינם מחליפים אותם.
+          </p>
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="r-equipment">

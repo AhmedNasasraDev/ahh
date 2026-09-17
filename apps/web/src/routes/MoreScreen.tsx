@@ -1,60 +1,66 @@
-// The "עוד" tab.
+// The "עוד" tab — §2 screen 19: "תפריט: יום ייצור, רכש, כלי מדידה, הגדרות".
 //
-// Still the honest placeholder from stage 2, with one thing added that stage 3
-// requires and that has nowhere else to live: the account block, holding the
-// signed-in address and Sign Out. §2 already lists "הגדרות" under this tab, so
-// this is filling in a screen rather than redesigning one.
+// WHAT THIS SCREEN USED TO BE, AND WHY IT CHANGED
+//
+// It was a half-menu with the account block, the ingredient centre and the
+// production plans on it, and then — at the bottom of the same screen — a
+// placeholder announcing that "יום ייצור, רכש ומלאי, כלי המדידה שלי, הגדרות"
+// were not built yet. Three of those four were linked immediately above it.
+// The screen contradicted itself, which is worse than either being honest or
+// being finished.
+//
+// It is now what §2 says it is: a menu, four entries, every one of them a
+// screen that exists. The account block and the calibration list moved to the
+// screens §2 assigns them to — הגדרות and כלי המדידה שלי — so each thing has
+// one home instead of being wherever there was room.
 
-import { useState } from 'react';
-import { toolLabel } from '@recipe-notebook/engine';
-import { useAuth } from '../auth/AuthProvider.js';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider.js';
 import { useAppData } from '../app/AppDataProvider.js';
-import { NotImplementedScreen } from './NotImplementedScreen.js';
 import styles from './MoreScreen.module.css';
 
-export function MoreScreen() {
-  const { status, user, signOut } = useAuth();
-  const { capabilities, prefs, setCalibrations } = useAppData();
-  const calibrations = prefs.calib ?? [];
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface Entry {
+  to: string;
+  title: string;
+  body: string;
+}
 
-  const onSignOut = async () => {
-    setError(null);
-    setBusy(true);
-    try {
-      await signOut();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'ההתנתקות נכשלה.');
-    } finally {
-      setBusy(false);
-    }
-  };
+const ENTRIES: readonly Entry[] = [
+  {
+    to: '/ingredients',
+    title: 'חומרי גלם ומחירים',
+    body: 'המחיר של כל חומר גלם נמצא במקום אחד. שינוי מחיר שם מעדכן את העלות בכל המתכונים שמשתמשים בו.',
+  },
+  {
+    to: '/plans',
+    title: 'תכנון ייצור ורכש',
+    body: 'מגדירים מה מייצרים ובאיזו כמות, והמערכת מחשבת מהמתכונים כמה חומר גלם צריך, מה לקנות, כמה זה צפוי לעלות ומתי להתחיל לעבוד.',
+  },
+  {
+    to: '/tools',
+    title: 'כלי המדידה שלי',
+    body: 'גודל הכוס, הכף והכפית שלכם, והכיולים האישיים. כל המרה בין נפח למשקל נעשית לפי מה שמוגדר כאן.',
+  },
+  {
+    to: '/settings',
+    title: 'הגדרות',
+    body: 'פרופיל, יחידות מדידה, שפה, פרטיות, שאלות הפתיחה והחשבון.',
+  },
+];
+
+export function MoreScreen() {
+  const { status, user } = useAuth();
+  const { capabilities } = useAppData();
 
   return (
     <div className={styles.wrap}>
-      <section className={styles.account} aria-label="החשבון שלי">
-        <h2 className={styles.accountTitle}>החשבון שלי</h2>
-
+      <header className={styles.account}>
+        <h1 className={styles.accountTitle}>עוד</h1>
         {status === 'signed-in' && user ? (
-          <>
-            <p className={styles.email}>
-              <span className="ltr">{user.email}</span>
-            </p>
-            <p className={styles.note}>
-              המתכונים, ההערות הפרטיות והכיולים שמורים לחשבון הזה. ההתנתקות גם מוחקת
-              את ההעתק המקומי מהמכשיר.
-            </p>
-            <button
-              type="button"
-              className={styles.signOut}
-              onClick={onSignOut}
-              disabled={busy}
-            >
-              {busy ? 'רגע…' : 'התנתקות'}
-            </button>
-          </>
+          <p className={styles.note}>
+            מחוברים כ־<span className="ltr">{user.email}</span>. ניהול החשבון
+            והסיסמה נמצא ב<Link to="/settings">הגדרות</Link>.
+          </p>
         ) : (
           <p className={styles.note}>
             {capabilities.source === 'local-demo'
@@ -62,95 +68,16 @@ export function MoreScreen() {
               : 'לא מחוברים לחשבון.'}
           </p>
         )}
+      </header>
 
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-      </section>
-
-      {/*
-        The calibration list. Added in stage 4 because a calibration is the way
-        out of a partial calculation, and a WRONG one is worse than none: it
-        takes precedence over every table value (§5.1 rank 1) and wears a green
-        "personal" badge while doing it. So it has to be visible and removable.
-      */}
-      <section className={styles.calibSection} aria-label="חומרי גלם ותמחור">
-        <h2 className={styles.accountTitle}>חומרי גלם ותמחור</h2>
-        <p className={styles.calibNote}>
-          המחיר של כל חומר גלם נמצא במקום אחד. שינוי מחיר שם מעדכן את העלות בכל
-          המתכונים שמשתמשים בו.
-        </p>
-        <Link to="/ingredients" className={styles.linkBtn}>
-          מרכז חומרי הגלם
-        </Link>
-      </section>
-
-      <section className={styles.calibSection} aria-label="תכנון ייצור">
-        <h2 className={styles.accountTitle}>תכנון ייצור ורכש</h2>
-        <p className={styles.calibNote}>
-          מגדירים מה מייצרים ובאיזו כמות, והמערכת מחשבת מהמתכונים כמה חומר גלם
-          צריך, מה לקנות, כמה זה צפוי לעלות ומתי להתחיל לעבוד.
-        </p>
-        <Link to="/plans" className={styles.linkBtn}>
-          תוכניות הייצור
-        </Link>
-      </section>
-
-      <section className={styles.calibSection} aria-label="הכיולים שלי">
-        <h2 className={styles.accountTitle}>כלי המדידה שלי</h2>
-        <p className={styles.note}>
-          כוס <span className="ltr">{prefs.tools?.cup ?? 240}</span> מ&quot;ל · כף{' '}
-          <span className="ltr">{prefs.tools?.tbsp ?? 15}</span> מ&quot;ל · כפית{' '}
-          <span className="ltr">{prefs.tools?.tsp ?? 5}</span> מ&quot;ל
-        </p>
-
-        <h3 className={styles.calibHead}>
-          {calibrations.length === 0
-            ? 'אין כיולים אישיים'
-            : calibrations.length === 1
-              ? 'כיול אישי אחד'
-              : `${calibrations.length} כיולים אישיים`}
-        </h3>
-
-        {calibrations.length === 0 ? (
-          <p className={styles.note}>
-            כיול אישי נמדד מתוך דף המתכון, על רכיב שאין לו נתון צפיפות אמין. הוא
-            מקבל עדיפות על כל נתון בטבלה.
-          </p>
-        ) : (
-          <ul className={styles.calibList}>
-            {calibrations.map((c) => (
-              <li key={`${c.id}-${c.tool}`} className={styles.calibItem}>
-                <span className={styles.calibItemText}>
-                  <span className={styles.calibItemName}>{c.name}</span>
-                  <span className={styles.calibItemDetail}>
-                    {toolLabel(c.tool)} אחת = <span className="ltr">{c.grams}</span> גרם,
-                    נמדד בכלי של <span className="ltr">{c.toolMl}</span> מ&quot;ל
-                    {c.at ? ` · ${c.at}` : ''}
-                    {c.toolMlAssumed && ' · גודל הכלי הונח, כדאי לאמת'}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className={styles.calibRemove}
-                  aria-label={`הסרת הכיול של ${c.name} ב${toolLabel(c.tool)}`}
-                  onClick={() =>
-                    void setCalibrations(
-                      calibrations.filter((x) => !(x.id === c.id && x.tool === c.tool)),
-                    )
-                  }
-                >
-                  הסרה
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <NotImplementedScreen screen="עוד" />
+      <nav className={styles.menu} aria-label="תפריט עוד">
+        {ENTRIES.map((e) => (
+          <Link key={e.to} to={e.to} className={styles.entry}>
+            <span className={styles.entryTitle}>{e.title}</span>
+            <span className={styles.entryBody}>{e.body}</span>
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }

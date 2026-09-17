@@ -197,6 +197,20 @@ export function createLocalDemoRepository(): Repository {
       return prefs;
     },
 
+    // §8. There is no account in this mode, and a personal note without an
+    // account is not private — it belongs to whoever picks up the device. So
+    // the demo repository refuses it in words rather than storing it locally
+    // and calling it private.
+    async getPrivateNote() {
+      return null;
+    },
+
+    async savePrivateNote() {
+      throw new WriteNotAllowedError(
+        'הערה אישית נשמרת לחשבון, ובהתקנה הזאת אין חיבור לשרת ואין חשבון.',
+      );
+    },
+
     async listCalibrations() {
       return normalizeCalibrations(await mirror.readCalibrations());
     },

@@ -323,7 +323,9 @@ describe('a calibration taken in the app persists and closes the gap', () => {
 
     // ── the calibration survives a refresh, because it is on the server
     view.unmount();
-    render(<AppUnderTest client={p.client} route="/more" />);
+    // STAGE-11: the calibration list moved from "עוד" to כלי המדידה שלי, which
+    // is where §2 screen 21 puts it. The assertion is unchanged.
+    render(<AppUnderTest client={p.client} route="/tools" />);
     expect(await screen.findByText('קקאו')).toBeInTheDocument();
     expect(screen.getByText(/כיול אישי אחד/)).toBeInTheDocument();
     expect(

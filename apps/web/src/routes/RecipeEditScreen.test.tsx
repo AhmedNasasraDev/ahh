@@ -435,3 +435,141 @@ describe('stage-10 audit, §11: a save the server refuses', () => {
     await waitFor(() => expect(calls.length).toBe(2));
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-11 completion, §1.1 / §7 / §13 — the fields the form never asked for.
+//
+// Every one of these already had a column, both mappers and a line in
+// `save_recipe`; the engine already computed from them and the recipe page
+// already displayed the result. The form was the only missing link, which is
+// why "פחת אפייה" read 0.0% on every recipe in the notebook.
+describe('stage-11: the professional inputs reach the saved recipe', () => {
+  it('saves the two weights that bake loss is computed from', async () => {
+    const user = userEvent.setup();
+    const saved: Recipe[] = [];
+    renderEdit(BRIOCHE, { onSaveRecipe: (r) => saved.push(r) });
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    await user.click(screen.getByRole('button', { name: 'תשואה ותמחור' }));
+    await user.type(screen.getByLabelText('משקל לפני אפייה, גרם'), '1000');
+    await user.type(screen.getByLabelText('משקל אחרי אפייה, גרם'), '880');
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]!.weightBefore).toBe('1000');
+    expect(saved[0]!.weightAfter).toBe('880');
+  });
+
+  it('keeps a blank weight blank, so "not weighed" never becomes a weight of 0', async () => {
+    const user = userEvent.setup();
+    const saved: Recipe[] = [];
+    renderEdit(BRIOCHE, { onSaveRecipe: (r) => saved.push(r) });
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+    await user.click(screen.getByRole('button', { name: 'תשואה ותמחור' }));
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]!.weightBefore).toBe('');
+    expect(saved[0]!.weightAfter).toBe('');
+  });
+
+  it('asks for the four dough temperatures only once dough mode is on (§13)', async () => {
+    const user = userEvent.setup();
+    const saved: Recipe[] = [];
+    renderEdit(BRIOCHE, { onSaveRecipe: (r) => saved.push(r) });
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+    await user.click(screen.getByRole('button', { name: 'תשואה ותמחור' }));
+
+    // Hidden until the recipe is declared a dough, because the water
+    // temperature is meaningless without the four inputs.
+    expect(screen.queryByLabelText(/טמפ' בצק מבוקשת/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: /מתכון בצק/ }));
+    await user.type(screen.getByLabelText(/טמפ' בצק מבוקשת/), '24');
+    await user.type(screen.getByLabelText(/טמפ' הקמח/), '20');
+    await user.type(screen.getByLabelText(/טמפ' החדר/), '22');
+    await user.type(screen.getByLabelText(/חימום המערבל/), '5');
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]!.doughMode).toBe(true);
+    expect(saved[0]!.ddt).toBe('24');
+    expect(saved[0]!.flourTemp).toBe('20');
+    expect(saved[0]!.roomTemp).toBe('22');
+    expect(saved[0]!.friction).toBe('5');
+  });
+
+  it('saves the pan, asking only for the dimensions its kind needs (§7)', async () => {
+    const user = userEvent.setup();
+    const saved: Recipe[] = [];
+    renderEdit(BRIOCHE, { onSaveRecipe: (r) => saved.push(r) });
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    await user.selectOptions(screen.getByLabelText('סוג התבנית של המתכון'), 'round');
+    expect(screen.queryByLabelText('מידת GN')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('קוטר, ס"מ'), '20');
+    await user.type(screen.getByLabelText('גובה, ס"מ'), '7');
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]!.pan).toEqual({ kind: 'round', diameter: '20', height: '7' });
+  });
+
+  it('stores no pan at all when a kind was picked with no dimensions', async () => {
+    const user = userEvent.setup();
+    const saved: Recipe[] = [];
+    renderEdit(BRIOCHE, { onSaveRecipe: (r) => saved.push(r) });
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    await user.selectOptions(screen.getByLabelText('סוג התבנית של המתכון'), 'round');
+    expect(screen.getByText(/נבחר סוג תבנית בלי מידות/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    // `{kind:'round'}` with nothing behind it would make panFactor look
+    // answerable. The kind alone is not a pan.
+    expect(saved[0]!.pan).toEqual({ kind: 'round' });
+  });
+
+  it('saves freezing, thawing and hand-added allergens', async () => {
+    const user = userEvent.setup();
+    const saved: Recipe[] = [];
+    renderEdit(BRIOCHE, { onSaveRecipe: (r) => saved.push(r) });
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    await user.type(screen.getByLabelText('הקפאה'), 'עד חודש, בקירור ספירלי');
+    await user.type(screen.getByLabelText('הפשרה'), 'לילה בקירור');
+    await user.type(screen.getByLabelText('אלרגנים להוספה ידנית'), 'שומשום, סויה');
+    await user.click(screen.getByRole('button', { name: 'שמירת השינויים' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]!.freezing).toBe('עד חודש, בקירור ספירלי');
+    expect(saved[0]!.thawing).toBe('לילה בקירור');
+    expect(saved[0]!.manualAllergens).toEqual(['שומשום', 'סויה']);
+  });
+
+  it('fills the form back from a recipe that has all of it', async () => {
+    const full = {
+      ...BRIOCHE,
+      weightBefore: 1000,
+      weightAfter: 880,
+      doughMode: true,
+      ddt: 24,
+      flourTemp: 20,
+      roomTemp: 22,
+      friction: 5,
+      freezing: 'עד חודש',
+      thawing: 'לילה בקירור',
+      manualAllergens: ['שומשום'],
+      pan: { kind: 'rect', width: 20, length: 30, height: 5 },
+    } as unknown as Recipe;
+    renderEdit(full);
+    await screen.findByRole('heading', { name: 'עריכת מתכון' });
+
+    expect(screen.getByLabelText('הקפאה')).toHaveValue('עד חודש');
+    expect(screen.getByLabelText('אלרגנים להוספה ידנית')).toHaveValue('שומשום');
+    expect(screen.getByLabelText('סוג התבנית של המתכון')).toHaveValue('rect');
+    expect(screen.getByLabelText('רוחב, ס"מ')).toHaveValue('20');
+    expect(screen.getByLabelText('גובה, ס"מ')).toHaveValue('5');
+  });
+});

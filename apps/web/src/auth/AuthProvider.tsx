@@ -54,6 +54,15 @@ export interface Auth {
   signUp(email: string, password: string): Promise<SignUpOutcome>;
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
+  /**
+   * Changes the signed-in account's password.
+   *
+   * The CURRENT password is required and is verified first, by signing in with
+   * it. GoTrue's `updateUser` does not ask for it — a live session is enough —
+   * which means an unattended browser is enough to lock the owner out of their
+   * own account. Checking it costs one request and closes that.
+   */
+  changePassword(current: string, next: string): Promise<void>;
 }
 
 const AuthContext = createContext<Auth | null>(null);
@@ -182,6 +191,41 @@ export function AuthProvider({
     [client],
   );
 
+  const changePassword = useCallback(
+    async (current: string, next: string) => {
+      if (!client) {
+        throw new AuthError('אין חיבור לשרת, ולכן לא ניתן לשנות סיסמה.');
+      }
+      const email = session?.user?.email;
+      if (!email) throw new AuthError('אין חשבון מחובר.');
+      if (next.length < 6) {
+        throw new AuthError('הסיסמה החדשה קצרה מדי. נדרשים לפחות 6 תווים.');
+      }
+      if (next === current) {
+        throw new AuthError('הסיסמה החדשה זהה לנוכחית.');
+      }
+
+      // Re-authenticate before changing anything. A wrong current password
+      // comes back as "invalid login credentials", which the message map turns
+      // into Hebrew — and nothing is written.
+      const { error: checkError } = await client.auth.signInWithPassword({
+        email,
+        password: current,
+      });
+      if (checkError) {
+        throw new AuthError(
+          checkError.message.toLowerCase().includes('invalid login credentials')
+            ? 'הסיסמה הנוכחית אינה נכונה.'
+            : checkError.message,
+        );
+      }
+
+      const { error } = await client.auth.updateUser({ password: next });
+      if (error) throw new AuthError(error.message);
+    },
+    [client, session],
+  );
+
   const signOut = useCallback(async () => {
     // The mirror is cleared BEFORE the session goes, so a failure leaves the
     // user still signed in with an intact cache rather than signed out with
@@ -202,8 +246,9 @@ export function AuthProvider({
       signUp,
       signIn,
       signOut,
+      changePassword,
     }),
-    [status, session, client, status0, signUp, signIn, signOut],
+    [status, session, client, status0, signUp, signIn, signOut, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

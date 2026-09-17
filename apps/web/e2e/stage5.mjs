@@ -387,9 +387,25 @@ try {
   // food-cost panel renders and withholds the percentage it cannot compute.
   await page.goto('http://127.0.0.1:8124/more', { waitUntil: 'load' });
   await page.waitForTimeout(700);
-  const centreLink = page.getByRole('link', { name: 'מרכז חומרי הגלם' });
+  // STAGE-11: "עוד" is now the menu §2 screen 19 describes, and its entries
+  // carry a title and a line of explanation — so the link is found by href
+  // rather than by an exact accessible name that now includes both.
+  const centreLink = page.locator('a[href="/ingredients"]');
   check('the ingredient centre is reachable from "עוד"', (await centreLink.count()) > 0);
-  await centreLink.click();
+  // The menu is checked as a whole here, because a menu with a dead entry is
+  // the defect this screen used to have.
+  for (const [href, label] of [
+    ['/ingredients', 'חומרי גלם'],
+    ['/plans', 'תכנון ייצור'],
+    ['/tools', 'כלי המדידה'],
+    ['/settings', 'הגדרות'],
+  ]) {
+    check(
+      `"עוד" links to ${label}`,
+      (await page.locator(`a[href="${href}"]`).count()) > 0,
+    );
+  }
+  await centreLink.first().click();
   await page.waitForTimeout(700);
 
   check(

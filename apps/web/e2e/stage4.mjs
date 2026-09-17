@@ -199,7 +199,11 @@ try {
   );
 
   // ── the calibration survives a FULL page reload ────────────────────────
-  await page.goto('http://127.0.0.1:8123/more', { waitUntil: 'load' });
+  // STAGE-11: the calibration list moved from "עוד" to "כלי המדידה שלי", which
+  // is the screen §2 assigns it to (screen 21). What is being checked here —
+  // that a calibration taken in the editor survives a real page reload — is
+  // unchanged.
+  await page.goto('http://127.0.0.1:8123/tools', { waitUntil: 'load' });
   await page.waitForTimeout(1000);
   const moreText = (await page.locator('body').textContent()) ?? '';
   check('the calibration list shows it after a full page reload', moreText.includes('קקאו'));

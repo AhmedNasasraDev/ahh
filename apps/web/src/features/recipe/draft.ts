@@ -21,7 +21,7 @@
 // way to the database.
 
 import { normalizeName, unitId } from '@recipe-notebook/engine';
-import type { IngredientLike, Recipe, Step, StepKind } from '@recipe-notebook/engine';
+import type { IngredientLike, Pan, Recipe, Step, StepKind } from '@recipe-notebook/engine';
 
 /** A form row for one ingredient. Ids are kept so React keys stay stable. */
 export interface IngredientDraft {
@@ -69,6 +69,25 @@ export interface StepDraft {
   kind: '' | StepKind;
 }
 
+/**
+ * A pan, held as form strings. Same reason as every other numeric field here:
+ * '' has to stay distinguishable from '0', and a <select> plus five inputs
+ * cannot hold a number|undefined without inventing one.
+ */
+export interface PanDraft {
+  kind: '' | NonNullable<Pan['kind']>;
+  diameter: string;
+  width: string;
+  length: string;
+  height: string;
+  gn: string;
+  cavities: string;
+}
+
+export function emptyPan(): PanDraft {
+  return { kind: '', diameter: '', width: '', length: '', height: '', gn: '', cavities: '' };
+}
+
 export interface RecipeDraft {
   /** '' for a recipe that does not exist yet */
   id: string;
@@ -97,8 +116,33 @@ export interface RecipeDraft {
   targetGM: string;
   shelfLife: string;
   storage: string;
+  /** §1.1, and the two the editor never asked for until now */
+  freezing: string;
+  thawing: string;
   equipment: string;
   notes: string;
+  /*
+    STAGE-11 COMPLETION (§1.1, §13). Everything below already existed in the
+    column list, in both mappers and in `save_recipe`; the engine already
+    computed from it and the recipe page already displayed the result. The form
+    simply never asked. So `פחת אפייה` read 0.0% for every recipe in the
+    notebook — not because there was no loss, but because nobody could enter
+    the two weights — and `טמפ' מים מחושבת` could never appear at all.
+  */
+  /** the weight of the batch before and after baking; '' = not weighed */
+  weightBefore: string;
+  weightAfter: string;
+  /** §13 dough mode: with it off, the four temperatures below mean nothing */
+  doughMode: boolean;
+  /** desired dough temperature, and the three inputs it is solved against */
+  ddt: string;
+  flourTemp: string;
+  roomTemp: string;
+  friction: string;
+  /** §1.1 manualAllergens — what the table cannot know, comma separated */
+  manualAllergens: string;
+  /** §7 the pan this recipe is written for */
+  pan: PanDraft;
   ingredients: IngredientDraft[];
   steps: StepDraft[];
 }
@@ -187,8 +231,19 @@ export function emptyDraft(category = 'אחר'): RecipeDraft {
     targetGM: '',
     shelfLife: '',
     storage: '',
+    freezing: '',
+    thawing: '',
     equipment: '',
     notes: '',
+    weightBefore: '',
+    weightAfter: '',
+    doughMode: false,
+    ddt: '',
+    flourTemp: '',
+    roomTemp: '',
+    friction: '',
+    manualAllergens: '',
+    pan: emptyPan(),
     // One empty row of each, so the form has somewhere to start typing.
     ingredients: [emptyIngredient()],
     steps: [emptyStep()],
@@ -215,8 +270,27 @@ export function draftFromRecipe(recipe: Recipe): RecipeDraft {
     targetGM: str(recipe['targetGM']),
     shelfLife: str(recipe.shelfLife),
     storage: str(recipe.storage),
+    freezing: str(recipe.freezing),
+    thawing: str(recipe.thawing),
     equipment: str(recipe.equipment),
     notes: str(recipe.notes),
+    weightBefore: str(recipe.weightBefore),
+    weightAfter: str(recipe.weightAfter),
+    doughMode: recipe.doughMode === true,
+    ddt: str(recipe.ddt),
+    flourTemp: str(recipe.flourTemp),
+    roomTemp: str(recipe.roomTemp),
+    friction: str(recipe.friction),
+    manualAllergens: (recipe.manualAllergens ?? []).join(', '),
+    pan: {
+      kind: recipe.pan?.kind ?? '',
+      diameter: str(recipe.pan?.diameter),
+      width: str(recipe.pan?.width),
+      length: str(recipe.pan?.length),
+      height: str(recipe.pan?.height),
+      gn: str(recipe.pan?.gn),
+      cavities: str(recipe.pan?.cavities),
+    },
     ingredients: (recipe.ingredients ?? []).map((ing) => ({
       key: nextKey('ing'),
       name: str(ing.name),
@@ -284,6 +358,27 @@ const isBlankStep = (s: StepDraft): boolean =>
  * engine reads them as "no value" rather than as zero. Nothing is defaulted
  * here — that would be the place where a guessed number would enter the system.
  */
+/**
+ * A pan the user actually described, or null.
+ *
+ * `kind: 'none'` is kept when the user picked it on purpose — "this recipe is
+ * not baked in a pan" is information, and §7 lists it as one of the six kinds.
+ * What is dropped is a kind with no dimensions behind it, which would make
+ * `panFactor` look answerable when it is not.
+ */
+export function panFromDraft(p: PanDraft): Pan | null {
+  if (!p.kind) return null;
+  if (p.kind === 'none') return { kind: 'none' };
+  const out: Pan = { kind: p.kind };
+  if (p.diameter.trim()) out.diameter = p.diameter.trim();
+  if (p.width.trim()) out.width = p.width.trim();
+  if (p.length.trim()) out.length = p.length.trim();
+  if (p.height.trim()) out.height = p.height.trim();
+  if (p.gn.trim()) out.gn = p.gn.trim();
+  if (p.cavities.trim()) out.cavities = p.cavities.trim();
+  return out;
+}
+
 export function draftToRecipe(draft: RecipeDraft): Recipe {
   const trimmed = draft.ingredients.filter((i) => !isBlankIngredient(i));
   const steps = draft.steps.filter((s) => !isBlankStep(s));
@@ -310,8 +405,27 @@ export function draftToRecipe(draft: RecipeDraft): Recipe {
     targetGM: draft.targetGM.trim(),
     shelfLife: draft.shelfLife.trim(),
     storage: draft.storage.trim(),
+    freezing: draft.freezing.trim(),
+    thawing: draft.thawing.trim(),
     equipment: draft.equipment.trim(),
     notes: draft.notes.trim(),
+    // Blank stays blank all the way to a NULL column: `weightBefore: ''` is
+    // "nobody weighed it" and the engine must not read it as a weight of 0.
+    weightBefore: draft.weightBefore.trim(),
+    weightAfter: draft.weightAfter.trim(),
+    doughMode: draft.doughMode,
+    ddt: draft.ddt.trim(),
+    flourTemp: draft.flourTemp.trim(),
+    roomTemp: draft.roomTemp.trim(),
+    friction: draft.friction.trim(),
+    manualAllergens: draft.manualAllergens
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean),
+    // A pan with nothing in it is stored as NULL rather than as `{kind:'none'}`:
+    // "no pan was recorded" and "this recipe uses no pan" are different
+    // statements, and only the second one is worth a row in the column.
+    pan: panFromDraft(draft.pan),
     ingredients: trimmed.map<IngredientLike>((i, idx) => {
       const ing: IngredientLike = {
         id: i.key,

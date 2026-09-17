@@ -251,3 +251,61 @@ describe('professional calculations survive the merge', () => {
     expect(c.warnings.join(' ')).toContain('מעגל תת־מתכונים');
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-11 — one weight is not a measurement.
+//
+// Before the recipe form asked for these two weights nothing could reach this
+// state. The moment it did, "I typed the before-weight and got interrupted"
+// became a normal thing for a real user to do, and the arithmetic had to have
+// an answer for it that is not Infinity.
+describe('bake loss needs BOTH weights', () => {
+  const base = {
+    id: 'loss',
+    name: 'לחם',
+    unitWeight: 85,
+    ingredients: [{ id: 'i1', name: 'קמח לבן', qty: 1000, unit: 'g', flour: true }],
+    steps: [],
+  };
+  const prefs = DEFAULT_PREFS;
+
+  it('reports no loss, and a finite scale weight, when only the before-weight is in', () => {
+    const c = compute({ ...base, weightBefore: 1000 } as never, [], { prefs });
+    expect(c.bakeLoss).toBe(0);
+    expect(Number.isFinite(c.scaleWeight)).toBe(true);
+    expect(c.scaleWeight).toBe(85);
+  });
+
+  it('and likewise when only the after-weight is in', () => {
+    const c = compute({ ...base, weightAfter: 880 } as never, [], { prefs });
+    expect(c.bakeLoss).toBe(0);
+    expect(c.scaleWeight).toBe(85);
+  });
+
+  it('computes the loss once both are there', () => {
+    const c = compute({ ...base, weightBefore: 1000, weightAfter: 880 } as never, [], { prefs });
+    expect(c.bakeLoss).toBeCloseTo(12, 6);
+    expect(c.scaleWeight).toBeCloseTo(85 / 0.88, 6);
+  });
+
+  it('keeps a real 0 apart from a blank: 0 after 1000 is a total loss', () => {
+    const c = compute({ ...base, weightBefore: 1000, weightAfter: 0 } as never, [], { prefs });
+    expect(c.bakeLoss).toBe(100);
+    // 100% loss cannot produce a weight to scale to, and Infinity is not one.
+    expect(c.scaleWeight).toBe(0);
+  });
+
+  it('refuses to invent a figure from weights that contradict each other', () => {
+    // After heavier than before is a gain, not a loss — soaking, glazing, a
+    // typo. Whatever it is, it is not a bake loss.
+    const c = compute({ ...base, weightBefore: 800, weightAfter: 1000 } as never, [], { prefs });
+    expect(c.bakeLoss).toBeCloseTo(-25, 6);
+    expect(Number.isFinite(c.scaleWeight)).toBe(true);
+  });
+
+  it('treats an empty string as not measured, not as zero', () => {
+    const c = compute({ ...base, weightBefore: '', weightAfter: '' } as never, [], { prefs });
+    expect(c.bakeLoss).toBe(0);
+    expect(c.scaleWeight).toBe(85);
+  });
+});

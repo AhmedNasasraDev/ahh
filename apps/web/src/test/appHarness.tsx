@@ -25,6 +25,8 @@ import { IngredientsScreen } from '../routes/IngredientsScreen.js';
 import { PlansScreen } from '../routes/PlansScreen.js';
 import { PlanScreen } from '../routes/PlanScreen.js';
 import { MoreScreen } from '../routes/MoreScreen.js';
+import { SettingsScreen } from '../routes/SettingsScreen.js';
+import { ToolsScreen } from '../routes/ToolsScreen.js';
 import type { TypedSupabaseClient } from '../lib/supabase.js';
 import { createFakeSupabase, type FakeDb, type FakeSupabase } from './fakeSupabase.js';
 import { createFakeAuth, type FakeAuthClient } from './fakeAuth.js';
@@ -58,6 +60,8 @@ export function AppUnderTest({
                 <Route path="/plans" element={<PlansScreen />} />
                 <Route path="/plan/:planId" element={<PlanScreen />} />
                 <Route path="/more" element={<MoreScreen />} />
+                <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/tools" element={<ToolsScreen />} />
               </Route>
               <Route path="*" element={<Navigate to="/notebook" replace />} />
             </Routes>

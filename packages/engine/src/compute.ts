@@ -196,11 +196,28 @@ export function compute(
   const prodLoss = theoretical
     ? ((theoretical - actualYield) / theoretical) * 100
     : 0;
-  const wb = num(recipe.weightBefore, 0);
-  const wa = num(recipe.weightAfter, 0);
+  /*
+    STAGE-11 DEFECT FIX. This read the two weights with `num(..., 0)` and then
+    `bakeLoss = wb ? ((wb - wa) / wb) * 100 : 0`, so a recipe with only the
+    BEFORE weight filled in — which is what a half-finished entry looks like —
+    was read as a 100% bake loss, and `scaleWeight` then divided by
+    `1 - 100/100` and came out **Infinity**. Unreachable while no form asked
+    for the weights; reachable the moment one did.
+
+    A loss needs the pair. One weight is not a measurement of anything, so it
+    is treated as "not measured", which in this arithmetic means no loss is
+    applied. The screen says so in words instead of printing 0%.
+  */
+  const wbEntered = numOrNull(recipe.weightBefore);
+  const waEntered = numOrNull(recipe.weightAfter);
+  const wb = wbEntered !== null && waEntered !== null && wbEntered > 0 ? wbEntered : 0;
+  const wa = wb ? waEntered! : 0;
   const bakeLoss = wb ? ((wb - wa) / wb) * 100 : 0;
   const unitW = num(recipe.unitWeight, 0);
-  const scaleWeight = unitW ? unitW / (1 - bakeLoss / 100) : 0;
+  // A loss of 100% or more would divide by zero or flip the sign. It can only
+  // come from weights that contradict each other (after ≥ before is a gain, not
+  // a loss), and the honest answer to a contradiction is no figure at all.
+  const scaleWeight = unitW && bakeLoss < 100 ? unitW / (1 - bakeLoss / 100) : 0;
   const unitsActual = scaleWeight
     ? actualYield / scaleWeight
     : num(recipe.yieldUnits, 0) * f;

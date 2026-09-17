@@ -475,3 +475,65 @@ describe('stage-10 audit, §10: every control on the page has its own name', () 
     expect(scale).not.toBe(view);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-11 — the two loss rows, and the project's own null-vs-zero rule.
+//
+// "פחת אפייה 0.0%" told every baker in the notebook that their bread lost no
+// water, when the truth was that nobody had weighed it. The rule the whole
+// data model turns on was being broken by two `toFixed(1)` calls.
+describe('stage-11: פחת is a measurement, and says so when it is missing', () => {
+  const unweighed: Recipe = {
+    id: 'loss',
+    name: 'לחם כפרי',
+    category: 'לחמים',
+    unitWeight: 500,
+    yieldUnits: 2,
+    ingredients: [
+      { id: 'i1', name: 'קמח לחם', qty: 1000, unit: 'g', flour: true },
+      { id: 'i2', name: 'מים', qty: 700, unit: 'g', liquid: true },
+    ],
+    steps: [],
+  } as unknown as Recipe;
+
+  const open = async (recipe: Recipe) => {
+    const user = userEvent.setup();
+    renderRecipe(recipe.id, { recipes: [recipe] });
+    await screen.findByRole('heading', { name: recipe.name as string });
+    await user.click(screen.getByRole('button', { name: /נתוני ייצור ועלויות/ }));
+  };
+
+  it('says the batch was not weighed instead of printing a loss of zero', async () => {
+    await open(unweighed);
+    expect(screen.getByText(/לא נשקל לפני ואחרי/)).toBeInTheDocument();
+    expect(screen.queryByText('0.0%')).not.toBeInTheDocument();
+  });
+
+  it('says the yield was not measured instead of a production loss of zero', async () => {
+    await open(unweighed);
+    expect(screen.getByText(/לא נמדדה תשואה בפועל/)).toBeInTheDocument();
+  });
+
+  it('shows the real figure once both weights are there', async () => {
+    await open({ ...unweighed, weightBefore: 1000, weightAfter: 880 } as unknown as Recipe);
+    expect(screen.getByText('12.0%')).toBeInTheDocument();
+    expect(screen.queryByText(/לא נשקל/)).not.toBeInTheDocument();
+  });
+
+  it('shows a measured production loss when the actual yield was entered', async () => {
+    // 1700 g theoretical, 1600 g on the scale → 5.9%.
+    await open({ ...unweighed, yieldActual: 1600 } as unknown as Recipe);
+    expect(screen.getByText('5.9%')).toBeInTheDocument();
+  });
+
+  it('treats a measured 0 as a measurement, not as a blank', async () => {
+    await open({ ...unweighed, weightBefore: 1000, weightAfter: 0 } as unknown as Recipe);
+    expect(screen.getByText('100.0%')).toBeInTheDocument();
+    expect(screen.queryByText(/לא נשקל/)).not.toBeInTheDocument();
+  });
+
+  it('withholds the loss when only one of the two weights was entered', async () => {
+    await open({ ...unweighed, weightBefore: 1000 } as unknown as Recipe);
+    expect(screen.getByText(/לא נשקל לפני ואחרי/)).toBeInTheDocument();
+  });
+});

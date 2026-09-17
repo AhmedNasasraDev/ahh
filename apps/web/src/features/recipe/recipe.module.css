@@ -1075,3 +1075,95 @@
   color: var(--c-green);
   font-weight: 600;
 }
+
+/* ── §7 the pan card ─────────────────────────────────────────────────────
+   Reuses .card and .cardTitle; only the picker and the suggestion are new.
+   Colours are the §16 tokens, and the contrast guard in tokens.test.ts
+   measures every pair below. */
+.panNote {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--c-ink);
+}
+.panWhy {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--c-muted);
+}
+.panPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: flex-end;
+  margin: 10px 0 0;
+}
+.panField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 96px;
+  flex: 1 1 96px;
+}
+.panLabel {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+.panSelect,
+.panInput {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: 10px;
+  background: var(--c-white);
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.panSuggest {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--c-amber-bg);
+  color: var(--c-ink);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.panAdapt {
+  margin: 10px 0 0;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-green);
+  color: var(--c-white);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── §8 the personal note ────────────────────────────────────────────────── */
+.noteArea {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 10px;
+  background: var(--c-white);
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.noteStatus {
+  margin: 6px 0 0;
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--c-muted);
+}

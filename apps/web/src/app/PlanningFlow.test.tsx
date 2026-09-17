@@ -417,3 +417,26 @@ describe('requirement 13 — one account cannot see or touch another’s plans',
     expect(db['production_plans']![0]!['owner_id']).toBe(USER_A);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-11 — a plan id that is not there.
+//
+// Found by walking every route in a browser: this was the one page in the app
+// that rendered no <h1>, so a screen reader landing on it from a stale
+// bookmark had nothing to announce. The message and the way back were already
+// correct; the heading was not there.
+describe('stage-11: a plan that cannot be loaded is still a page', () => {
+  it('says the plan was not found, under a heading, with a way back', async () => {
+    const db = emptyDb();
+    db['profiles']!.push(newProfileRow(USER_A, { onboarding_done: true }));
+    const p = project(db, USER_A);
+
+    render(<AppUnderTest client={p.client} route="/plan/no-such-plan" />);
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'תוכנית ייצור' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('התוכנית לא נמצאה.');
+    expect(screen.getByRole('link', { name: 'חזרה לתוכניות' })).toBeInTheDocument();
+  });
+});
