@@ -34,17 +34,41 @@ import type {
   ProductionPlanItemRow,
   ProductionPlanRow,
   ProductionPlanStockRow,
+  RecipeImageRow,
   RecipeVersionRow,
 } from '../lib/database.types.js';
 import {
   RecipeInUseError,
   WriteNotAllowedError,
   type PlanSummary,
+  type RecipeImage,
   type Repository,
   type RepositoryCapabilities,
   type SaveOptions,
   type StoredVersion,
 } from './repository.js';
+import {
+  convertErrorText,
+  convertToWebp,
+  imagePath,
+} from '../features/images/convert.js';
+
+/** The private bucket from migration 0029. */
+const RECIPE_IMAGE_BUCKET = 'recipe-images';
+
+function imageFromRow(row: RecipeImageRow): RecipeImage {
+  return {
+    id: row.id,
+    recipeId: row.recipe_id,
+    storagePath: row.storage_path,
+    ord: row.ord,
+    width: row.width,
+    height: row.height,
+    bytes: row.bytes,
+    caption: row.caption,
+    createdAt: row.created_at,
+  };
+}
 import {
   bundleToRecipe,
   calibrationRowToDomain,
@@ -624,6 +648,108 @@ export function createSupabaseRepository({
         p_body: body,
       });
       if (error) throw new SupabaseRepositoryError('שמירת ההערה האישית נכשלה', error);
+    },
+
+    // ── §5 recipe photographs (migration 0029) ─────────────────────────────
+
+    async listRecipeImages(recipeId: string): Promise<RecipeImage[]> {
+      const { data, error } = await client
+        .from('recipe_images')
+        .select('*')
+        .eq('recipe_id', recipeId)
+        .order('ord', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (error) throw new SupabaseRepositoryError('טעינת התמונות נכשלה', error);
+      return (data ?? []).map(imageFromRow);
+    },
+
+    async addRecipeImage(recipeId: string, file: File | Blob): Promise<RecipeImage> {
+      requireOnline('העלאת תמונה');
+
+      /*
+        Convert FIRST. The bucket accepts only image/webp under 2 MB, so a
+        failure here is a failure the user can act on — and reporting it before
+        any network call is the difference between "the photo is too big, crop
+        it" and a 400 from storage with no explanation.
+      */
+      const converted = await convertToWebp(file);
+      if (!converted.ok) {
+        throw new SupabaseRepositoryError(convertErrorText(converted), null);
+      }
+
+      const path = imagePath(recipeId);
+      const upload = await client.storage
+        .from(RECIPE_IMAGE_BUCKET)
+        .upload(path, converted.blob, {
+          contentType: 'image/webp',
+          // No overwrite: the path carries a fresh uuid, so a collision would
+          // mean something is wrong rather than something to paper over.
+          upsert: false,
+        });
+      if (upload.error) {
+        throw new SupabaseRepositoryError('העלאת התמונה נכשלה', upload.error);
+      }
+
+      const { data, error } = await client
+        .from('recipe_images')
+        .insert({
+          recipe_id: recipeId,
+          storage_path: path,
+          width: converted.width,
+          height: converted.height,
+          bytes: converted.bytes,
+          created_by: userId,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        /*
+          The object is up and the row failed. Remove the object rather than
+          leave a file nothing points at — this is the only place the two can
+          get out of step, and it is worth the extra call.
+        */
+        await client.storage.from(RECIPE_IMAGE_BUCKET).remove([path]);
+        throw new SupabaseRepositoryError('שמירת התמונה נכשלה', error);
+      }
+      return imageFromRow(data);
+    },
+
+    async removeRecipeImage(image: RecipeImage): Promise<void> {
+      requireOnline('מחיקת תמונה');
+      /*
+        The OBJECT first, then the row. Postgres cannot reach into storage, so
+        nothing deletes the file for us (0029 says why there is no trigger). In
+        this order a failure leaves a row pointing at a missing file, which the
+        gallery already has to survive — a signed URL can fail for other
+        reasons. The other order leaves a file nothing points at, which nothing
+        will ever clean up.
+      */
+      const removed = await client.storage
+        .from(RECIPE_IMAGE_BUCKET)
+        .remove([image.storagePath]);
+      if (removed.error) {
+        throw new SupabaseRepositoryError('מחיקת התמונה נכשלה', removed.error);
+      }
+      const { error } = await client.from('recipe_images').delete().eq('id', image.id);
+      if (error) throw new SupabaseRepositoryError('מחיקת התמונה נכשלה', error);
+    },
+
+    async signedImageUrl(storagePath: string): Promise<string | null> {
+      /*
+        Ten minutes. Long enough for a recipe page to stay usable while someone
+        bakes from it, short enough that a URL pasted into a chat stops working
+        — which matters, because the signed URL bypasses RLS for whoever holds
+        it. Not throwing: a photo this account may not see is a legitimate
+        answer, and it should render as a missing photo rather than take the
+        page down.
+      */
+      const { data, error } = await client.storage
+        .from(RECIPE_IMAGE_BUCKET)
+        .createSignedUrl(storagePath, 600);
+      if (error || !data?.signedUrl) return null;
+      return data.signedUrl;
     },
 
     async listCalibrations(): Promise<Calibration[]> {

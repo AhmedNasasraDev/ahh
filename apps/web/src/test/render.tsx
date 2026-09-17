@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AppDataProvider } from '../app/AppDataProvider.js';
 import type { Repository, RepositoryCapabilities } from '../data/repository.js';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from '../data/demoRecipes.js';
-import type { StoredVersion } from '../data/repository.js';
+import type { RecipeImage, StoredVersion } from '../data/repository.js';
 import { defaultPrefs, type Calibration, type MeasurementPrefs, type Recipe } from '@recipe-notebook/engine';
 import { basePriceOf, type CatalogItem } from '../features/pricing/catalog.js';
 import type {
@@ -36,6 +36,12 @@ export interface FakeRepoOptions {
   /** §8: personal notes the account already has, keyed by recipe id */
   notes?: Readonly<Record<string, string>>;
   onSavePrivateNote?(recipeId: string, body: string): void;
+  /** §5: photographs the recipe already has */
+  images?: readonly RecipeImage[];
+  onAddRecipeImage?(recipeId: string, file: File | Blob): void;
+  onRemoveRecipeImage?(image: RecipeImage): void;
+  /** true makes every signed URL come back null, as a private object can */
+  signedUrlFails?: boolean;
 }
 
 /**
@@ -59,6 +65,7 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
   const purchases: Array<{ key: string; record: PurchaseRecord }> = [];
   let recipes = [...(opts.recipes ?? DEMO_RECIPES)];
   const notes: Record<string, string> = { ...(opts.notes ?? {}) };
+  let images: RecipeImage[] = [...(opts.images ?? [])];
   const caps: RepositoryCapabilities = {
     source: 'local-demo',
     online: true,
@@ -207,6 +214,34 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
       ].reverse(),
     // §8. Mirrors migration 0022: an empty body is not a note, it is the
     // absence of one, so saving one removes it.
+    // §5 photographs. The double keeps them in memory and hands back a fake
+    // signed URL, so a gallery test exercises the real code path — list, then
+    // sign each path — without a network or a bucket.
+    listRecipeImages: async (recipeId: string) =>
+      images.filter((i) => i.recipeId === recipeId).sort((a, b) => a.ord - b.ord),
+    addRecipeImage: async (recipeId: string, file: File | Blob) => {
+      if (opts.onAddRecipeImage) opts.onAddRecipeImage(recipeId, file);
+      const added: RecipeImage = {
+        id: `img-${images.length + 1}`,
+        recipeId,
+        storagePath: `${recipeId}/img-${images.length + 1}.webp`,
+        ord: images.length,
+        width: 1600,
+        height: 1200,
+        bytes: 120000,
+        caption: '',
+        createdAt: new Date().toISOString(),
+      };
+      images = [...images, added];
+      return added;
+    },
+    removeRecipeImage: async (image: RecipeImage) => {
+      opts.onRemoveRecipeImage?.(image);
+      images = images.filter((i) => i.id !== image.id);
+    },
+    signedImageUrl: async (path: string) =>
+      opts.signedUrlFails === true ? null : `blob:signed/${path}`,
+
     getPrivateNote: async (recipeId: string) => notes[recipeId] ?? null,
     savePrivateNote: async (recipeId: string, body: string) => {
       if (body.trim() === '') delete notes[recipeId];

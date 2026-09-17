@@ -445,6 +445,29 @@ export type GroupJoinRequestRow = {
   created_at: string;
 };
 
+/* ── §5 recipe photographs (migration 0029) ──────────────────────────────── */
+
+/**
+ * The index of what is in the private bucket.
+ *
+ * `storage_path` is `{recipe_id}/{uuid}.webp`, and the leading segment is load
+ * bearing: 0029's storage policies read the recipe id out of it to decide
+ * access. A path built any other way is refused by the database.
+ */
+export type RecipeImageRow = {
+  id: string;
+  recipe_id: string;
+  storage_path: string;
+  ord: number;
+  /** what the client measured after conversion; null is allowed */
+  width: number | null;
+  height: number | null;
+  bytes: number | null;
+  caption: string;
+  created_at: string;
+  created_by: string | null;
+};
+
 export type ProductionPlanRow = {
   id: string;
   owner_id: string;
@@ -519,6 +542,7 @@ export type Database = {
       group_recipe_items: Table<GroupRecipeItemRow>;
       group_invites: Table<GroupInviteRow>;
       group_join_requests: Table<GroupJoinRequestRow>;
+      recipe_images: Table<RecipeImageRow>;
     };
     // Empty MAPPED types, not `Record<string, never>`. Record<string, never>
     // says every possible name is a view whose row type is `never`, so

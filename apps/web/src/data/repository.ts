@@ -231,13 +231,61 @@ export interface PrivateNoteRepository {
   savePrivateNote(recipeId: string, body: string): Promise<void>;
 }
 
+/**
+ * §5 / HANDOFF §7 step 8 — recipe photographs.
+ *
+ * WHY A URL IS A SEPARATE CALL, AND WHY IT EXPIRES
+ *
+ * The bucket is PRIVATE (migration 0029), so there is no permanent address for
+ * a photo. A viewer needs a signed URL, minted per request and valid for a
+ * while, and the signing is itself an authorisation check: the storage policy
+ * decides whether this caller may have one. So `signedImageUrl` is not a
+ * formatting helper — it is a request that can legitimately fail, and the UI
+ * has to be able to show a photo that would not load.
+ *
+ * WHY UPLOAD TAKES A FILE AND NOT A URL
+ *
+ * The conversion to WebP happens in the browser (features/images/convert.ts)
+ * and the bucket accepts nothing else. Passing an already-converted blob would
+ * let a caller skip the conversion, get a 400 from storage, and have no idea
+ * why; passing the original file keeps the one code path that knows the rules.
+ */
+export interface RecipeImage {
+  id: string;
+  recipeId: string;
+  storagePath: string;
+  ord: number;
+  width: number | null;
+  height: number | null;
+  bytes: number | null;
+  caption: string;
+  createdAt: string;
+}
+
+export interface RecipeImageRepository {
+  listRecipeImages(recipeId: string): Promise<RecipeImage[]>;
+  /**
+   * Converts, uploads and indexes one photo. Rejects with a message the UI can
+   * show when the file cannot be made to fit — see `convertErrorText`.
+   */
+  addRecipeImage(recipeId: string, file: File | Blob): Promise<RecipeImage>;
+  /** Removes the object AND its row. The object goes first — see 0029. */
+  removeRecipeImage(image: RecipeImage): Promise<void>;
+  /**
+   * A time-limited URL for a private object, or null when one cannot be had.
+   * Null is a real answer: the photo exists and this caller may not see it.
+   */
+  signedImageUrl(storagePath: string): Promise<string | null>;
+}
+
 export interface CalibrationRepository {
   listCalibrations(): Promise<Calibration[]>;
   saveCalibrations(list: readonly Calibration[]): Promise<Calibration[]>;
 }
 
 export interface Repository
-  extends RecipeRepository,
+  extends RecipeImageRepository,
+    RecipeRepository,
     PlanRepository,
     PrefsRepository,
     CalibrationRepository,

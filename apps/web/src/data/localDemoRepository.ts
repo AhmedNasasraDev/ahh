@@ -211,6 +211,33 @@ export function createLocalDemoRepository(): Repository {
       );
     },
 
+    /*
+      §5 photographs. The bucket is on the server and the whole point of it is
+      that access is decided per account (0029). A demo session has no account,
+      so there is nowhere a photo could be stored that would honour that — and
+      keeping it on the device while calling it a recipe photo would promise
+      something this mode cannot deliver. It says so instead.
+    */
+    async listRecipeImages() {
+      return [];
+    },
+
+    async addRecipeImage(): Promise<never> {
+      throw new WriteNotAllowedError(
+        'תמונות מתכון נשמרות בשרת ומשויכות לחשבון, ובהתקנה הזאת אין חיבור לשרת.',
+      );
+    },
+
+    async removeRecipeImage(): Promise<never> {
+      throw new WriteNotAllowedError(
+        'תמונות מתכון נשמרות בשרת, ובהתקנה הזאת אין חיבור לשרת.',
+      );
+    },
+
+    async signedImageUrl() {
+      return null;
+    },
+
     async listCalibrations() {
       return normalizeCalibrations(await mirror.readCalibrations());
     },

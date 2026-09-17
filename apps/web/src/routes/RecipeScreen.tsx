@@ -27,6 +27,7 @@ import { duplicateRecipe } from '../features/recipe/duplicate.js';
 import { VersionHistory } from '../features/recipe/VersionHistory.js';
 import { PanCard } from '../features/recipe/PanCard.js';
 import { PrivateNote } from '../features/recipe/PrivateNote.js';
+import { RecipeImages } from '../features/images/RecipeImages.js';
 import { writeLastOpened } from '../data/offlineMirror.js';
 import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
 import styles from '../features/recipe/recipe.module.css';
@@ -92,6 +93,10 @@ export function RecipeScreen() {
     catalog,
     getPrivateNote,
     savePrivateNote,
+    listRecipeImages,
+    addRecipeImage,
+    removeRecipeImage,
+    signedImageUrl,
   } = useAppData();
 
   /** §8: null while it is being read, then '' or the text. */
@@ -666,6 +671,27 @@ export function RecipeScreen() {
           setScaleMode('weight');
           setScaleValue(String(Math.round(grams)));
         }}
+      />
+
+      {/*
+        ── §5 photographs ────────────────────────────────────────────────
+        On the recipe page rather than in the edit form: an upload happens
+        immediately, and an immediate action inside a form whose promise is
+        "nothing happens until you save" means cancelling the edit leaves the
+        photo behind. RecipeImages.tsx has the longer version.
+
+        `canEdit` is ownership, not the profile: a member reading a group
+        recipe may see its photos and may not add to them, which is what
+        migration 0029's storage policies enforce anyway.
+      */}
+      <RecipeImages
+        recipeId={recipe.id}
+        canWrite={capabilities.canWrite}
+        canEdit={!recipe.group_id}
+        list={listRecipeImages}
+        add={addRecipeImage}
+        remove={removeRecipeImage}
+        sign={signedImageUrl}
       />
 
       {/* ── §8 the personal note ───────────────────────────────────────── */}

@@ -35,6 +35,7 @@ import {
   type RepositoryCapabilities,
   type SaveOptions,
   type PlanSummary,
+  type RecipeImage,
   type StoredVersion,
 } from '../data/repository.js';
 import { supabaseStatus } from '../lib/supabase.js';
@@ -102,6 +103,14 @@ export interface AppData {
    */
   getPrivateNote(recipeId: string): Promise<string | null>;
   savePrivateNote(recipeId: string, body: string): Promise<void>;
+  /* §5 photographs. Passed straight through: the gallery owns its own state,
+     because a photo list is per-recipe and nothing else on the screen needs
+     it — putting it in the provider would reload every recipe's photos on
+     every render of the notebook. */
+  listRecipeImages(recipeId: string): Promise<RecipeImage[]>;
+  addRecipeImage(recipeId: string, file: File | Blob): Promise<RecipeImage>;
+  removeRecipeImage(image: RecipeImage): Promise<void>;
+  signedImageUrl(storagePath: string): Promise<string | null>;
   listPlans(): Promise<PlanSummary[]>;
   getPlan(id: string): Promise<ProductionPlan | null>;
   savePlan(plan: ProductionPlan): Promise<ProductionPlan>;
@@ -340,6 +349,20 @@ export function AppDataProvider({
     [repo],
   );
 
+  const listRecipeImages = useCallback((id: string) => repo.listRecipeImages(id), [repo]);
+  const addRecipeImage = useCallback(
+    (id: string, file: File | Blob) => repo.addRecipeImage(id, file),
+    [repo],
+  );
+  const removeRecipeImage = useCallback(
+    (image: RecipeImage) => repo.removeRecipeImage(image),
+    [repo],
+  );
+  const signedImageUrl = useCallback(
+    (path: string) => repo.signedImageUrl(path),
+    [repo],
+  );
+
   const getPrivateNote = useCallback((id: string) => repo.getPrivateNote(id), [repo]);
   const savePrivateNote = useCallback(
     (id: string, body: string) => repo.savePrivateNote(id, body),
@@ -388,6 +411,10 @@ export function AppDataProvider({
       purchaseHistory,
       getPrivateNote,
       savePrivateNote,
+      listRecipeImages,
+      addRecipeImage,
+      removeRecipeImage,
+      signedImageUrl,
       listPlans,
       getPlan,
       savePlan,
@@ -418,6 +445,10 @@ export function AppDataProvider({
       purchaseHistory,
       getPrivateNote,
       savePrivateNote,
+      listRecipeImages,
+      addRecipeImage,
+      removeRecipeImage,
+      signedImageUrl,
       listPlans,
       getPlan,
       savePlan,

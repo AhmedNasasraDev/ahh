@@ -1,0 +1,139 @@
+/* §5 photographs, on the recipe page. §16 tokens only. */
+
+.card {
+  background: var(--c-paper);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card-lg);
+  padding: var(--pad-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+}
+
+.title {
+  font-family: var(--font-body);
+  font-size: var(--fs-meta-lg);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--c-muted);
+}
+
+.note,
+.hint {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  line-height: 1.7;
+}
+
+.error {
+  padding: 9px 11px;
+  border-radius: var(--r-card);
+  background: var(--c-red-bg);
+  color: var(--c-red);
+  font-size: var(--fs-secondary);
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  /* One column on a phone, two once there is room. A recipe photo wants to be
+     as large as the page allows. */
+  grid-template-columns: 1fr;
+  gap: var(--gap-in-group);
+  list-style: none;
+}
+
+@media (min-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+
+.frame {
+  /* aspect-ratio is set inline from the stored dimensions, so the box is
+     reserved before the signed URL resolves and the page does not reflow. */
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--c-neutral-bg);
+}
+
+.frameNote {
+  padding: 12px;
+  font-size: var(--fs-meta-lg);
+  color: var(--c-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.caption {
+  font-size: var(--fs-meta-lg);
+  color: var(--c-ink);
+  line-height: 1.6;
+}
+
+.addBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  padding-inline: 16px;
+  border: 1px solid var(--c-green);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-secondary);
+  cursor: pointer;
+}
+
+.removeBtn {
+  align-self: flex-start;
+  min-height: var(--hit-compact);
+  padding-inline: 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  color: var(--c-muted);
+  font-size: var(--fs-meta-lg);
+}
+
+.confirm {
+  display: flex;
+  gap: var(--gap-tight);
+}
+
+.confirmYes,
+.confirmNo {
+  min-height: var(--hit-compact);
+  padding-inline: 12px;
+  border-radius: var(--r-control);
+  font-size: var(--fs-meta-lg);
+}
+
+.confirmYes {
+  border: 1px solid var(--c-red);
+  background: var(--c-red-bg);
+  color: var(--c-red);
+}
+
+.confirmNo {
+  border: 1px solid var(--c-line);
+  background: var(--c-white);
+  color: var(--c-muted);
+}
