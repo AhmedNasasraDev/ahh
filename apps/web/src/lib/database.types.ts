@@ -55,6 +55,19 @@ export type ProfileRow = {
   touched_units: boolean;
   locale: Locale;
   onboarding_done: boolean;
+  /*
+    §10's chat needs a name and a face.
+
+    Default '', and migration 0031 deliberately does NOT derive one from the
+    email address. The local part of an address is not a name anybody chose,
+    and putting it in a group roster would disclose most of an address to
+    every other member — which is the one thing §10.1 says not to do.
+
+    So '' means "not set yet" and the UI falls back to a neutral label.
+  */
+  display_name: string;
+  /** `{user_id}/{uuid}.webp` in the `avatars` bucket. null = no picture. */
+  avatar_path: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -325,7 +338,16 @@ export type DensityTableRow = {
  */
 /* ── §10 groups, courses, lessons and items (migrations 0023-0026) ───────── */
 
-export type GroupRole = 'owner' | 'instructor' | 'member';
+/**
+ * The four roles, in the order `role_rank` ranks them (migration 0030):
+ * owner 4, admin 3, instructor 2, member 1.
+ *
+ * `admin` was added in 0030. Before it there was no way to let somebody run
+ * a group — invite, approve, remove — without handing them the group itself,
+ * and "owner or nothing" is how groups end up with three owners. The rank is
+ * what every policy compares; the names are only labels for it.
+ */
+export type GroupRole = 'owner' | 'admin' | 'instructor' | 'member';
 
 /** §10.2's four ways in. Stored as a text[] so a group can accept a subset. */
 export type JoinMethod = 'invite' | 'link' | 'code' | 'request';
@@ -413,21 +435,51 @@ export type GroupRecipeItemRow = {
  * it themselves, so the link has to be readable again afterwards. If a mailer
  * is added, this should become a hash.
  */
+/**
+ * The four states an invitation is STORED in. `expired` is not among them on
+ * purpose: expiry is a fact about the clock, not a transition anybody
+ * performs, so it is derived by `invite_state` rather than written by a job
+ * that might not run. See migration 0030.
+ */
+export type InviteStatus = 'pending' | 'accepted' | 'rejected' | 'revoked';
+
+/** What `invite_state` answers: the stored status, or the derived expiry. */
+export type InviteState = InviteStatus | 'expired';
+
 export type GroupInviteRow = {
   id: string;
   group_id: string;
   /**
-   * Who it was meant for — a LABEL, not a check. Redemption is by token, so
-   * this never decides who may join. An `email` column that looked like a
-   * check but was not would be the more dangerous design.
+   * A free-text note for the inviter's own list ("the Tuesday group"). Never
+   * a check — see `email` for the thing that is one.
    */
   label: string;
+  /**
+   * Who it was issued to, normalised (trimmed and lower-cased) by
+   * `normalize_email`. Since 0031 this IS a check: `redeem_group_invite`
+   * compares it against `auth.email()` and refuses a mismatch, so a leaked
+   * link cannot be used by whoever ends up holding it.
+   *
+   * Null = an open link, the 0027 behaviour, kept because an invitation the
+   * instructor hands out in a lesson has no address to bind to.
+   */
+  email: string | null;
+  status: InviteStatus;
   token: string;
   expires_at: string;
   created_by: string;
   created_at: string;
   used_at: string | null;
   used_by: string | null;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  /**
+   * "Resend" issues a NEW invitation with a new token and revokes the old
+   * one, rather than extending the old row. The old link must stop working —
+   * that is the whole point of being able to resend — and this column keeps
+   * the chain readable afterwards.
+   */
+  replaces_id: string | null;
 };
 
 /**
@@ -437,12 +489,77 @@ export type GroupInviteRow = {
  * row here grants NOTHING: no policy anywhere references this table, so there
  * is no `and status = 'active'` for a future policy to forget. See 0027.
  */
+/**
+ * `accepted` is absent, and that is the design: approving a request creates
+ * the membership and DELETES the request row, so there is never a row that
+ * says "accepted" next to a membership that might not exist. See 0031's
+ * `approve_group_join`.
+ */
+export type JoinRequestStatus = 'pending' | 'rejected' | 'withdrawn';
+
 export type GroupJoinRequestRow = {
   id: string;
   group_id: string;
   user_id: string;
   note: string;
+  status: JoinRequestStatus;
+  decided_at: string | null;
+  decided_by: string | null;
   created_at: string;
+};
+
+/* ── group chat (migration 0032) ─────────────────────────────────────────── */
+
+/**
+ * `system` is a legal value the client can never write — 0032's insert guard
+ * refuses it — so a "X joined the group" line can be added later by a trigger
+ * without a message that only looks official.
+ */
+export type MessageKind = 'text' | 'announcement' | 'system';
+
+export type GroupMessageRow = {
+  id: string;
+  /**
+   * The total order the chat pages on. `bigint` in the database; it arrives
+   * as a NUMBER here because PostgREST serialises int8 as a JSON number, and
+   * the sequence would have to pass 2^53 for that to matter.
+   *
+   * Pagination is `seq < cursor order by seq desc`, never OFFSET: a new
+   * message shifts every offset by one and the page boundary duplicates or
+   * skips a row. See the header of 0032.
+   */
+  seq: number;
+  group_id: string;
+  /** Reserved for multiple channels and DMs. null = the group's main channel. */
+  channel_id: string | null;
+  author_id: string;
+  body: string;
+  kind: MessageKind;
+  /** null = not a reply. Survives its parent's soft delete by design. */
+  reply_to_id: string | null;
+  /** Stamped by the database on an author's edit, never sent by the client. */
+  edited_at: string | null;
+  /**
+   * Soft delete, because a reply points at a message: a hard delete would
+   * take the answers with the question. A deleted row keeps its `seq` and
+   * its place in the thread, and the client renders a tombstone.
+   */
+  deleted_at: string | null;
+  deleted_by: string | null;
+  created_at: string;
+};
+
+/**
+ * One row per person per group, holding the highest `seq` they have seen.
+ *
+ * A `seq` and not a timestamp: "after the last message I read" is exact,
+ * while "after the time I last read" is wrong by however long the write took.
+ */
+export type GroupMessageReadRow = {
+  group_id: string;
+  user_id: string;
+  last_read_seq: number;
+  updated_at: string;
 };
 
 /* ── §5 recipe photographs (migration 0029) ──────────────────────────────── */
@@ -542,6 +659,8 @@ export type Database = {
       group_recipe_items: Table<GroupRecipeItemRow>;
       group_invites: Table<GroupInviteRow>;
       group_join_requests: Table<GroupJoinRequestRow>;
+      group_messages: Table<GroupMessageRow>;
+      group_message_reads: Table<GroupMessageReadRow>;
       recipe_images: Table<RecipeImageRow>;
     };
     // Empty MAPPED types, not `Record<string, never>`. Record<string, never>
@@ -586,7 +705,10 @@ export type Database = {
                                   only. Returns the new recipe, or the existing
                                   copy when there already was one.
       */
-      create_group_invite: { Args: { p_group_id: string; p_label: string }; Returns: string };
+      create_group_invite: {
+        Args: { p_group_id: string; p_email: string | null; p_label: string };
+        Returns: string;
+      };
       redeem_group_invite: { Args: { p_token: string }; Returns: string };
       request_group_join: { Args: { p_code: string; p_note: string }; Returns: string };
       approve_group_join: {
@@ -594,6 +716,69 @@ export type Database = {
         Returns: undefined;
       };
       save_group_recipe_copy: { Args: { p_item_id: string }; Returns: string };
+      /*
+        migrations 0030/0031 — the invitation lifecycle and the roster.
+
+        revoke_group_invite   → void. Kills the token now; the row stays, so
+                                the list still shows what was sent to whom.
+        resend_group_invite   → the NEW token. Revokes the old invitation and
+                                issues a replacement rather than extending it,
+                                because a resend has to make the old link stop
+                                working.
+        reject_group_invite   → void. "Not me / no thanks", from the invitee.
+                                Definer like redemption, and for the same
+                                reason: the person is not a member yet, so no
+                                policy can reach the row.
+        reject_group_join     → void. Staff decline a request; the row stays
+                                with status 'rejected' so the same person
+                                asking again is visibly a second attempt.
+        withdraw_group_join   → void. The asker takes it back themselves.
+        group_roster          → the members, with the name and picture the
+                                chat draws. NO EMAIL ADDRESSES: §10.1 says an
+                                address must not be disclosed, and a roster
+                                read by every member is exactly where that
+                                would leak. display_name and avatar_path are
+                                nullable because the join to profiles is a
+                                LEFT join — a member whose profile row was
+                                never created still belongs in the list.
+      */
+      revoke_group_invite: { Args: { p_invite_id: string }; Returns: undefined };
+      resend_group_invite: { Args: { p_invite_id: string }; Returns: string };
+      reject_group_invite: { Args: { p_token: string }; Returns: undefined };
+      reject_group_join: {
+        Args: { p_group_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      withdraw_group_join: { Args: { p_group_id: string }; Returns: undefined };
+      group_roster: {
+        Args: { p_group_id: string };
+        Returns: Array<{
+          user_id: string;
+          display_name: string | null;
+          avatar_path: string | null;
+          role: GroupRole;
+          rank: number;
+          joined_at: string;
+        }>;
+      };
+      /*
+        migration 0032 — the chat's two aggregate reads.
+
+        group_unread_counts  → one row per group the caller is in. `unread`
+                               counts messages above their last-read `seq`,
+                               computed in the database because doing it in
+                               the browser means downloading the messages you
+                               have not read in order to count them.
+        mark_group_read      → void, and it only ever moves the marker
+                               FORWARD (`greatest`), so a stale client that
+                               reports an old seq cannot un-read a
+                               conversation the person already saw elsewhere.
+      */
+      group_unread_counts: {
+        Args: Record<string, never>;
+        Returns: Array<{ group_id: string; unread: number; last_seq: number }>;
+      };
+      mark_group_read: { Args: { p_group_id: string; p_seq: number }; Returns: undefined };
       // migration 0007 — the atomic write paths (§9, stage-5 requirement 9)
       save_recipe: {
         Args: {

@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema after migrations 0001-0029. Not used at runtime.",
+    "information_schema and pg_proc after migrations 0001-0034. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -11,8 +11,43 @@
     "types stay, and this snapshot plus scripts/check-types-against-schema.mjs",
     "prove they still describe the real tables.",
     "",
-    "Refresh after a migration, then run: npm run schema:check"
+    "Refresh after a migration, then run: npm run schema:check",
+    "",
+    "REFRESH IT WITH THE TWO QUERIES IN `_generated_by`, not by hand. The 0030",
+    "refresh found that `guard_locked_plan` and `guard_locked_plan_child` (both",
+    "from migration 0021) had never been in `_functions` at all - an earlier",
+    "refresh had listed the functions by hand and missed two. Nothing was hidden",
+    "by it (neither is callable by a client role), but a function missing from",
+    "here is a function whose grants nothing checks, which is the opposite of",
+    "what this file is for."
   ],
+  "_generated_by": {
+    "tables": [
+      "select jsonb_object_agg(t, cols order by t) from (",
+      "  select c.table_name as t, jsonb_object_agg(c.column_name,",
+      "           case when c.is_nullable = 'YES' then 'nullable' else 'required' end",
+      "           order by c.column_name) as cols",
+      "    from information_schema.columns c",
+      "    join information_schema.tables tb on tb.table_schema = c.table_schema",
+      "     and tb.table_name = c.table_name",
+      "   where c.table_schema = 'public' and tb.table_type in ('BASE TABLE','VIEW')",
+      "   group by c.table_name) s;"
+    ],
+    "functions": [
+      "select jsonb_object_agg(name, info order by name) from (",
+      "  select p.proname as name, jsonb_build_object(",
+      "           'args', coalesce((select jsonb_agg(a.nm order by a.ord)",
+      "                               from unnest(p.proargnames, p.proargmodes)",
+      "                                      with ordinality as a(nm, md, ord)",
+      "                              where a.md is null or a.md in ('i','b')), '[]'::jsonb),",
+      "           'security_definer', p.prosecdef,",
+      "           'anon_execute', has_function_privilege('anon', p.oid, 'execute'),",
+      "           'authenticated_execute', has_function_privilege('authenticated', p.oid, 'execute')",
+      "         ) as info",
+      "    from pg_proc p join pg_namespace n on n.oid = p.pronamespace",
+      "   where n.nspname = 'public' and p.prokind = 'f') s;"
+    ]
+  },
   "batches": {
     "ccp": "required",
     "chill_temp": "nullable",
@@ -67,19 +102,27 @@
   "group_invites": {
     "created_at": "required",
     "created_by": "required",
+    "email": "nullable",
     "expires_at": "required",
     "group_id": "required",
     "id": "required",
     "label": "required",
+    "replaces_id": "nullable",
+    "revoked_at": "nullable",
+    "revoked_by": "nullable",
+    "status": "required",
     "token": "required",
     "used_at": "nullable",
     "used_by": "nullable"
   },
   "group_join_requests": {
     "created_at": "required",
+    "decided_at": "nullable",
+    "decided_by": "nullable",
     "group_id": "required",
     "id": "required",
     "note": "required",
+    "status": "required",
     "user_id": "required"
   },
   "group_members": {
@@ -87,6 +130,26 @@
     "joined_at": "required",
     "role": "required",
     "user_id": "required"
+  },
+  "group_message_reads": {
+    "group_id": "required",
+    "last_read_seq": "required",
+    "updated_at": "required",
+    "user_id": "required"
+  },
+  "group_messages": {
+    "author_id": "required",
+    "body": "required",
+    "channel_id": "nullable",
+    "created_at": "required",
+    "deleted_at": "nullable",
+    "deleted_by": "nullable",
+    "edited_at": "nullable",
+    "group_id": "required",
+    "id": "required",
+    "kind": "required",
+    "reply_to_id": "nullable",
+    "seq": "required"
   },
   "group_recipe_items": {
     "created_at": "required",
@@ -224,7 +287,9 @@
     "updated_at": "required"
   },
   "profiles": {
+    "avatar_path": "nullable",
     "created_at": "required",
+    "display_name": "required",
     "locale": "required",
     "onboarding_done": "required",
     "pro": "required",
@@ -332,6 +397,12 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "broadcast_group_message": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
     "can_read_recipe": {
       "args": [
         "p_recipe_id"
@@ -373,6 +444,7 @@
     "create_group_invite": {
       "args": [
         "p_group_id",
+        "p_email",
         "p_label"
       ],
       "security_definer": false,
@@ -403,7 +475,51 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "group_roster": {
+      "args": [
+        "p_group_id"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "group_unread_counts": {
+      "args": [],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "guard_group_item_recipe": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "guard_locked_plan": {
+      "args": [],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "guard_locked_plan_child": {
+      "args": [],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "guard_message_insert": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "guard_message_update": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "guard_owner_membership": {
       "args": [],
       "security_definer": true,
       "anon_execute": false,
@@ -421,6 +537,14 @@
       "anon_execute": false,
       "authenticated_execute": false
     },
+    "invite_state": {
+      "args": [
+        "p_invite"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "lesson_rank": {
       "args": [
         "p_lesson_id"
@@ -429,9 +553,26 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "mark_group_read": {
+      "args": [
+        "p_group_id",
+        "p_seq"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "next_version_tag": {
       "args": [
         "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "normalize_email": {
+      "args": [
+        "p_email"
       ],
       "security_definer": false,
       "anon_execute": false,
@@ -454,6 +595,14 @@
       "authenticated_execute": true
     },
     "path_recipe_id": {
+      "args": [
+        "p_name"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "path_user_id": {
       "args": [
         "p_name"
       ],
@@ -528,6 +677,23 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "reject_group_invite": {
+      "args": [
+        "p_token"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "reject_group_join": {
+      "args": [
+        "p_group_id",
+        "p_user_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "replace_recipe_children": {
       "args": [
         "p_recipe_id",
@@ -548,9 +714,33 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "resend_group_invite": {
+      "args": [
+        "p_invite_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "restore_recipe_version": {
       "args": [
         "p_version_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "revoke_group_invite": {
+      "args": [
+        "p_invite_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "role_rank": {
+      "args": [
+        "p_role"
       ],
       "security_definer": false,
       "anon_execute": false,
@@ -609,6 +799,22 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "shares_group_with": {
+      "args": [
+        "p_user_id"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "topic_group_id": {
+      "args": [
+        "p_topic"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "touch_price_updated_at": {
       "args": [],
       "security_definer": false,
@@ -620,6 +826,14 @@
       "security_definer": false,
       "anon_execute": false,
       "authenticated_execute": false
+    },
+    "withdraw_group_join": {
+      "args": [
+        "p_group_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
     }
   }
 }

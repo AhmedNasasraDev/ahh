@@ -115,6 +115,16 @@ if (!fnBlock) {
   )) {
     declaredFns.set(name, [...args.matchAll(/(\w+)\s*:/g)].map((m) => m[1]));
   }
+  // A function with no arguments is typed `Args: Record<string, never>` —
+  // postgrest-js's convention, and `Args: {}` would mean "any object".
+  // Matched separately because it is not a braces block, and a declaration
+  // this pattern misses is a declaration nothing checks: `group_unread_counts`
+  // was silently unchecked until this line existed.
+  for (const [, name] of fnBlock[1].matchAll(
+    /(\w+):\s*\{\s*Args:\s*Record<string,\s*never>\s*;?\s*Returns:/g,
+  )) {
+    declaredFns.set(name, []);
+  }
 }
 
 for (const [name, args] of declaredFns) {
@@ -154,8 +164,14 @@ for (const [name, args] of declaredFns) {
   So the grant is unavoidable, and what makes it safe is the SHAPE of what is
   exposed. Every function on this list must:
 
-    · answer only about `auth.uid()` — no parameter naming a user, so it can
-      never be asked about somebody else;
+    · answer only about `auth.uid()`. 0031 added `shares_group_with(uuid)`,
+      which DOES take a user id, so the condition is stated more precisely
+      than "no parameter naming a user": a parameter may name a second party
+      only when the answer is still about the CALLER's own relationship to it
+      ("do I share a group with this person?") and is a single boolean. It can
+      never be asked about two OTHER people, and what it discloses — that a
+      uuid you already hold is a groupmate — is what `group_roster` hands the
+      caller anyway;
     · return a rank or a boolean, never a row and never an id. 0026 withdrew
       three earlier helpers (`course_group`, `lesson_group`, `item_group`)
       precisely because they returned somebody else's group id;
@@ -164,7 +180,39 @@ for (const [name, args] of declaredFns) {
   Adding a name here is a security decision. If a helper does not meet all
   three conditions, the answer is to change the helper, not this list.
 */
-const RLS_POLICY_HELPERS = new Set(['group_rank', 'course_rank', 'lesson_rank']);
+const RLS_POLICY_HELPERS = new Set([
+  'group_rank',
+  'course_rank',
+  'lesson_rank',
+  'shares_group_with',
+]);
+
+/*
+  DEFINER READS — a third exemption, for a function that reads rows the caller
+  is entitled to see but RLS cannot express.
+
+  `group_roster` is the case. A member may see who else is in their group,
+  which means reading OTHER PEOPLE's `profiles` rows for a name and a picture.
+  `profiles` is own-row-only and should stay that way: widening it to "anyone
+  who shares a group with me" would expose every column of that row — and
+  `profiles` is where a person's settings live — to get two of them.
+
+  So the read is a definer function with a fixed, narrow projection. What
+  every name on this list must satisfy:
+
+    · the FIRST statement of the body is a check on `auth.uid()` that raises
+      42501 — `group_roster` raises unless `group_rank(p_group_id) >= 1`;
+    · it returns only data about a group the caller is ALREADY a member of,
+      never a way to discover one;
+    · it never returns an email address or a token. The roster returns
+      `display_name` and `avatar_path` and stops there, because §10.1 is
+      explicit that an address must not be disclosed, and a list every member
+      can read is exactly where that would leak.
+
+  A function that needs to return more than a fixed projection does not belong
+  here; it belongs behind a policy.
+*/
+const DEFINER_READS = new Set(['group_roster']);
 
 /*
   PRIVILEGED RPCs — a second, separate exemption, and a narrower one.
@@ -187,6 +235,17 @@ const RLS_POLICY_HELPERS = new Set(['group_rank', 'course_rank', 'lesson_rank'])
       checks the caller's rank first AND requires that the person actually
       asked. It cannot put an arbitrary account into a group.
 
+  `reject_group_invite` (0031) is here for the invitee's side of the same
+  problem: declining an invitation is done by somebody who is not a member, so
+  no policy can reach the row either. It takes the TOKEN, not an id, so it can
+  only affect an invitation whose secret the caller already holds, and it
+  creates nothing at all.
+
+  Note what is NOT here: `revoke_group_invite`, `resend_group_invite`,
+  `reject_group_join` and `withdraw_group_join`. Each is performed by
+  somebody the group's own policies already reach — staff, or the asker — so
+  each is SECURITY INVOKER and needs no exemption. That is the test.
+
   Note what is NOT on this list: `save_group_recipe_copy`. It looked like it
   belonged here and does not — every step of §11's copy is within the caller's
   own RLS, so it is SECURITY INVOKER (see migration 0027). If a function can be
@@ -194,6 +253,7 @@ const RLS_POLICY_HELPERS = new Set(['group_rank', 'course_rank', 'lesson_rank'])
 */
 const PRIVILEGED_RPCS = new Set([
   'redeem_group_invite',
+  'reject_group_invite',
   'request_group_join',
   'approve_group_join',
 ]);
@@ -210,7 +270,8 @@ for (const [name, fn] of Object.entries(fnSnapshot)) {
     fn.security_definer &&
     (fn.authenticated_execute || fn.anon_execute) &&
     !RLS_POLICY_HELPERS.has(name) &&
-    !PRIVILEGED_RPCS.has(name)
+    !PRIVILEGED_RPCS.has(name) &&
+    !DEFINER_READS.has(name)
   ) {
     problems.push(
       `${name}(): SECURITY DEFINER and directly callable by a client role. ` +
@@ -220,7 +281,12 @@ for (const [name, fn] of Object.entries(fnSnapshot)) {
   }
   // Neither exemption extends to `anon`. Both kinds of function decide
   // something about `auth.uid()`, which is null for an unauthenticated caller.
-  if ((RLS_POLICY_HELPERS.has(name) || PRIVILEGED_RPCS.has(name)) && fn.anon_execute) {
+  if (
+    (RLS_POLICY_HELPERS.has(name) ||
+      PRIVILEGED_RPCS.has(name) ||
+      DEFINER_READS.has(name)) &&
+    fn.anon_execute
+  ) {
     problems.push(
       `${name}(): an exempted definer function must not be callable by \`anon\`.`,
     );
