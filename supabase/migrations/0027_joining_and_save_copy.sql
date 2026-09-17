@@ -43,12 +43,36 @@
 --   · Single use: `used_at` is set on redemption and a used token is refused.
 --   · Seven days (§6), enforced server-side in the redeem function, not by the
 --     client.
---   · The token is 32 bytes from `gen_random_bytes`, not a guessable id.
+--   · The token is not a guessable id: 64 hex characters, from two
+--     `gen_random_uuid()` values with the dashes removed. This line used to
+--     say "32 bytes from `gen_random_bytes`", which the body of this same
+--     migration then explains is NOT what happens — `gen_random_bytes` is
+--     pgcrypto, it is not on the search_path this function pins, and the
+--     first attempt failed with 42883. A header that contradicts its own body
+--     is worse than no header, so it now says what the code does.
 --
 -- IF A MAIL SERVICE IS ADDED, this should change: the mailer becomes the
 -- delivery channel, nobody needs to re-read the link, and the column should
 -- hold `sha256(token)` with the raw value returned once to the caller. That is
 -- a small migration and it is the right one to make at that point.
+--
+-- STAGE 12, AND THE DECISION THAT DID NOT CHANGE. A mail service now exists
+-- (`functions/send-group-invite`), so the paragraph above came due — and the
+-- answer is still plaintext, for a reason that is about the product rather
+-- than about effort:
+--
+--   · §10.2 lists "קישור פרטי" as one of the four ways in, separately from
+--     "הזמנה אישית". An open link has no address to mail it to; it is handed
+--     over in a lesson, so it has to be readable after it was created.
+--   · The permissions screen shows the link beside every pending invitation,
+--     because the mail service can legitimately be unconnected or bounce, and
+--     "copy the link" is the fallback that keeps a class working.
+--
+-- Hashing would break both. What limits the exposure is unchanged and now
+-- narrower than in 0027: staff-only reads, single use, seven days, an address
+-- binding checked against `auth.email()` (0031) so a leaked link is not a way
+-- in, and `revoke`/`resend` to kill one deliberately. The day the product
+-- drops the open-link method, hashing becomes the right change.
 --
 -- ══════════════════════════════════════════════════════════════════════════
 -- WHAT IS SECURITY DEFINER HERE AND WHY EACH ONE HAS TO BE
