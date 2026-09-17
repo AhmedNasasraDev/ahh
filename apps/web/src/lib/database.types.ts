@@ -562,6 +562,29 @@ export type GroupMessageReadRow = {
   updated_at: string;
 };
 
+/**
+ * The text of a deleted message (migration 0035).
+ *
+ * A soft delete used to leave the body in the message row, where
+ * `messages_read` — which has no condition on `deleted_at` — let any member
+ * read it straight from the API, and where the delete's own broadcast carried
+ * it to every open client. So the words move here, where only rank >= 2 may
+ * read them, and the message keeps an empty body.
+ *
+ * Typed because it is part of the schema and `schema:check` requires every
+ * table to be. NOTHING IN THE APP READS IT YET: the accountability view for a
+ * moderator is not built, and a screen that showed removed text would need its
+ * own thought about who is looking at the phone.
+ */
+export type GroupMessageRemovalRow = {
+  message_id: string;
+  group_id: string;
+  body: string;
+  /** null once the account that removed it is deleted (ON DELETE SET NULL) */
+  removed_by: string | null;
+  removed_at: string;
+};
+
 /* ── §5 recipe photographs (migration 0029) ──────────────────────────────── */
 
 /**
@@ -661,6 +684,7 @@ export type Database = {
       group_join_requests: Table<GroupJoinRequestRow>;
       group_messages: Table<GroupMessageRow>;
       group_message_reads: Table<GroupMessageReadRow>;
+      group_message_removals: Table<GroupMessageRemovalRow>;
       recipe_images: Table<RecipeImageRow>;
     };
     // Empty MAPPED types, not `Record<string, never>`. Record<string, never>

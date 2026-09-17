@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema and pg_proc after migrations 0001-0034. Not used at runtime.",
+    "information_schema and pg_proc after migrations 0001-0035. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -136,6 +136,13 @@
     "last_read_seq": "required",
     "updated_at": "required",
     "user_id": "required"
+  },
+  "group_message_removals": {
+    "body": "required",
+    "group_id": "required",
+    "message_id": "required",
+    "removed_at": "required",
+    "removed_by": "nullable"
   },
   "group_messages": {
     "author_id": "required",

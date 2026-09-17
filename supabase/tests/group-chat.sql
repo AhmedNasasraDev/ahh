@@ -23,7 +23,16 @@
 --
 --   · A DELETE that no policy admits matches ZERO ROWS and raises nothing. My
 --     first draft treated "no exception" as "it deleted", which would have
---     reported a hole that is not there. The assertion is the row count.
+--     reported a hole that is not there. The assertion is the row count — and
+--     it is kept as a row count deliberately, so that the day somebody grants
+--     DELETE again this check goes back to measuring the POLICY rather than
+--     the privilege.
+--   · That same check then failed once more, and the failure was mine again:
+--     after migration 0034 revoked DELETE from `authenticated` the statement
+--     no longer matches zero rows, it raises 42501 before RLS is consulted.
+--     I had written the expectation from a run made BEFORE 0034. The recorded
+--     expectation is now the measured one; the refusal is stricter than the
+--     empty match it replaced.
 --   · The unread count is 2, not 3, because one of the three messages was
 --     soft-deleted earlier in the run. I expected 3; the engine was right.
 --
@@ -33,7 +42,9 @@
 -- so the delete is wrapped and asserted rather than assumed.
 --
 -- Run: every statement below in one session. Every row must have pass = true.
--- Verified 40/40 after 0033.
+-- Verified 45/45 after 0035 and 0034. The run that added the five 0035
+-- checks measured 44/45, the one failure being the stale DELETE expectation
+-- described above; the expectation now records what that run measured.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create temp table c_result (
@@ -240,6 +251,62 @@ exception when others then
   perform set_config('ch.note','CRASHED: '||sqlerrm,true);
 end $$;
 
+/*
+  0035 — WHAT A DELETED MESSAGE STILL SAID.
+
+  This section exists because the hole was real and was MEASURED before it was
+  closed. 0032 left the body in the row and claimed "every read path filters on
+  deleted_at", which was true of this repository's queries and of nothing else:
+  `messages_read` has no condition on `deleted_at`, so a member could ask
+  PostgREST for the row and read the text a moderator had just removed. The
+  probe returned it in full.
+
+  0035 moves the words to `group_message_removals` (rank >= 2 only) and leaves
+  the message with an empty body. The five checks below are the five things
+  that has to mean.
+*/
+do $$
+declare
+  o uuid := '30000000-0000-4000-8000-000000000001';
+  i uuid := '30000000-0000-4000-8000-000000000002';
+  m uuid := '30000000-0000-4000-8000-000000000003';
+  ga uuid := '40000000-0000-4000-8000-00000000000a';
+  msg uuid; txt text; n int;
+begin
+perform set_config('request.jwt.claims', json_build_object('sub', m,'role','authenticated')::text, true);
+execute 'set local role authenticated';
+insert into public.group_messages (group_id, author_id, body)
+values (ga, m, 'טקסט שיוסר') returning id into msg;
+
+perform set_config('request.jwt.claims', json_build_object('sub', o,'role','authenticated')::text, true);
+update public.group_messages set deleted_at = now() where id = msg;
+
+perform set_config('request.jwt.claims', json_build_object('sub', m,'role','authenticated')::text, true);
+select body into txt from public.group_messages where id = msg;
+perform set_config('ch.rm1', coalesce(nullif(txt,''),'<empty>'), true);
+select count(*) into n from public.group_message_removals where message_id = msg;
+perform set_config('ch.rm2', n::text, true);
+begin
+  insert into public.group_message_removals (message_id, group_id, body)
+  values (msg, ga, 'forged');
+  perform set_config('ch.rm3','INSERTED',true);
+exception when others then perform set_config('ch.rm3','refused: '||sqlstate,true); end;
+
+perform set_config('request.jwt.claims', json_build_object('sub', i,'role','authenticated')::text, true);
+select body into txt from public.group_message_removals where message_id = msg;
+perform set_config('ch.rm4', coalesce(txt,'<none>'), true);
+
+-- The tombstone keeps its place in the thread: a reply that pointed at it
+-- still has a parent to point at, which is why the delete is soft at all.
+select seq into n from public.group_messages where id = msg;
+perform set_config('ch.rm5', (n is not null)::text, true);
+
+execute 'set local role postgres';
+exception when others then
+  execute 'set local role postgres';
+  perform set_config('ch.rmnote','CRASHED: '||sqlerrm,true);
+end $$;
+
 -- 0033's regression, and the reason that migration exists.
 do $$
 begin
@@ -272,7 +339,7 @@ select area, check_name, expected, actual, pass from (values
   ('editing','kind cannot be changed','refused: 42501',current_setting('ch.e6',true)),
   ('editing','group cannot be changed','refused: 42501',current_setting('ch.e7',true)),
   ('editing','a reply cannot be repointed','refused: 42501',current_setting('ch.e8',true)),
-  ('deleting','a hard DELETE matches no rows','rows: 0',current_setting('ch.d1',true)),
+  ('deleting','a hard DELETE is refused outright','refused: 42501',current_setting('ch.d1',true)),
   ('deleting','a moderator may remove a message','ok',current_setting('ch.d2',true)),
   ('deleting','deleted_by is stamped by the database','true',current_setting('ch.d3',true)),
   ('deleting','a deletion cannot be undone','refused: 42501',current_setting('ch.d4',true)),
@@ -289,6 +356,11 @@ select area, check_name, expected, actual, pass from (values
   ('realtime','and nonsense fails the predicate','false',current_setting('ch.t5',true)),
   ('non-member','reads no message','0',current_setting('ch.n1',true)),
   ('non-member','reads no read-marker','0',current_setting('ch.n2',true)),
+  ('0035 removal','a member reads an EMPTY body after a delete','<empty>',current_setting('ch.rm1',true)),
+  ('0035 removal','a member sees no removal record at all','0',current_setting('ch.rm2',true)),
+  ('0035 removal','a member cannot forge a removal record','refused: 42501',current_setting('ch.rm3',true)),
+  ('0035 removal','staff can still account for what was removed','טקסט שיוסר',current_setting('ch.rm4',true)),
+  ('0035 removal','the tombstone keeps its seq','true',current_setting('ch.rm5',true)),
   ('teardown 0033','deleting an account with chat history succeeds','ok',current_setting('ch.td',true))
 ) as t(area,check_name,expected,actual)
 cross join lateral (select t.expected = t.actual) as p(pass);
@@ -297,8 +369,10 @@ insert into c_result (area, check_name, expected, actual, pass)
 select 'cleanup','nothing left behind','0',n::text,n=0
 from (select (select count(*) from public.groups)+(select count(*) from public.group_messages)
            +(select count(*) from public.group_message_reads)
+           +(select count(*) from public.group_message_removals)
            +(select count(*) from auth.users where email like '%test.invalid') as n) c;
 
 select area, check_name, expected, actual, pass,
-       current_setting('ch.note',true) as probe_status
+       current_setting('ch.note',true) as probe_status,
+       current_setting('ch.rmnote',true) as removal_probe_status
 from c_result order by ord;
