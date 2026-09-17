@@ -5,7 +5,7 @@
 // there was nowhere to keep that promise. A cup size is not cosmetic — every
 // volume measurement in every recipe is converted through it.
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { defaultPrefs, type Calibration, type MeasurementPrefs } from '@recipe-notebook/engine';

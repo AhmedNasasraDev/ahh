@@ -46,7 +46,13 @@ export interface ProductionPlan {
   /** requirement 14: a locked plan is a record, and reads from its snapshot */
   locked: boolean;
   lockedAt: string | null;
-  snapshot: unknown | null;
+  /**
+   * The frozen figures of a locked plan, opaque on purpose — the shape belongs
+   * to `snapshotOf()` in purchase.ts and nothing here should reach into it.
+   * `unknown` already admits null (the unlocked case); the `| null` this used
+   * to carry said nothing and hid that.
+   */
+  snapshot: unknown;
   /** the optimistic-concurrency token the next save sends back */
   updatedAt: string;
   items: PlanItem[];

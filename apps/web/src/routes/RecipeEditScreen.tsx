@@ -36,7 +36,6 @@ import {
   formatNis,
   ingredientKeyOf,
   panLabel,
-  unitLabel,
   type Recipe,
 } from '@recipe-notebook/engine';
 import type { StepKind } from '@recipe-notebook/engine';

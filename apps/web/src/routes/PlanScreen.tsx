@@ -34,7 +34,6 @@ import { useAppData } from '../app/AppDataProvider.js';
 import { resolveFromCatalog } from '../features/pricing/catalog.js';
 import {
   PLAN_QTY_UNITS,
-  planQtyLabel,
   type PlanItem,
   type ProductionPlan,
 } from '../features/planning/plan.js';

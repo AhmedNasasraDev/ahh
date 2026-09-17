@@ -93,7 +93,7 @@ export function parseLocal(
     if (hasNum && unitWord && line.length < 60) {
       let name = line.replace(/^[-•*]\s*/, '').trim();
       const q = parseQuantity(name);
-      name = name.replace(/^[\d½¼¾⅓⅔.\/\s]+/, '').trim();
+      name = name.replace(/^[\d½¼¾⅓⅔./\s]+/, '').trim();
       for (const u of [...UNIT_WORDS].sort((a, b) => b.length - a.length)) {
         if (name.startsWith(u)) {
           name = name.slice(u.length).trim();

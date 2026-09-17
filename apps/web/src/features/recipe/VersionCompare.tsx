@@ -32,8 +32,19 @@ import type { StoredVersion } from '../../data/repository.js';
 import { compareRecipes, type CellValue, type FieldChange } from './versionDiff.js';
 import styles from './recipe.module.css';
 
-/** 'current' is the live recipe; anything else is a version id. */
-export type CompareSide = 'current' | string;
+/**
+ * One side of the comparison: the literal `CURRENT` for the live recipe, or a
+ * version id.
+ *
+ * Written as `string` rather than `'current' | string`, which TypeScript
+ * collapses to `string` anyway — the union looked like it documented the
+ * special value while giving no checking at all. The constant below is the
+ * documentation, and it is the one thing callers should compare against.
+ */
+export type CompareSide = string;
+
+/** The live recipe, as a `CompareSide`. */
+export const CURRENT: CompareSide = 'current';
 
 export interface CompareChoice {
   value: CompareSide;

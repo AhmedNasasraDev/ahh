@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { compute, defaultPrefs, type Recipe } from '@recipe-notebook/engine';
 import { RecipeScreen } from './RecipeScreen.js';
 import { fakeRepository, renderRoute } from '../test/render.js';
+import { useAppData } from '../app/AppDataProvider.js';
 import { DEMO_RECIPES } from '../data/demoRecipes.js';
 
 const prefsAt = (cupMl: number) => ({
@@ -535,5 +536,95 @@ describe('stage-11: פחת is a measurement, and says so when it is missing', ()
   it('withholds the loss when only one of the two weights was entered', async () => {
     await open({ ...unweighed, weightBefore: 1000 } as unknown as Recipe);
     expect(screen.getByText(/לא נשקל לפני ואחרי/)).toBeInTheDocument();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Stage-11 — a price that moves while the recipe page is open.
+//
+// Found by turning on react-hooks/exhaustive-deps, which is the only tool that
+// could have found it: the code type-checked, every test passed, and the bug
+// was a dependency list that did not match what the callback read. `baseline`
+// recomputed when the catalog changed and `computed` did not, so the ingredient
+// table and every cost figure kept the old price while the yield figures had
+// the new one.
+//
+// The catalog has to change WITHOUT remounting the screen — navigating away and
+// back would pass even with the bug — so the test renders a control beside the
+// page that writes to the same provider, which is what the ingredient centre
+// does in the real app.
+describe('stage-11: the page follows a price change without being remounted', () => {
+  const PRICED: Recipe = {
+    id: 'bread',
+    name: 'לחם שיפון',
+    category: 'לחמים',
+    ingredients: [
+      { id: 'i1', name: 'קמח שיפון', ingredientKey: 'קמח שיפון', qty: 1000, unit: 'g', flour: true },
+    ],
+    steps: [],
+  } as unknown as Recipe;
+
+  const flourAt = (total: number) => ({
+    id: 'cat-rye',
+    key: 'קמח שיפון',
+    name: 'קמח שיפון',
+    purchaseUnit: 'kg' as const,
+    packageQty: 1,
+    packageCount: 1,
+    purchaseTotal: total,
+    usablePct: null,
+    supplier: '',
+    purchasedAt: null,
+    priceUpdatedAt: null,
+    note: '',
+    purchasePrice: total,
+    price: total,
+    priceUnit: 'ק"ג' as const,
+    allergens: [],
+  });
+
+  /** Stands in for the ingredient centre: changes a price in place. */
+  function RaisePrice() {
+    const { saveCatalogItem } = useAppData();
+    return (
+      <button type="button" onClick={() => void saveCatalogItem(flourAt(9))}>
+        ייקור הקמח
+      </button>
+    );
+  }
+
+  it('recomputes the cost when the catalog moves under it', async () => {
+    const user = userEvent.setup();
+    renderRoute(
+      <>
+        <RecipeScreen />
+        <RaisePrice />
+      </>,
+      {
+        path: '/recipe/:recipeId',
+        route: '/recipe/bread',
+        repository: fakeRepository({
+          prefs: prefsAt(240),
+          recipes: [PRICED],
+          catalog: [flourAt(4)],
+          canWrite: true,
+        }),
+      },
+    );
+
+    // 1 kg of rye at ₪4/kg.
+    await screen.findByRole('heading', { name: 'לחם שיפון' });
+    await user.click(screen.getByRole('button', { name: /נתוני ייצור ועלויות/ }));
+    // `getAllBy`: ₪4 is both the batch cost and the cost per kilo here, one
+    // kilo being the whole recipe.
+    expect(screen.getAllByText('₪4').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('₪9')).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'ייקור הקמח' }));
+
+    // The same kilo at ₪9. Before the fix this stayed ₪4 until the screen was
+    // remounted, while the figures taken from the baseline had already moved.
+    await waitFor(() => expect(screen.getAllByText('₪9').length).toBeGreaterThan(0));
+    expect(screen.queryAllByText('₪4')).toHaveLength(0);
   });
 });

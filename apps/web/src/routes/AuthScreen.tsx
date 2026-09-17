@@ -95,7 +95,19 @@ export function AuthScreen() {
           </button>
         </div>
 
-        <form className={styles.form} onSubmit={submit} noValidate>
+        {/*
+          `void submit(e)` rather than `onSubmit={submit}`: React ignores the
+          returned promise, so a rejection inside an async handler becomes an
+          unhandled rejection with nothing on screen. `submit` catches its own
+          failures, and this says that is deliberate.
+        */}
+        <form
+          className={styles.form}
+          onSubmit={(e) => {
+            void submit(e);
+          }}
+          noValidate
+        >
           <label className={styles.label} htmlFor="auth-email">
             אימייל
           </label>

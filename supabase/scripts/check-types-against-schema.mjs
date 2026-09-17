@@ -53,7 +53,7 @@ function fieldsOf(iface) {
   const fields = {};
   // `name: type;` — comments and doc blocks are skipped by the anchor on \n
   // Groups: 1 = name, 2 = the optional `?` marker, 3 = the type.
-  for (const [, name, , type] of m[1].matchAll(/\n  (\w+)(\??): ([^;]+);/g)) {
+  for (const [, name, , type] of m[1].matchAll(/\n {2}(\w+)(\??): ([^;]+);/g)) {
     fields[name] = / \| null$|^null \| /.test(type.trim()) ? 'nullable' : 'required';
   }
   return fields;
@@ -105,7 +105,7 @@ const fnSnapshot = snapshot['_functions'] ?? {};
 // `Args: { p_recipe_id: string }` -> ['p_recipe_id'], in source order, because
 // order is part of what a positional call in psql depends on.
 const declaredFns = new Map();
-const fnBlock = src.match(/\n    Functions: \{([\s\S]*?)\n    \};/);
+const fnBlock = src.match(/\n {4}Functions: \{([\s\S]*?)\n {4}\};/);
 if (!fnBlock) {
   problems.push('Functions: block not found in database.types.ts');
 } else {

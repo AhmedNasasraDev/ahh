@@ -1,7 +1,7 @@
 // The ingredient centre screen (stage-7 requirements 1, 3, 5).
 
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IngredientsScreen } from './IngredientsScreen.js';
 import { fakeRepository, renderRoute } from '../test/render.js';

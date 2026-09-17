@@ -33,7 +33,6 @@ import {
   resetFakeIds,
   USER_A,
   USER_B,
-  type FakeDb,
 } from '../test/fakeSupabase.js';
 import { AppUnderTest, emptyDb, project } from '../test/appHarness.js';
 
@@ -248,6 +247,23 @@ describe('a recipe created by one account is invisible to the other', () => {
 
     expect(await screen.findByText('המחברת ריקה.')).toBeInTheDocument();
     expect(screen.queryByText('הסוד של א')).not.toBeInTheDocument();
+
+    // `aId` was captured and then never used, which lint found. Rather than
+    // drop the line, it now carries the stronger assertion: B asking for A's
+    // recipe BY ITS ID — the thing a screen cannot do but a client can — comes
+    // back with nothing. The double models the RLS policy, and
+    // supabase/tests/rls-isolation.sql proves the same thing against Postgres.
+    const asB = await (
+      b.client as unknown as {
+        from(t: string): {
+          select(c: string): { eq(col: string, v: string): Promise<{ data: unknown[] | null }> };
+        };
+      }
+    )
+      .from('recipes')
+      .select('*')
+      .eq('id', aId);
+    expect(asB.data ?? []).toHaveLength(0);
   });
 
   it('refuses B a direct link to A\'s recipe', async () => {

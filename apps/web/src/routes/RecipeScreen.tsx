@@ -198,9 +198,20 @@ export function RecipeScreen() {
     return scaleFactor(scaleMode, Number(scaleValue), baseline, scaleIngredient || undefined);
   }, [baseline, scaleMode, scaleValue, scaleIngredient]);
 
+  /*
+    STAGE-11 FIX, found by turning on react-hooks/exhaustive-deps.
+
+    The dependency list was `[recipe, recipes, factor, prefs]` while the
+    callback reads `pricedRecipe` and `pricedNotebook` — both of which are
+    derived from the CATALOG as well as from the recipe. So when a price moved
+    in the ingredient centre, `baseline` (whose list is right) recomputed and
+    `computed` did not: the ingredient table and every cost figure on the page
+    kept the old price while the figures derived from the baseline had the new
+    one. One recipe, one screen, two prices.
+  */
   const computed = useMemo(
     () => (pricedRecipe ? compute(pricedRecipe, pricedNotebook, { factor, prefs }) : null),
-    [recipe, recipes, factor, prefs],
+    [pricedRecipe, pricedNotebook, factor, prefs],
   );
 
   if (!recipe || !computed || !baseline) {

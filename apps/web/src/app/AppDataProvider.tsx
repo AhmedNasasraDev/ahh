@@ -167,7 +167,10 @@ export function AppDataProvider({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    // `void`: the body catches everything, so there is nothing to await and
+    // nothing that can reject — but saying so explicitly is what keeps the next
+    // edit from adding a throw path nobody handles.
+    void (async () => {
       try {
         const [stored, calib, list, cats, materials] = await Promise.all([
           repo.getPrefs(),
