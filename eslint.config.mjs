@@ -39,6 +39,16 @@ export default tseslint.config(
       'design_handoff_recipe_notebook/**',
       '.e2e-shots/**',
       /*
+        The AUDIT VIEWER (see artifact/README.md). It is not product code, it
+        is in no tsconfig, and the type-aware rules cannot parse a file the
+        project service has no program for — without this line `npm run lint`
+        fails with three parsing errors that say nothing about the product.
+        This is the ONE tracked file the audit task touched, and reverting it
+        is deleting these four lines.
+      */
+      'artifact/**',
+
+      /*
         The Edge Function. Deno, not Node: it imports from `jsr:` URLs, uses
         the `Deno` global, and is in no tsconfig's `include` — so the project
         service has no program for it and the type-aware rules would fail to

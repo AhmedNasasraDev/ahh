@@ -1,0 +1,1469 @@
+{
+ "generatedAt": "2026-09-17",
+ "commit": "7e5031c",
+ "routes": [
+  {
+   "route": "/onboarding",
+   "name": "שאלות הפתיחה",
+   "spec": "מסך 1",
+   "screen": "OnboardingScreen",
+   "file": "apps/web/src/routes/OnboardingScreen.tsx",
+   "reach": "OnboardingGate מפנה לכאן כש-prefs.done אינו true · הגדרות → «שאלות הפתיחה»",
+   "data": "prefs (טבלת profiles) דרך AppDataProvider",
+   "backend": "profiles: getPrefs/savePrefs",
+   "actions": [
+    "בחירת פרופיל",
+    "בחירת יחידות",
+    "כיול כלים",
+    "סיום → /notebook"
+   ],
+   "states": [
+    "3 שלבים",
+    "גייט שמונע מעבר לטאבים"
+   ],
+   "tests": "OnboardingScreen.test.tsx · AppSession.test.tsx",
+   "e2e": "stage4 — עובר את כל השלבים",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/notebook",
+   "name": "מחברת",
+   "spec": "מסך 3",
+   "screen": "NotebookScreen",
+   "file": "apps/web/src/routes/NotebookScreen.tsx",
+   "reach": "טאב «מחברת» · ברירת המחדל של catch-all",
+   "data": "listRecipes()",
+   "backend": "recipes + ingredients/steps/issues (RLS: recipes_own)",
+   "actions": [
+    "חיפוש",
+    "סינון לפי קטגוריה",
+    "מתכון חדש",
+    "הדבקה",
+    "פתיחת מתכון"
+   ],
+   "states": [
+    "loading",
+    "empty (אין מתכונים)",
+    "סרגל מצב נתונים (AppShell)"
+   ],
+   "tests": "NotebookScreen.test.tsx · RecipeFlow.test.tsx",
+   "e2e": "stage4 + stage5",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/paste",
+   "name": "הדבקת מתכון",
+   "spec": "מסך 6",
+   "screen": "PasteScreen",
+   "file": "apps/web/src/routes/PasteScreen.tsx",
+   "reach": "מחברת → «הדבקה»",
+   "data": "parser מקומי (packages/engine)",
+   "backend": "saveRecipe (RPC save_recipe) בשמירה בלבד",
+   "actions": [
+    "פענוח מקומי",
+    "שמירה → /recipe/:id"
+   ],
+   "states": [
+    "empty",
+    "שגיאת פענוח"
+   ],
+   "tests": "PasteScreen.test.tsx",
+   "e2e": "לא — לא נבדק בדפדפן",
+   "viewer": "ok",
+   "notes": "«פענוח חכם» (Claude) אינו קיים בקוד — ראו findings"
+  },
+  {
+   "route": "/recipe/new",
+   "name": "מתכון חדש",
+   "spec": "מסך 5",
+   "screen": "RecipeEditScreen",
+   "file": "apps/web/src/routes/RecipeEditScreen.tsx",
+   "reach": "מחברת → «מתכון חדש»",
+   "data": "draft מקומי",
+   "backend": "save_recipe",
+   "actions": [
+    "טופס מלא",
+    "הוספת רכיבים/שלבים/תקלות",
+    "בחירת מתכון בסיס",
+    "שמירה"
+   ],
+   "states": [
+    "ולידציה",
+    "locked",
+    "שגיאת שמירה"
+   ],
+   "tests": "RecipeEditScreen.test.tsx · RecipeFlow.test.tsx",
+   "e2e": "stage4 + stage5",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/recipe/:recipeId/edit",
+   "name": "עריכת מתכון",
+   "spec": "מסך 5",
+   "screen": "RecipeEditScreen",
+   "file": "apps/web/src/routes/RecipeEditScreen.tsx",
+   "reach": "מסך מתכון → «עריכה» · תווית → קישור אזהרה · Cook Mode → יציאה",
+   "data": "getRecipe(id)",
+   "backend": "save_recipe (עם expected_updated_at)",
+   "actions": [
+    "עריכה",
+    "שמירה",
+    "ביטול",
+    "כיול כלי (CalibrateSheet)"
+   ],
+   "states": [
+    "locked — מסך אישור לפני עריכת נוסחה מאושרת",
+    "התנגשות שמירה"
+   ],
+   "tests": "RecipeEditScreen.test.tsx · VersionFlow.test.tsx",
+   "e2e": "stage5",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/recipe/:recipeId",
+   "name": "מתכון",
+   "spec": "מסך 4",
+   "screen": "RecipeScreen",
+   "file": "apps/web/src/routes/RecipeScreen.tsx",
+   "reach": "כרטיס במחברת · «המשך מאיפה שעצרת» בבית · מתכוני בסיס · חומרי גלם",
+   "data": "getRecipe + catalog + prefs → compute()",
+   "backend": "recipes/ingredients/steps/issues · recipe_versions · private_notes · recipe_images (bucket פרטי)",
+   "actions": [
+    "שינוי מנות/תפוקה",
+    "המרת יחידה (ConvertSheet)",
+    "כיול (CalibrateSheet)",
+    "התאמת תבנית (PanCard)",
+    "הערה אישית",
+    "גרסאות + השוואה",
+    "תמחור (CostingPanel)",
+    "תמונות",
+    "שכפול",
+    "מחיקה",
+    "Cook Mode",
+    "תווית",
+    "דף הזמנה",
+    "עריכה"
+   ],
+   "states": [
+    "loading",
+    "not found",
+    "locked",
+    "מצב חישוב חלקי (CalcNotice)",
+    "סירוב מחיקה (RecipeInUseError)",
+    "תמונות: loading/empty/failed/URL null"
+   ],
+   "tests": "RecipeScreen.test.tsx · RecipeFlow · VersionFlow · CostingFlow · DeleteGuardFlow",
+   "e2e": "stage5 (ניווט מתוך המחברת)",
+   "viewer": "ok",
+   "notes": "המסך הגדול במוצר (~1000 שורות). תמונות: signedImageUrl מחזיר null בתצוגה"
+  },
+  {
+   "route": "/recipe/:recipeId/cook",
+   "name": "Cook Mode",
+   "spec": "מסך 7",
+   "screen": "CookScreen",
+   "file": "apps/web/src/routes/CookScreen.tsx",
+   "reach": "מסך מתכון → «Cook Mode» · בית → «המשך»",
+   "data": "getRecipe + mirror (offlineMirror: התקדמות)",
+   "backend": "קריאה בלבד; ההתקדמות נשמרת ב-IndexedDB מקומית",
+   "actions": [
+    "סימון שלב",
+    "ניווט בין שלבים",
+    "טיימר",
+    "יציאה"
+   ],
+   "states": [
+    "מסך מלא ללא טאבים",
+    "ללא שלבים"
+   ],
+   "tests": "CookScreen.test.tsx",
+   "e2e": "stage4",
+   "viewer": "ok",
+   "notes": "אין h1 — הכיתוב הראשי הוא מספר השלב"
+  },
+  {
+   "route": "/recipe/:recipeId/label",
+   "name": "תווית",
+   "spec": "מסך 8",
+   "screen": "LabelScreen",
+   "file": "apps/web/src/routes/LabelScreen.tsx",
+   "reach": "מסך מתכון → «תווית»",
+   "data": "compute() + labelComposition() + lastBatch()/haccpOf()",
+   "backend": "קריאה בלבד (batches נקראות, לא נכתבות)",
+   "actions": [
+    "הדפסה (window.print)"
+   ],
+   "states": [
+    "אלרגנים לא ודאיים → הסרת אחוזים",
+    "אין אצווה → אין שורת HACCP",
+    "אזהרת «אינה תווית מאושרת»"
+   ],
+   "tests": "LabelScreen.test.tsx (18)",
+   "e2e": "לא — לא נבדק בדפדפן",
+   "viewer": "ok",
+   "notes": "מסך הדפסה: @media print ב-global.css"
+  },
+  {
+   "route": "/recipe/:recipeId/order",
+   "name": "דף הזמנה",
+   "spec": "מסך 9",
+   "screen": "OrderScreen",
+   "file": "apps/web/src/routes/OrderScreen.tsx",
+   "reach": "מסך מתכון → «דף הזמנה» (כולל פרמטרי scale ב-URL)",
+   "data": "compute() בקנה המידה שב-URL",
+   "backend": "קריאה בלבד",
+   "actions": [
+    "מילוי פרטי הזמנה (לא נשמר)",
+    "הדפסה"
+   ],
+   "states": [
+    "משקל לא ידוע → ______",
+    "עלות לא מלאה → מסויגת",
+    "אין מספר הזמנה"
+   ],
+   "tests": "OrderScreen.test.tsx (23)",
+   "e2e": "לא — לא נבדק בדפדפן",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/home",
+   "name": "בית",
+   "spec": "מסך 2",
+   "screen": "HomeScreen",
+   "file": "apps/web/src/routes/HomeScreen.tsx",
+   "reach": "טאב «בית»",
+   "data": "listRecipes + mirror (lastOpened)",
+   "backend": "recipes",
+   "actions": [
+    "המשך מאיפה שעצרת",
+    "קטגוריות",
+    "מתכוני בסיס"
+   ],
+   "states": [
+    "אין מתכון פתוח",
+    "אין עלות"
+   ],
+   "tests": "HomeScreen.test.tsx",
+   "e2e": "stage4",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/groups",
+   "name": "קבוצות",
+   "spec": "מסך 15",
+   "screen": "GroupsScreen",
+   "file": "apps/web/src/routes/GroupsScreen.tsx",
+   "reach": "טאב «קבוצות»",
+   "data": "listGroups() + myJoinRequests() + group_unread_counts()",
+   "backend": "groups · group_members · group_join_requests · RPC create_group/request_group_join",
+   "actions": [
+    "יצירת קבוצה",
+    "הצטרפות עם קוד",
+    "ביטול בקשה",
+    "פתיחת קבוצה"
+   ],
+   "states": [
+    "loading",
+    "empty + ארבע דרכי הצטרפות",
+    "ללא שרת → הודעה ואין כפתורים",
+    "alert על שגיאה",
+    "badge לא נקראו"
+   ],
+   "tests": "GroupsScreen.test.tsx (14)",
+   "e2e": "stage12 (מצב ללא שרת בלבד)",
+   "viewer": "fixture",
+   "notes": ""
+  },
+  {
+   "route": "/group/:groupId",
+   "name": "קבוצה",
+   "spec": "מסך 16",
+   "screen": "GroupScreen",
+   "file": "apps/web/src/routes/GroupScreen.tsx",
+   "reach": "כרטיס ברשימת הקבוצות · אחרי פדיון הזמנה",
+   "data": "getGroup() (courses→lessons→items) + group_roster() + signed avatar URLs",
+   "backend": "courses/lessons/group_recipe_items · RPC group_roster · Realtime (בטאב הצ׳אט)",
+   "actions": [
+    "טאב שיעורים/צ׳אט",
+    "(דרגה≥2) קורס חדש, שיעור חדש, הוספת מתכון מהמחברת, סימון שיעור, הסרת פריט",
+    "יציאה מהקבוצה",
+    "מעבר להרשאות"
+   ],
+   "states": [
+    "loading",
+    "הקבוצה אינה קיימת/אין גישה — הודעה אחת",
+    "אין קורסים (נוסח שונה לתלמיד ולמדריך)",
+    "קוד הקבוצה מוצג לדרגה≥2",
+    "badge לא נקראו"
+   ],
+   "tests": "GroupScreen.test.tsx (20)",
+   "e2e": "לא — דורש נתוני קבוצה",
+   "viewer": "fixture",
+   "notes": ""
+  },
+  {
+   "route": "/group/:groupId/perms",
+   "name": "הרשאות",
+   "spec": "מסך 18",
+   "screen": "PermsScreen",
+   "file": "apps/web/src/routes/PermsScreen.tsx",
+   "reach": "מסך קבוצה → «חברים והרשאות» (מוצג לדרגה≥2)",
+   "data": "getGroup + roster + listInvites + listJoinRequests",
+   "backend": "group_members (members_role/members_remove) · group_invites + RPC create/revoke/resend · approve/reject_group_join · group_recipe_items · Edge Function send-group-invite",
+   "actions": [
+    "שינוי תפקיד",
+    "הסרת חבר",
+    "אישור/דחיית בקשה",
+    "יצירת הזמנה (מייל או קישור)",
+    "ביטול/שליחה מחדש",
+    "חמישה מתגי הרשאה לכל מתכון"
+   ],
+   "states": [
+    "תלמיד → «למדריכים ולמנהלים בלבד»",
+    "מדריך → ללא שליטה בתפקידים",
+    "בעלים — אין מה לשנות",
+    "הזמנה: ממתינה/נוצלה/בוטלה/נדחתה/פג תוקף",
+    "מייל לא נשלח → הסבר + קישור"
+   ],
+   "tests": "PermsScreen.test.tsx (25)",
+   "e2e": "לא",
+   "viewer": "fixture",
+   "notes": "שליחת מייל אינה מופעלת בתצוגה — BACKEND NOT EXECUTED"
+  },
+  {
+   "route": "/group/:groupId/item/:itemId",
+   "name": "מתכון קבוצתי",
+   "spec": "מסך 17",
+   "screen": "GroupRecipeScreen",
+   "file": "apps/web/src/routes/GroupRecipeScreen.tsx",
+   "reach": "שיעור בקבוצה → פריט מתכון",
+   "data": "getGroup + fetchRecipe(recipeId) + getItemNote(itemId)",
+   "backend": "recipes (recipes_group_read) · private_notes · RPC save_group_recipe_copy/save_item_note",
+   "actions": [
+    "צפייה ברכיבים ובשלבים",
+    "כרטיס «מה מותר לי כאן»",
+    "הערה אישית",
+    "שמירת עותק למחברת",
+    "הדפסה (אם מותר)"
+   ],
+   "states": [
+    "אינו זמין — הודעה אחת לכל סיבה",
+    "save חסום → נוסח המפרט",
+    "מתכון בסיס שלא שותף → הודעה",
+    "העותק נוצר → הודעה + מעבר"
+   ],
+   "tests": "GroupRecipeScreen.test.tsx (14)",
+   "e2e": "לא",
+   "viewer": "fixture",
+   "notes": ""
+  },
+  {
+   "route": "/ingredients",
+   "name": "חומרי גלם ומחירים",
+   "spec": "מסך 11",
+   "screen": "IngredientsScreen",
+   "file": "apps/web/src/routes/IngredientsScreen.tsx",
+   "reach": "עוד → «חומרי גלם ומחירים»",
+   "data": "listCatalog()",
+   "backend": "ingredient_catalog · RPC record_purchase · purchase_history · recipes_pricing_on",
+   "actions": [
+    "הוספה/עריכה/מחיקה של חומר גלם",
+    "רישום קנייה",
+    "היסטוריית מחירים",
+    "אילו מתכונים נשענים על המחיר"
+   ],
+   "states": [
+    "empty",
+    "מחיר לא ידוע ≠ 0",
+    "עלות נגזרת ע״י המסד"
+   ],
+   "tests": "IngredientsScreen.test.tsx · PricingFlow · CostingFlow",
+   "e2e": "לא",
+   "viewer": "fixture",
+   "notes": "ל-5 מתכוני הדמו אין ingredientKey; ההתאמה נעשית לפי שם מנורמל"
+  },
+  {
+   "route": "/plans",
+   "name": "תכנון ייצור",
+   "spec": "מסך 10",
+   "screen": "PlansScreen",
+   "file": "apps/web/src/routes/PlansScreen.tsx",
+   "reach": "עוד → «תכנון ייצור ורכש»",
+   "data": "listPlans()",
+   "backend": "production_plans · RPC save_production_plan",
+   "actions": [
+    "תוכנית חדשה",
+    "פתיחת תוכנית",
+    "מחיקה"
+   ],
+   "states": [
+    "loading",
+    "empty",
+    "נעול/פתוח"
+   ],
+   "tests": "PlanningFlow.test.tsx (דרך appHarness)",
+   "e2e": "לא",
+   "viewer": "fixture",
+   "notes": "אין קובץ בדיקה ייעודי למסך"
+  },
+  {
+   "route": "/plan/:planId",
+   "name": "יום ייצור",
+   "spec": "מסך 10",
+   "screen": "PlanScreen",
+   "file": "apps/web/src/routes/PlanScreen.tsx",
+   "reach": "רשימת התוכניות → שם התוכנית",
+   "data": "getPlan + recipes + catalog → explode/timeline/purchase",
+   "backend": "production_plans + items + stock · RPC set_plan_locked",
+   "actions": [
+    "הוספת פריטים",
+    "מלאי קיים",
+    "נעילה (snapshot)",
+    "מחיקה"
+   ],
+   "states": [
+    "נעול = קורא מה-snapshot",
+    "חסר מחיר → לא מוצגת עלות",
+    "לוח זמנים אחורה"
+   ],
+   "tests": "PlanningFlow.test.tsx",
+   "e2e": "לא",
+   "viewer": "fixture",
+   "notes": "אין קובץ בדיקה ייעודי למסך"
+  },
+  {
+   "route": "/more",
+   "name": "עוד",
+   "spec": "מסך 19",
+   "screen": "MoreScreen",
+   "file": "apps/web/src/routes/MoreScreen.tsx",
+   "reach": "טאב «עוד»",
+   "data": "useAuth + capabilities",
+   "backend": "auth session בלבד",
+   "actions": [
+    "4 כניסות: חומרי גלם, תכנון ייצור, כלי מדידה, הגדרות"
+   ],
+   "states": [
+    "מחובר/לא מחובר",
+    "הערת מצב נתונים"
+   ],
+   "tests": "AppSession.test.tsx (מותקן ב-harness)",
+   "e2e": "stage4",
+   "viewer": "ok",
+   "notes": "אין קובץ בדיקה ייעודי"
+  },
+  {
+   "route": "/settings",
+   "name": "הגדרות",
+   "spec": "מסך 20",
+   "screen": "SettingsScreen",
+   "file": "apps/web/src/routes/SettingsScreen.tsx",
+   "reach": "עוד → «הגדרות»",
+   "data": "prefs + auth + getIdentity()",
+   "backend": "profiles (prefs + display_name + avatar_path) · bucket avatars · auth (שינוי סיסמה/יציאה)",
+   "actions": [
+    "פרופיל",
+    "יחידות",
+    "שם ותמונה לקבוצות (IdentityCard)",
+    "איפוס שאלות פתיחה",
+    "שינוי סיסמה",
+    "יציאה"
+   ],
+   "states": [
+    "שפה: ערבית «בהכנה» — ללא מתג",
+    "פרטיות: טקסט, אין מה לכבות",
+    "ללא שרת → שדות מושבתים"
+   ],
+   "tests": "SettingsScreen.test.tsx · IdentityCard.test.tsx (11)",
+   "e2e": "stage4 + stage12",
+   "viewer": "fixture",
+   "notes": "העלאת תמונה בתצוגה אינה מגיעה ל-Storage"
+  },
+  {
+   "route": "/tools",
+   "name": "כלי המדידה שלי",
+   "spec": "מסך 21",
+   "screen": "ToolsScreen",
+   "file": "apps/web/src/routes/ToolsScreen.tsx",
+   "reach": "עוד → «כלי המדידה שלי»",
+   "data": "prefs.tools + prefs.calib",
+   "backend": "profiles.tools · calibrations",
+   "actions": [
+    "גודל כוס/כף/כפית",
+    "oz מול fl oz",
+    "כיול אישי",
+    "מחיקת כיול"
+   ],
+   "states": [
+    "אין כיולים",
+    "כיול מוקפא מזמן היצירה"
+   ],
+   "tests": "ToolsScreen.test.tsx",
+   "e2e": "stage4 + stage5",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "/join/:token",
+   "name": "הזמנה לקבוצה",
+   "spec": "§10.2",
+   "screen": "JoinScreen",
+   "file": "apps/web/src/routes/JoinScreen.tsx",
+   "reach": "קישור הזמנה מהמייל או מהעתקה — מחוץ ל-AppShell",
+   "data": "הטוקן מה-URL בלבד",
+   "backend": "RPC redeem_group_invite / reject_group_invite",
+   "actions": [
+    "הצטרפות",
+    "דחייה"
+   ],
+   "states": [
+    "אינו פודה בטעינה",
+    "סירוב אחד לכל הסיבות",
+    "נדחתה"
+   ],
+   "tests": "JoinScreen.test.tsx (7)",
+   "e2e": "stage12 (מצב ללא שרת)",
+   "viewer": "fixture",
+   "notes": "הטוקן אינו מוצג במסך"
+  },
+  {
+   "route": "*",
+   "name": "הפניה לברירת מחדל",
+   "spec": "—",
+   "screen": "Navigate → /notebook",
+   "file": "apps/web/src/App.tsx",
+   "reach": "כל כתובת שאינה מוכרת",
+   "data": "—",
+   "backend": "—",
+   "actions": [
+    "redirect"
+   ],
+   "states": [
+    "replace: true"
+   ],
+   "tests": "AppSession.test.tsx",
+   "e2e": "לא",
+   "viewer": "ok",
+   "notes": ""
+  },
+  {
+   "route": "(אין route)",
+   "name": "התחברות / הרשמה",
+   "spec": "§2 · HANDOFF §2",
+   "screen": "AuthScreen",
+   "file": "apps/web/src/routes/AuthScreen.tsx",
+   "reach": "AuthGate מציג אותו כאשר status === 'signed-out' (כלומר: פרויקט מוגדר והמשתמש אינו מחובר)",
+   "data": "auth session",
+   "backend": "Supabase GoTrue (signUp/signIn/reset)",
+   "actions": [
+    "הרשמה",
+    "התחברות",
+    "איפוס סיסמה"
+   ],
+   "states": [
+    "loading",
+    "unconfigured → אינו מוצג כלל",
+    "שגיאת התחברות"
+   ],
+   "tests": "אין קובץ בדיקה",
+   "e2e": "לא",
+   "viewer": "component",
+   "notes": "בתצוגה מוצג בנתיב /__inspector/auth — לא route של המוצר. BACKEND NOT EXECUTED"
+  },
+  {
+   "route": "(אין route)",
+   "name": "NotImplementedScreen",
+   "spec": "—",
+   "screen": "NotImplementedScreen",
+   "file": "apps/web/src/routes/NotImplementedScreen.tsx",
+   "reach": "אין — אף route ואף קומפוננטה אינם מפנים אליו יותר",
+   "data": "—",
+   "backend": "—",
+   "actions": [],
+   "states": [],
+   "tests": "אין",
+   "e2e": "—",
+   "viewer": "dead",
+   "notes": "קוד מת מאז ש-/groups קיבל מסך אמיתי"
+  }
+ ],
+ "components": [
+  {
+   "name": "AppShell",
+   "file": "apps/web/src/shell/AppShell.tsx",
+   "host": "כל מסכי הטאבים",
+   "what": "מסגרת, סרגל מצב הנתונים (§17), TabBar",
+   "tests": "AppSession.test.tsx"
+  },
+  {
+   "name": "TabBar",
+   "file": "apps/web/src/shell/TabBar.tsx",
+   "host": "AppShell",
+   "what": "4 טאבים + tabOf(); אין יותר תווית «בהכנה»",
+   "tests": "TabBar.test.tsx (7)"
+  },
+  {
+   "name": "ConvertSheet",
+   "file": "apps/web/src/features/recipe/ConvertSheet.tsx",
+   "host": "RecipeScreen",
+   "what": "§5.3 גלית המרת יחידה",
+   "tests": "דרך RecipeScreen.test.tsx"
+  },
+  {
+   "name": "CalibrateSheet",
+   "file": "apps/web/src/features/recipe/CalibrateSheet.tsx",
+   "host": "RecipeScreen · RecipeEditScreen",
+   "what": "כיול כלי מדידה בזמן עבודה",
+   "tests": "CalibrateSheet.test.tsx"
+  },
+  {
+   "name": "PanCard",
+   "file": "apps/web/src/features/recipe/PanCard.tsx",
+   "host": "RecipeScreen",
+   "what": "§7 התאמת תבנית",
+   "tests": "PanCard.test.tsx"
+  },
+  {
+   "name": "PrivateNote",
+   "file": "apps/web/src/features/recipe/PrivateNote.tsx",
+   "host": "RecipeScreen",
+   "what": "§8 הערה אישית על מתכון",
+   "tests": "PrivateNote.test.tsx"
+  },
+  {
+   "name": "VersionHistory",
+   "file": "apps/web/src/features/recipe/VersionHistory.tsx",
+   "host": "RecipeScreen",
+   "what": "§9 היסטוריית גרסאות + שחזור",
+   "tests": "VersionHistory.test.tsx · VersionFlow"
+  },
+  {
+   "name": "VersionCompare",
+   "file": "apps/web/src/features/recipe/VersionCompare.tsx",
+   "host": "VersionHistory",
+   "what": "§2 מסך 14 «השוואת גרסאות» — קיים כקומפוננטה בתוך ההיסטוריה, לא כמסך",
+   "tests": "VersionCompare.test.tsx"
+  },
+  {
+   "name": "CostingPanel",
+   "file": "apps/web/src/features/pricing/CostingPanel.tsx",
+   "host": "RecipeScreen",
+   "what": "עלות, food cost, רווחיות",
+   "tests": "CostingFlow · PricingFlow"
+  },
+  {
+   "name": "RecipeImages",
+   "file": "apps/web/src/features/images/RecipeImages.tsx",
+   "host": "RecipeScreen",
+   "what": "§5 תמונות מתכון (bucket פרטי, WebP)",
+   "tests": "RecipeImages.test.tsx (21)"
+  },
+  {
+   "name": "GroupChat",
+   "file": "apps/web/src/features/groups/GroupChat.tsx",
+   "host": "GroupScreen",
+   "what": "§10 צ׳אט: היסטוריה, pagination, unread, עריכה/מחיקה/תשובה, Realtime",
+   "tests": "GroupChat.test.tsx (34)"
+  },
+  {
+   "name": "IdentityCard",
+   "file": "apps/web/src/features/groups/IdentityCard.tsx",
+   "host": "SettingsScreen",
+   "what": "§10.1 שם ותמונה שהקבוצה רואה",
+   "tests": "IdentityCard.test.tsx (11)"
+  },
+  {
+   "name": "SourceBadge",
+   "file": "apps/web/src/components/SourceBadge.tsx",
+   "host": "RecipeScreen · RecipeEditScreen · ConvertSheet",
+   "what": "מקור הצפיפות/הנתון (§5.1)",
+   "tests": "דרך מסכי המתכון"
+  },
+  {
+   "name": "AuthGate",
+   "file": "apps/web/src/auth/AuthGate.tsx",
+   "host": "App",
+   "what": "loading / unconfigured / signed-out / signed-in",
+   "tests": "AppSession.test.tsx"
+  },
+  {
+   "name": "OnboardingGate",
+   "file": "apps/web/src/app/OnboardingGate.tsx",
+   "host": "App",
+   "what": "§4 חוסם את הטאבים עד לסיום",
+   "tests": "AppSession.test.tsx"
+  }
+ ],
+ "spec": [
+  {
+   "req": "§2 מסך 1 — Onboarding",
+   "impl": "OnboardingScreen",
+   "route": "/onboarding",
+   "file": "routes/OnboardingScreen.tsx",
+   "ui": "כן",
+   "backend": "profiles",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 2 — בית",
+   "impl": "HomeScreen",
+   "route": "/home",
+   "file": "routes/HomeScreen.tsx",
+   "ui": "כן",
+   "backend": "recipes + mirror",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 3 — מחברת",
+   "impl": "NotebookScreen",
+   "route": "/notebook",
+   "file": "routes/NotebookScreen.tsx",
+   "ui": "כן",
+   "backend": "recipes",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 4 — מתכון",
+   "impl": "RecipeScreen",
+   "route": "/recipe/:id",
+   "file": "routes/RecipeScreen.tsx",
+   "ui": "כן",
+   "backend": "recipes + versions + notes + images",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 5 — עריכה",
+   "impl": "RecipeEditScreen",
+   "route": "/recipe/:id/edit",
+   "file": "routes/RecipeEditScreen.tsx",
+   "ui": "כן",
+   "backend": "save_recipe",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 6 — הדבקה",
+   "impl": "PasteScreen",
+   "route": "/paste",
+   "file": "routes/PasteScreen.tsx",
+   "ui": "כן",
+   "backend": "save_recipe",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "פענוח מקומי בלבד. «פענוח חכם» (proxy ל-Claude, HANDOFF §6) אינו קיים בקוד"
+  },
+  {
+   "req": "§2 מסך 7 — Cook Mode",
+   "impl": "CookScreen",
+   "route": "/recipe/:id/cook",
+   "file": "routes/CookScreen.tsx",
+   "ui": "כן",
+   "backend": "קריאה + IndexedDB",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 8 — תווית",
+   "impl": "LabelScreen",
+   "route": "/recipe/:id/label",
+   "file": "routes/LabelScreen.tsx",
+   "ui": "כן",
+   "backend": "קריאה",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": "שורת ה-HACCP תלויה באצווה קיימת — ואין UI ליצור אצווה (ראו F3)"
+  },
+  {
+   "req": "§2 מסך 9 — דף הזמנה",
+   "impl": "OrderScreen",
+   "route": "/recipe/:id/order",
+   "file": "routes/OrderScreen.tsx",
+   "ui": "כן",
+   "backend": "קריאה",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 10 — יום ייצור",
+   "impl": "PlansScreen + PlanScreen",
+   "route": "/plans · /plan/:id",
+   "file": "routes/PlanScreen.tsx",
+   "ui": "כן",
+   "backend": "production_plans + items + stock",
+   "test": "דרך flow בלבד",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": "אין קובץ בדיקה ייעודי למסכים עצמם"
+  },
+  {
+   "req": "§2 מסך 11 — מלאי ומחירים",
+   "impl": "IngredientsScreen",
+   "route": "/ingredients",
+   "file": "routes/IngredientsScreen.tsx",
+   "ui": "כן",
+   "backend": "ingredient_catalog + record_purchase",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "מחירים וקניות קיימים. «מלאי» ככמות במחסן קיים רק כ-onHand בתוך תוכנית ייצור, ואין route /stock שה-TabBar מכיר"
+  },
+  {
+   "req": "§2 מסך 12 — מצב לימוד",
+   "impl": "—",
+   "route": "—",
+   "file": "—",
+   "ui": "לא",
+   "backend": "—",
+   "test": "לא",
+   "e2e": "לא",
+   "status": "NOT BUILT",
+   "note": "אין קומפוננטה, אין route. קיים בפרוטוטייפ (learn.js) ולא הועבר"
+  },
+  {
+   "req": "§2 מסך 13 — אצוות",
+   "impl": "—",
+   "route": "—",
+   "file": "features/batch/haccp.ts (מנוע בלבד)",
+   "ui": "לא",
+   "backend": "batches (נקראות בלבד)",
+   "test": "haccp.test.ts (13)",
+   "e2e": "לא",
+   "status": "NOT BUILT",
+   "note": "אין מסך ואין נתיב כתיבה: ל-Repository אין שום מתודת batch"
+  },
+  {
+   "req": "§2 מסך 14 — השוואת גרסאות",
+   "impl": "VersionCompare",
+   "route": "(בתוך VersionHistory)",
+   "file": "features/recipe/VersionCompare.tsx",
+   "ui": "חלקי",
+   "backend": "recipe_versions",
+   "test": "VersionCompare.test.tsx",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "קיים כקומפוננטה בתוך היסטוריית הגרסאות, לא כמסך עם route כמו במפרט"
+  },
+  {
+   "req": "§2 מסך 15 — קבוצות",
+   "impl": "GroupsScreen",
+   "route": "/groups",
+   "file": "routes/GroupsScreen.tsx",
+   "ui": "כן",
+   "backend": "groups + members + requests",
+   "test": "כן",
+   "e2e": "חלקי",
+   "status": "COMPLETED",
+   "note": "E2E בדפדפן מכסה רק את המצב ללא שרת"
+  },
+  {
+   "req": "§2 מסך 16 — קבוצה",
+   "impl": "GroupScreen",
+   "route": "/group/:id",
+   "file": "routes/GroupScreen.tsx",
+   "ui": "כן",
+   "backend": "courses/lessons/items + roster",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 17 — מתכון קבוצתי",
+   "impl": "GroupRecipeScreen",
+   "route": "/group/:id/item/:itemId",
+   "file": "routes/GroupRecipeScreen.tsx",
+   "ui": "כן",
+   "backend": "recipes_group_read + save_group_recipe_copy",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 18 — הרשאות",
+   "impl": "PermsScreen",
+   "route": "/group/:id/perms",
+   "file": "routes/PermsScreen.tsx",
+   "ui": "כן",
+   "backend": "members_role + invites + items_write",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": "כולל חברים, תפקידים, בקשות והזמנות — המפרט לא נותן להם מסך נפרד"
+  },
+  {
+   "req": "§2 מסך 19 — עוד",
+   "impl": "MoreScreen",
+   "route": "/more",
+   "file": "routes/MoreScreen.tsx",
+   "ui": "כן",
+   "backend": "auth session",
+   "test": "דרך harness",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": "אין קובץ בדיקה ייעודי"
+  },
+  {
+   "req": "§2 מסך 20 — הגדרות",
+   "impl": "SettingsScreen",
+   "route": "/settings",
+   "file": "routes/SettingsScreen.tsx",
+   "ui": "כן",
+   "backend": "profiles + avatars + auth",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§2 מסך 21 — כלי המדידה שלי",
+   "impl": "ToolsScreen",
+   "route": "/tools",
+   "file": "routes/ToolsScreen.tsx",
+   "ui": "כן",
+   "backend": "profiles.tools + calibrations",
+   "test": "כן",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§3 Progressive disclosure",
+   "impl": "PROFILES + prefs.pro",
+   "route": "כל המסכים",
+   "file": "packages/engine/src/profiles.ts",
+   "ui": "כן",
+   "backend": "profiles.profile/pro",
+   "test": "profiles.test.ts",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§4 Onboarding פעם אחת",
+   "impl": "OnboardingGate",
+   "route": "—",
+   "file": "app/OnboardingGate.tsx",
+   "ui": "כן",
+   "backend": "profiles.onboarding_done",
+   "test": "AppSession.test.tsx",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§5 המרות יחידה",
+   "impl": "engine convert + ConvertSheet",
+   "route": "/recipe/:id",
+   "file": "packages/engine/src/convert.ts",
+   "ui": "כן",
+   "backend": "density_table",
+   "test": "conversion.test.ts + parity.test.ts",
+   "e2e": "חלקי",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§5.1 סדר קדימות של מקור",
+   "impl": "SourceBadge + resolve",
+   "route": "/recipe/:id",
+   "file": "components/SourceBadge.tsx",
+   "ui": "כן",
+   "backend": "calibrations + density_table",
+   "test": "כן",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§5.4 המרת מתכון שלם",
+   "impl": "שלושה מצבי תצוגה",
+   "route": "/recipe/:id",
+   "file": "routes/RecipeScreen.tsx (VIEW_TABS)",
+   "ui": "חלקי",
+   "backend": "—",
+   "test": "RecipeScreen.test.tsx",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "שלושת המצבים קיימים והכיתוב «המתכון לא השתנה» קיים. «שמירה כגרסה» מתצוגה מומרת — אינו קיים"
+  },
+  {
+   "req": "§6 שינוי מנות ותפוקה",
+   "impl": "ארבעה מצבי סקיילינג",
+   "route": "/recipe/:id",
+   "file": "routes/RecipeScreen.tsx",
+   "ui": "כן",
+   "backend": "—",
+   "test": "RecipeScreen.test.tsx",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "המפרט עצמו מסמן «נפח סופי» כחסר — הוא עדיין חסר"
+  },
+  {
+   "req": "§7 תבניות וציוד",
+   "impl": "PanCard + שדה ציוד",
+   "route": "/recipe/:id · /recipe/:id/edit",
+   "file": "features/recipe/PanCard.tsx",
+   "ui": "כן",
+   "backend": "recipes.pan/equipment",
+   "test": "PanCard.test.tsx",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§8 הערות אישיות",
+   "impl": "PrivateNote + הערת פריט",
+   "route": "/recipe/:id · /group/:id/item/:itemId",
+   "file": "features/recipe/PrivateNote.tsx",
+   "ui": "כן",
+   "backend": "private_notes (RLS own)",
+   "test": "PrivateNote.test.tsx + private-notes.sql",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§9 גרסאות מתכון",
+   "impl": "VersionHistory + restore",
+   "route": "/recipe/:id",
+   "file": "features/recipe/VersionHistory.tsx",
+   "ui": "כן",
+   "backend": "recipe_versions + restore RPC",
+   "test": "VersionFlow + version-roundtrip",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§10 קבוצות, קורסים ותפקידים",
+   "impl": "4 מסכים + צ׳אט",
+   "route": "/groups …",
+   "file": "routes/Group*.tsx",
+   "ui": "כן",
+   "backend": "מיגרציות 0023-0037",
+   "test": "5 חבילות SQL + 5 קובצי מסך",
+   "e2e": "חלקי",
+   "status": "COMPLETED",
+   "note": "הצ׳אט לא הורץ מול שרת מהסביבה הזאת (F14)"
+  },
+  {
+   "req": "§10.2 ארבע דרכי הצטרפות",
+   "impl": "invite/link/code/request",
+   "route": "/groups · /join/:token",
+   "file": "migrations 0027/0030/0031",
+   "ui": "כן",
+   "backend": "group_invites + join_requests",
+   "test": "group-joining.sql + roles-and-invitations.sql",
+   "e2e": "חלקי",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§10.4 הרשאות פר־מתכון",
+   "impl": "5 מתגים + כרטיס «מה מותר לי»",
+   "route": "/group/:id/perms · item",
+   "file": "routes/PermsScreen.tsx",
+   "ui": "כן",
+   "backend": "group_recipe_items",
+   "test": "group-teaching.sql (36)",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§11 שמירת עותק למחברת",
+   "impl": "save_group_recipe_copy",
+   "route": "/group/:id/item/:itemId",
+   "file": "migrations 0027/0036",
+   "ui": "כן",
+   "backend": "RPC (server-side perm_save)",
+   "test": "group-teaching.sql",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§12 מודל פרטיות",
+   "impl": "RLS + roster ללא מייל",
+   "route": "—",
+   "file": "migrations 0023-0037",
+   "ui": "כן",
+   "backend": "RLS",
+   "test": "rls-isolation.sql + group-teaching.sql",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§13 יכולות מקצועיות",
+   "impl": "תמחור, food cost, DDT, HACCP חלקי",
+   "route": "/recipe/:id",
+   "file": "features/pricing/*",
+   "ui": "חלקי",
+   "backend": "ingredient_catalog",
+   "test": "foodCost.test.ts ועוד",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "אצוות וניסיונות אינם מוצגים/נכתבים מה-UI"
+  },
+  {
+   "req": "§13a HACCP ומעקב אצוות",
+   "impl": "haccpOf + שורת תווית",
+   "route": "/recipe/:id/label",
+   "file": "features/batch/haccp.ts",
+   "ui": "חלקי",
+   "backend": "batches (קריאה בלבד)",
+   "test": "haccp.test.ts (13)",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "אין מסך אצוות, אין תיעוד מצולם, אין נתיב כתיבה (F3)"
+  },
+  {
+   "req": "§14 Cook Mode",
+   "impl": "CookScreen",
+   "route": "/recipe/:id/cook",
+   "file": "routes/CookScreen.tsx",
+   "ui": "כן",
+   "backend": "mirror",
+   "test": "CookScreen.test.tsx",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§15 RTL ומספרים",
+   "impl": "dir=rtl + פורמט מספרים",
+   "route": "כל המסכים",
+   "file": "styles/global.css",
+   "ui": "כן",
+   "backend": "—",
+   "test": "probe-nav (RTL) + בדיקות מסך",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§15 ערבית",
+   "impl": "—",
+   "route": "—",
+   "file": "routes/SettingsScreen.tsx (הצהרה)",
+   "ui": "לא",
+   "backend": "—",
+   "test": "SettingsScreen.test.tsx",
+   "e2e": "לא",
+   "status": "NOT BUILT",
+   "note": "ההגדרות אומרות במפורש «בהכנה» ואין מתג שאינו עושה דבר"
+  },
+  {
+   "req": "§16 Design System",
+   "impl": "tokens.css + בדיקת ניגודיות",
+   "route": "כל המסכים",
+   "file": "styles/tokens.css",
+   "ui": "כן",
+   "backend": "—",
+   "test": "tokens.test.ts (80)",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "§17 אמיתי מול Demo",
+   "impl": "banner + סירובי demo repo",
+   "route": "כל המסכים",
+   "file": "shell/AppShell.tsx",
+   "ui": "כן",
+   "backend": "—",
+   "test": "localDemoRepository.test.ts",
+   "e2e": "כן",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "HANDOFF §1 Database",
+   "impl": "37 מיגרציות",
+   "route": "—",
+   "file": "supabase/migrations",
+   "ui": "—",
+   "backend": "28 טבלאות",
+   "test": "schema:check + חבילות SQL",
+   "e2e": "—",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "HANDOFF §2 Auth",
+   "impl": "AuthScreen + AuthProvider",
+   "route": "(AuthGate)",
+   "file": "auth/*.tsx",
+   "ui": "כן",
+   "backend": "GoTrue",
+   "test": "אין בדיקה ל-AuthScreen",
+   "e2e": "לא",
+   "status": "PARTIAL",
+   "note": "F11"
+  },
+  {
+   "req": "HANDOFF §3 RLS",
+   "impl": "כל הטבלאות",
+   "route": "—",
+   "file": "supabase/migrations",
+   "ui": "—",
+   "backend": "RLS",
+   "test": "rls-isolation + 5 חבילות",
+   "e2e": "—",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "HANDOFF §4 RPC",
+   "impl": "34 פונקציות מוצהרות",
+   "route": "—",
+   "file": "supabase/migrations",
+   "ui": "—",
+   "backend": "RPC",
+   "test": "schema:check + חבילות SQL",
+   "e2e": "—",
+   "status": "COMPLETED",
+   "note": ""
+  },
+  {
+   "req": "HANDOFF §5 Storage",
+   "impl": "recipe-images + avatars",
+   "route": "/recipe/:id · /settings",
+   "file": "migrations 0029/0031",
+   "ui": "כן",
+   "backend": "buckets פרטיים",
+   "test": "recipe-images.sql (27)",
+   "e2e": "לא",
+   "status": "COMPLETED",
+   "note": "URL חתום אינו נבדק מדפדפן מהסביבה הזאת"
+  },
+  {
+   "req": "HANDOFF §6 Security — proxy ל-Claude",
+   "impl": "—",
+   "route": "—",
+   "file": "—",
+   "ui": "לא",
+   "backend": "—",
+   "test": "—",
+   "e2e": "—",
+   "status": "NOT BUILT",
+   "note": "«פענוח חכם» דורש proxy עם מפתח בצד שרת. לא נבנה"
+  },
+  {
+   "req": "HANDOFF §4 מייל הזמנות",
+   "impl": "Edge Function send-group-invite",
+   "route": "(נקראת מ-PermsScreen)",
+   "file": "supabase/functions/send-group-invite",
+   "ui": "כן",
+   "backend": "Resend",
+   "test": "—",
+   "e2e": "לא",
+   "status": "BLOCKED",
+   "note": "נפרסה ופעילה; ממתינה לאימות דומיין ול-3 secrets. מעולם לא נקראה"
+  },
+  {
+   "req": "§10 צ׳אט בזמן אמת",
+   "impl": "Realtime Broadcast",
+   "route": "/group/:id",
+   "file": "migrations 0032 + GroupChat.tsx",
+   "ui": "כן",
+   "backend": "realtime.messages RLS",
+   "test": "group-chat.sql (45) + GroupChat.test.tsx (34)",
+   "e2e": "לא",
+   "status": "BLOCKED",
+   "note": "הסביבה הזאת חוסמת *.supabase.co — הערוץ לא נפתח אף פעם מדפדפן"
+  }
+ ],
+ "findings": [
+  {
+   "id": "F1",
+   "kind": "קוד מת",
+   "what": "NotImplementedScreen אינו מוזכר באף route ובאף קומפוננטה",
+   "where": "apps/web/src/routes/NotImplementedScreen.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F2",
+   "kind": "ניווט",
+   "what": "TabBar.owns כולל '/stock' — אין route כזה. tabOf('/stock') יאיר טאב לנתיב שאי אפשר להגיע אליו",
+   "where": "apps/web/src/shell/TabBar.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F3",
+   "kind": "פיצ'ר לא מחובר",
+   "what": "אין שום נתיב שכותב אצווה: ל-Repository אין מתודת batch. שורת ה-HACCP בתווית תלויה באצווה שרק המסד יכול לקבל",
+   "where": "features/batch/haccp.ts · routes/LabelScreen.tsx · data/repository.ts",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F4",
+   "kind": "פיצ'ר לא מחובר",
+   "what": "trials נקראות אל תוך אובייקט המתכון ואינן מוצגות בשום מסך",
+   "where": "data/mappers.ts",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F5",
+   "kind": "לא נבנה",
+   "what": "מסך 12 «מצב לימוד» — אין קומפוננטה ואין route",
+   "where": "—",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F6",
+   "kind": "לא נבנה",
+   "what": "מסך 13 «אצוות» — אין קומפוננטה ואין route",
+   "where": "—",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F7",
+   "kind": "חלקי",
+   "what": "מסך 14 «השוואת גרסאות» קיים כקומפוננטה בתוך VersionHistory, לא כמסך",
+   "where": "features/recipe/VersionCompare.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F8",
+   "kind": "חלקי",
+   "what": "§5.4: שלושת מצבי התצוגה קיימים; «שמירה כגרסה» מתצוגה מומרת אינה קיימת",
+   "where": "routes/RecipeScreen.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F9",
+   "kind": "חלקי",
+   "what": "§6: מצב הסקיילינג «נפח סופי» חסר — המפרט עצמו מסמן אותו כחסר",
+   "where": "routes/RecipeScreen.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F10",
+   "kind": "לא נבנה",
+   "what": "«פענוח חכם» בהדבקה — אין proxy ואין קריאה ל-Claude",
+   "where": "routes/PasteScreen.tsx",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F11",
+   "kind": "כיסוי בדיקות",
+   "what": "ל-AuthScreen אין קובץ בדיקה ואינו נבדק בדפדפן",
+   "where": "routes/AuthScreen.tsx",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F12",
+   "kind": "כיסוי בדיקות",
+   "what": "ל-PlansScreen ול-PlanScreen אין קובצי בדיקה ייעודיים (מכוסים דרך PlanningFlow)",
+   "where": "routes/Plan*.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F13",
+   "kind": "כיסוי בדיקות",
+   "what": "ל-MoreScreen אין קובץ בדיקה ייעודי",
+   "where": "routes/MoreScreen.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F14",
+   "kind": "לא אומת",
+   "what": "הצ׳אט וה-Realtime מעולם לא הורצו מדפדפן מול השרת — הסביבה חוסמת *.supabase.co",
+   "where": "features/groups/GroupChat.tsx",
+   "sev": "גבוה"
+  },
+  {
+   "id": "F15",
+   "kind": "חסום",
+   "what": "Edge Function send-group-invite נפרסה ולא נקראה; חסרים אימות דומיין ו-3 secrets",
+   "where": "supabase/functions/send-group-invite",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F16",
+   "kind": "כיסוי בדיקות",
+   "what": "מסכי הקבוצות אינם בטבלת ה-routes של appHarness — אין flow test ברמת session שעובר עליהם",
+   "where": "apps/web/src/test/appHarness.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F17",
+   "kind": "לא נבנה",
+   "what": "ערבית (§15/§17) אינה ממומשת; ההגדרות מצהירות «בהכנה»",
+   "where": "routes/SettingsScreen.tsx",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F18",
+   "kind": "ביצועים",
+   "what": "50 אזהרות multiple permissive policies מה-linter — עלות מדודה ומקובלת, מתועדת ב-0037",
+   "where": "supabase/migrations/0037_advisor_findings.sql",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F19",
+   "kind": "הגדרת פרויקט",
+   "what": "Leaked password protection כבוי ב-Supabase Auth — החלטה של בעל הפרויקט",
+   "where": "project setting",
+   "sev": "בינוני"
+  },
+  {
+   "id": "F20",
+   "kind": "בקרת גרסאות",
+   "what": "39 מיגרציות מוחלות מול 37 קבצים: שתי מיגרציות תיקון מ-stage 10 הוטמעו בקבצים הממוספרים ונשארו בהיסטוריה המרוחקת",
+   "where": "supabase/migrations",
+   "sev": "נמוך"
+  },
+  {
+   "id": "F21",
+   "kind": "הערת תצוגה",
+   "what": "קישור ההזמנה נבנה מ-window.location.origin, ולכן בתצוגה הוא מציג את הכתובת של ה-Artifact",
+   "where": "routes/PermsScreen.tsx",
+   "sev": "—"
+  },
+  {
+   "id": "F22",
+   "kind": "החלטה מתועדת",
+   "what": "טוקן הזמנה נשמר כטקסט גלוי — הנימוק ב-0027 (קישור פתוח חייב להיות קריא שוב)",
+   "where": "supabase/migrations/0027",
+   "sev": "נמוך"
+  }
+ ],
+ "caveats": [
+  "התצוגה מריצה את המסכים של המוצר ללא שינוי, עם MemoryRouter במקום BrowserRouter — לעמוד Artifact אין שליטה בשורת הכתובת.",
+  "capabilities() בתצוגה מדווח source: 'supabase', canWrite: true. זה שקר לגבי התצוגה, והדרך היחידה לראות איך המסכים נראים לחשבון מחובר. שום בקשה אינה יוצאת מהעמוד.",
+  "כל הנתונים הם ARTIFACT FIXTURE חוץ מ-5 מתכוני הדמו (data/demoRecipes.ts — נתוני המוצר עצמו).",
+  "אין Supabase, אין auth, אין Realtime, אין Storage ואין Edge Function. פעולה שנראית כאילו הצליחה — הצליחה בזיכרון הדפדפן בלבד.",
+  "URL חתום לתמונה מחזיר null בתצוגה — זהו מצב אמיתי שהגלריה מטפלת בו.",
+  "/__inspector/auth אינו route של המוצר. AuthScreen מוצג בפרודקשן דרך AuthGate כשאין session."
+ ]
+}
