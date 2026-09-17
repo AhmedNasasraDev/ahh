@@ -35,21 +35,55 @@ if (!js || !css) {
 }
 const cssText = readFileSync(at(`../dist/${css}`), 'utf8');
 
+/*
+  THE FONT LINKS, PARSED AS TAGS — NOT AS LINES.
+
+  The first version filtered apps/web/index.html LINE BY LINE for 'fonts.g'.
+  The stylesheet link in that file is written across four lines, so the filter
+  kept the bare `href="https://fonts.googleapis.com/..."` line out of the
+  middle of the tag. In the published page that line was no longer part of any
+  element — it was a TEXT NODE in <body>, and the artifact opened with the URL
+  printed across the top.
+
+  It cost more than looks: the stray line is ~32px tall, the product's frame is
+  `height: 100dvh`, so the document became one line taller than the viewport
+  and the BOTTOM TAB BAR — the app's only navigation — was pushed out of view.
+  That is why the artifact appeared to have a single screen.
+
+  So the links are matched as whole tags, across newlines, and emitted on one
+  line each.
+*/
 const productHtml = readFileSync(at('../../apps/web/index.html'), 'utf8');
-const fonts = productHtml
-  .split('\n')
-  .filter((l) => l.includes('fonts.g'))
-  .join('\n')
-  .trim();
+const fonts = [...productHtml.matchAll(/<link[^>]*?fonts\.g[^>]*?>/gs)]
+  .map((m) => m[0].replace(/\s+/g, ' ').trim())
+  .join('\n');
+if (!/fonts\.googleapis\.com\/css2/.test(fonts)) {
+  console.error('the product stylesheet link was not found in apps/web/index.html');
+  process.exit(1);
+}
 
 const page = `<title>מחברת מתכונים</title>
 ${fonts}
 <style>
-/* ── the host page, not the product ────────────────────────────────────────
-   Three rules and a badge. Everything else on this page is the product's own
-   stylesheet, inlined below exactly as the build emitted it. */
-html, body { height: 100%; margin: 0; }
-#root { min-height: 100%; }
+/* ── the host page, not the product ──────────────────────────────
+   Four rules and a badge. Everything else on this page is the product's own
+   stylesheet, inlined below exactly as the build emitted it.
+
+   "overflow: hidden" on the page and "height: 100%" down the chain: the app is
+   a one-screen application that scrolls INSIDE its own frame (AppShell's
+   content area), and the page around it must not scroll at all — a page that
+   scrolls is a page whose bottom tab bar can end up below the fold.
+
+   The ":root" padding reset is the same problem from the other side. The
+   artifact skeleton pads :root by the phone's safe-area insets, and the
+   product's frame asks for 100dvh INSIDE that padding, so the sum overflows
+   the viewport by exactly the inset and the tab bar goes under the edge. The
+   product's frame is designed to own the whole screen — on a phone it drops
+   its own rounding and shadow to do exactly that — so the padding is dropped
+   here and the frame gets the screen it expects. */
+html, body { height: 100%; margin: 0; overflow: hidden; }
+#root { height: 100%; }
+:root { padding: 0 !important; }
 
 .simBadge {
   position: fixed;

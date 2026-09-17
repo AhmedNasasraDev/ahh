@@ -1,13 +1,27 @@
 <title>מחברת מתכונים</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-      href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@400;500;600;700&display=swap"
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-/* ── the host page, not the product ────────────────────────────────────────
-   Three rules and a badge. Everything else on this page is the product's own
-   stylesheet, inlined below exactly as the build emitted it. */
-html, body { height: 100%; margin: 0; }
-#root { min-height: 100%; }
+/* ── the host page, not the product ──────────────────────────────
+   Four rules and a badge. Everything else on this page is the product's own
+   stylesheet, inlined below exactly as the build emitted it.
+
+   "overflow: hidden" on the page and "height: 100%" down the chain: the app is
+   a one-screen application that scrolls INSIDE its own frame (AppShell's
+   content area), and the page around it must not scroll at all — a page that
+   scrolls is a page whose bottom tab bar can end up below the fold.
+
+   The ":root" padding reset is the same problem from the other side. The
+   artifact skeleton pads :root by the phone's safe-area insets, and the
+   product's frame asks for 100dvh INSIDE that padding, so the sum overflows
+   the viewport by exactly the inset and the tab bar goes under the edge. The
+   product's frame is designed to own the whole screen — on a phone it drops
+   its own rounding and shadow to do exactly that — so the padding is dropped
+   here and the frame gets the screen it expects. */
+html, body { height: 100%; margin: 0; overflow: hidden; }
+#root { height: 100%; }
+:root { padding: 0 !important; }
 
 .simBadge {
   position: fixed;
