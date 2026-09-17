@@ -38,6 +38,14 @@ export default tseslint.config(
       '**/node_modules/**',
       'design_handoff_recipe_notebook/**',
       '.e2e-shots/**',
+      /*
+        The Edge Function. Deno, not Node: it imports from `jsr:` URLs, uses
+        the `Deno` global, and is in no tsconfig's `include` — so the project
+        service has no program for it and the type-aware rules would fail to
+        parse it rather than check it. It is deployed by the Supabase CLI,
+        which type-checks it with Deno's own checker.
+      */
+      'supabase/functions/**',
     ],
   },
 

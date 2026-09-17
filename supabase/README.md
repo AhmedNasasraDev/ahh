@@ -136,16 +136,58 @@ interfaces, `Database['public']` quietly fails postgrest's `GenericSchema` check
 the client's `Schema` parameter resolves to `never`, and every insert in the
 repository is rejected as `never` with no hint why.
 
+## Connecting the invitation email
+
+`functions/send-group-invite` is deployed and live, and it answers
+`{ sent: false, reason: … }` until three secrets exist. Until then the app says
+so on the screen and shows the link to copy — an invitation works without an
+email; what does not work is pretending one went out.
+
+Three things are needed, and only the first is a decision:
+
+1. **A mail provider.** The function is written against [Resend](https://resend.com),
+   because sending is one `POST` and it needs no SDK. Any provider works —
+   swapping it is the single `fetch` at the bottom of the function, and the body
+   shape is the only provider-specific thing in the file. Resend's free tier is
+   100 messages a day, 3,000 a month, which is more than a school sends.
+2. **A verified sending domain.** This is the part that takes a DNS record and
+   up to a day, and it is not optional: mail from an unverified domain is
+   delivered to spam or refused. In Resend: Domains → Add Domain → publish the
+   DKIM and SPF records it prints. A subdomain such as `mail.your-domain.com` is
+   the usual choice, so a deliverability problem cannot affect the main domain's
+   reputation.
+3. **The secrets.** Set by the project owner, never in this repository and never
+   pasted into a chat:
+
+   ```bash
+   npx supabase secrets set RESEND_API_KEY=re_xxxxxxxx \
+                            INVITE_FROM="מחברת מתכונים <invites@mail.your-domain.com>" \
+                            PUBLIC_SITE_URL=https://app.your-domain.com
+   ```
+
+   `INVITE_FROM` must be an address at the verified domain. `PUBLIC_SITE_URL` is
+   where the app is served: the link in the mail is built from it, so a wrong
+   value sends every invitation to the wrong host.
+
+Nothing else changes. The function needs no service-role key — it reads the
+invitation with the CALLER's token, so `invites_staff` is what authorises the
+send — and there is no code path that logs the token.
+
 ## Not prepared here, on purpose
 
-- **Storage buckets** (HANDOFF §5) — recipe, category and batch photos. Needs
-  the private-bucket policy and signed access, plus the server-set timestamp
-  §13a requires.
 - **The recipe-parsing proxy** (HANDOFF §6). The Claude API key must never reach
   the browser. This is an edge function with a per-user rate limit.
-- **Group endpoints** (HANDOFF §4) — invitations, join by code, approvals and
-  `save-copy`.
 - **Email templates and the redirect URL** for confirmation. The app reads
   whichever setting the project has (`signUp` returning a user with no session
   means "confirm first") and says the right thing either way, but the templates
   themselves are untouched Supabase defaults.
+- **Arabic** (§17 lists it as "בהכנה"). The settings screen states the fact
+  rather than offering a switch that changes nothing.
+
+## Done since this list was written
+
+- **Storage buckets** (HANDOFF §5) — `recipe-images` in migration 0029 and
+  `avatars` in 0031, both private, WebP only, with signed access.
+- **Group endpoints** (HANDOFF §4) — invitations, join by code, approvals,
+  `save-copy`, roles, the chat and `publish_recipe_to_lesson`, in migrations
+  0023-0036.
