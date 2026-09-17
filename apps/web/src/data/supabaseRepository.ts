@@ -86,6 +86,7 @@ import {
   stepsToRows,
   type RecipeBundle,
 } from './mappers.js';
+import { createSupabaseGroups } from './supabaseGroups.js';
 import * as mirror from './offlineMirror.js';
 import { DEMO_CATEGORIES } from './demoRecipes.js';
 
@@ -169,6 +170,15 @@ export function createSupabaseRepository({
   };
 
   return {
+    /*
+      §10 — the whole group surface, from data/supabaseGroups.ts. Spread rather
+      than implemented here because it is a large, self-contained set of
+      methods; nothing above the seam knows there are two files. It is given
+      `requireOnline` so a group write is refused offline for the same reason
+      and in the same words as every other write.
+    */
+    ...createSupabaseGroups({ client, userId, requireOnline }),
+
     capabilities,
 
     async listCategories() {

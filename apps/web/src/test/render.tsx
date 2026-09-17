@@ -12,6 +12,7 @@ import type {
   PurchaseRecord,
 } from '../features/pricing/purchases.js';
 import type { ProductionPlan } from '../features/planning/plan.js';
+import { createFakeGroups, type FakeGroupOptions } from './fakeGroups.js';
 
 export interface FakeRepoOptions {
   prefs?: MeasurementPrefs | null;
@@ -42,6 +43,10 @@ export interface FakeRepoOptions {
   onRemoveRecipeImage?(image: RecipeImage): void;
   /** true makes every signed URL come back null, as a private object can */
   signedUrlFails?: boolean;
+  /** §10 — the in-memory group world. See test/fakeGroups.ts. */
+  groups?: FakeGroupOptions;
+  /** the account these tests act as; also the chat's author id */
+  userId?: string;
 }
 
 /**
@@ -73,6 +78,14 @@ export function fakeRepository(opts: FakeRepoOptions = {}): Repository {
     servingFromCache: false,
   };
   return {
+    /*
+      §10. An in-memory group world that ENFORCES the rank model — see
+      test/fakeGroups.ts. A test opts in by passing `groups`; with none, every
+      list is empty and no group screen has anything to show, which is what
+      the existing tests expect.
+    */
+    ...createFakeGroups({ userId: opts.userId ?? 'me', ...opts.groups }),
+
     capabilities: () => caps,
     listCategories: async () => DEMO_CATEGORIES,
     listRecipes: async () => [...recipes],

@@ -9,8 +9,10 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AVATAR_LIMITS,
   MAX_BYTES,
   MAX_EDGE,
+  RECIPE_LIMITS,
   MAX_SOURCE_BYTES,
   QUALITY_LADDER,
   convertErrorText,
@@ -239,5 +241,54 @@ describe('the storage path', () => {
 
   it('always ends .webp, which is the only type the bucket accepts', () => {
     expect(imagePath('r', 'x')).toMatch(/\.webp$/);
+  });
+});
+
+describe('the size budget is per bucket, not per module', () => {
+  /*
+    Added with the avatars bucket (migration 0031), which takes 512 KB where
+    the recipe bucket takes 2 MB. The alternative was a second conversion
+    function for one different number — which is how a second code path with
+    different EXIF handling gets written — or discovering the limit as a 400
+    from storage.
+  */
+  it('defaults to the recipe photograph limits, so every old caller is unchanged', () => {
+    expect(RECIPE_LIMITS).toEqual({ maxBytes: MAX_BYTES, maxEdge: MAX_EDGE });
+  });
+
+  it('bounds an avatar at 512 pixels rather than 1600', async () => {
+    const sizes: Array<{ width: number; height: number }> = [];
+    const r = await convertToWebp(
+      file(),
+      deps({ width: 4032, height: 3024, onEncode: (_q, size) => sizes.push(size) }),
+      AVATAR_LIMITS,
+    );
+    expect(r.ok).toBe(true);
+    expect(sizes[0]).toEqual({ width: 512, height: 384 });
+  });
+
+  it('refuses an avatar that will not fit in 512 KB, even though it would fit 2 MB', async () => {
+    // 700 KB is comfortably under the recipe limit and over the avatar one.
+    const bytes = 700 * 1024;
+    const asRecipe = await convertToWebp(file(), deps({ sizeFor: () => bytes }));
+    expect(asRecipe.ok).toBe(true);
+
+    const asAvatar = await convertToWebp(file(), deps({ sizeFor: () => bytes }), AVATAR_LIMITS);
+    expect(asAvatar).toEqual({ ok: false, reason: 'still-too-large', bytes });
+  });
+
+  it('walks the same ladder for an avatar, and stops at the first rung that fits', async () => {
+    const seen: number[] = [];
+    const r = await convertToWebp(
+      file(),
+      deps({
+        onEncode: (q) => seen.push(q),
+        // only the third rung gets under 512 KB
+        sizeFor: (q) => (q > 0.65 ? 600 * 1024 : 400 * 1024),
+      }),
+      AVATAR_LIMITS,
+    );
+    expect(r.ok).toBe(true);
+    expect(seen).toEqual([0.82, 0.7, 0.6]);
   });
 });

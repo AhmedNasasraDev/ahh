@@ -23,6 +23,7 @@ import type { PurchaseRecord } from '../features/pricing/purchases.js';
 import type { ProductionPlan } from '../features/planning/plan.js';
 import { defaultPrefs, normalizeCalibrations } from '@recipe-notebook/engine';
 import { DEMO_CATEGORIES, DEMO_RECIPES } from './demoRecipes.js';
+import { createLocalDemoGroups } from './localDemoGroups.js';
 import * as mirror from './offlineMirror.js';
 import {
   WriteNotAllowedError,
@@ -54,6 +55,13 @@ export function createLocalDemoRepository(): Repository {
   let servingFromCache = false;
 
   return {
+    /*
+      §10. Every read empty, every write refused in words — see
+      localDemoGroups.ts for why a local "demo group" is the one thing this
+      mode may not fabricate.
+    */
+    ...createLocalDemoGroups(),
+
     capabilities(): RepositoryCapabilities {
       return {
         source: 'local-demo',

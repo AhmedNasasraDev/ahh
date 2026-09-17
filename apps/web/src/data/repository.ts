@@ -20,6 +20,18 @@ import type {
   PurchaseRecord,
 } from '../features/pricing/purchases.js';
 import type { ProductionPlan } from '../features/planning/plan.js';
+import type { GroupRole } from '../lib/database.types.js';
+import type { ItemPerms } from '../features/groups/roles.js';
+import type { InviteView } from '../features/groups/invites.js';
+import type {
+  ChatMessage,
+  ChatPage,
+  GroupDetail,
+  GroupLesson,
+  GroupMember,
+  GroupSummary,
+  JoinRequestView,
+} from '../features/groups/types.js';
 
 /** Extra instructions for a save. All optional; a plain save still works. */
 export interface SaveOptions {
@@ -278,13 +290,168 @@ export interface RecipeImageRepository {
   signedImageUrl(storagePath: string): Promise<string | null>;
 }
 
+/**
+ * §10 — groups, courses, lessons, invitations, members and the chat.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * NOTHING HERE IS A PERMISSION DECISION
+ *
+ * Every method is a request that the database may refuse, and several of them
+ * exist precisely BECAUSE they can be refused: `setMemberRole` is not "change
+ * this role", it is "ask to change this role", and an admin asking to create
+ * another admin gets a 42501 no matter what the UI offered. The role a
+ * `GroupSummary` carries is what the database reported, and the UI uses it to
+ * decide what to OFFER — never as the check itself.
+ *
+ * WHY SO MANY OF THESE ARE RPCs RATHER THAN TABLE WRITES
+ *
+ * Three different reasons, and they are worth telling apart:
+ *
+ *   · the caller is not a member yet, so no policy can reach the row —
+ *     redeeming or declining an invitation, asking to join;
+ *   · it is two writes that must not come apart — publishing a recipe into a
+ *     lesson (see migration 0036), creating a group with its owner membership;
+ *   · it needs to read rows the caller may not select — the roster, which
+ *     reaches other people's `profiles` for a name and a picture.
+ *
+ * Everything else is an ordinary insert, update or delete under RLS.
+ *
+ * WHAT A LOCAL DEMO SESSION DOES WITH ALL THIS
+ *
+ * Refuses it, in words. A group is other people; there is no honest way to
+ * have one without an account, and a fabricated group list would be exactly
+ * the §17 dishonesty this project rules out.
+ */
+export interface GroupRepository {
+  listGroups(): Promise<GroupSummary[]>;
+  /** Group plus owner membership in one transaction (`create_group`). */
+  createGroup(input: { name: string; kind: string; note: string }): Promise<string>;
+  /** The whole §10.3 tree. null = no such group, or not the caller's. */
+  getGroup(groupId: string): Promise<GroupDetail | null>;
+  updateGroup(
+    groupId: string,
+    patch: Partial<Pick<GroupSummary, 'name' | 'kind' | 'note' | 'joinBy' | 'code'>>,
+  ): Promise<void>;
+  deleteGroup(groupId: string): Promise<void>;
+  /** Removes the caller's own membership. The owner cannot — see 0030. */
+  leaveGroup(groupId: string): Promise<void>;
+
+  /** Members with the name and picture the chat draws. Never an email address. */
+  roster(groupId: string): Promise<GroupMember[]>;
+  /** Signed URLs for avatar paths, keyed by path. A path may be missing. */
+  avatarUrls(paths: readonly string[]): Promise<Record<string, string>>;
+  setMemberRole(groupId: string, userId: string, role: GroupRole): Promise<void>;
+  removeMember(groupId: string, userId: string): Promise<void>;
+
+  listInvites(groupId: string): Promise<InviteView[]>;
+  /** Returns the TOKEN; the caller builds the link with `inviteLink`. */
+  createInvite(groupId: string, email: string | null, label: string): Promise<string>;
+  revokeInvite(inviteId: string): Promise<void>;
+  /** Revokes and issues a replacement. Returns the NEW token. */
+  resendInvite(inviteId: string): Promise<string>;
+  /** Returns the group joined, so the screen can navigate to it. */
+  redeemInvite(token: string): Promise<string>;
+  rejectInvite(token: string): Promise<void>;
+
+  listJoinRequests(groupId: string): Promise<JoinRequestView[]>;
+  /** §6: a code creates a REQUEST, never membership. Returns the group NAME. */
+  requestJoin(code: string, note: string): Promise<string>;
+  approveJoin(groupId: string, userId: string): Promise<void>;
+  rejectJoin(groupId: string, userId: string): Promise<void>;
+  withdrawJoin(groupId: string): Promise<void>;
+
+  addCourse(groupId: string, name: string): Promise<string>;
+  renameCourse(courseId: string, name: string): Promise<void>;
+  removeCourse(courseId: string): Promise<void>;
+  addLesson(courseId: string, input: { name: string; date: string | null }): Promise<string>;
+  updateLesson(
+    lessonId: string,
+    patch: Partial<Pick<GroupLesson, 'name' | 'date' | 'summary' | 'done'>>,
+  ): Promise<void>;
+  removeLesson(lessonId: string): Promise<void>;
+
+  /** Marks the caller's own recipe as the group's and adds the item (0036). */
+  publishRecipe(lessonId: string, recipeId: string, name: string): Promise<string>;
+  /** Removes the item, and un-groups the recipe when it was the last (0036). */
+  unpublishItem(itemId: string): Promise<void>;
+  setItemPerms(itemId: string, perms: ItemPerms): Promise<void>;
+  /** §11. Returns the personal recipe — the existing copy if there is one. */
+  saveGroupCopy(itemId: string): Promise<string>;
+
+  /** §8 on a group item. null = no note. */
+  getItemNote(itemId: string): Promise<string | null>;
+  saveItemNote(itemId: string, body: string): Promise<void>;
+
+  /**
+   * One page of history, newest first in the database and oldest-first in the
+   * result, because that is reading order.
+   *
+   * `before` is a `seq` cursor: the page is `seq < before`. Null asks for
+   * the newest page. Never OFFSET — a new message shifts every offset by one.
+   */
+  chatPage(groupId: string, before: number | null, limit: number): Promise<ChatPage>;
+  sendMessage(input: {
+    groupId: string;
+    body: string;
+    replyToId?: string | null;
+    kind?: 'text' | 'announcement';
+  }): Promise<ChatMessage>;
+  /** Author only. The database stamps `edited_at` — see 0032. */
+  editMessage(messageId: string, body: string): Promise<ChatMessage>;
+  /** Soft delete. The author, or rank >= 2. The words move out of reach (0035). */
+  deleteMessage(messageId: string): Promise<void>;
+  /** The caller's own marker. Only ever moves forward (`greatest`). */
+  markGroupRead(groupId: string, seq: number): Promise<void>;
+  lastReadSeq(groupId: string): Promise<number>;
+  /**
+   * Live delivery over Realtime BROADCAST on a private channel.
+   *
+   * Broadcast rather than Postgres Changes because Supabase's own
+   * documentation recommends it for scalability and security, and because RLS
+   * is then evaluated once per subscriber at JOIN time instead of per change
+   * per subscriber. The table is still the source of truth: a client that was
+   * offline catches up with `chatPage`, not by replaying a stream it missed.
+   */
+  subscribeGroupChat(groupId: string, events: ChatEvents): ChatSubscription;
+}
+
+export interface ChatEvents {
+  /** an insert or an update — the caller merges by id, newest copy winning */
+  onMessage(message: ChatMessage): void;
+  onStatus?(status: 'connecting' | 'subscribed' | 'error'): void;
+}
+
+export interface ChatSubscription {
+  unsubscribe(): void;
+}
+
+/**
+ * The account's own name and picture (migration 0031).
+ *
+ * Separate from `PrefsRepository` because it is not a preference: a display
+ * name and an avatar are what OTHER PEOPLE see in a group, and the whole
+ * reason they exist is that §10.1 will not let a roster or a chat disclose an
+ * email address.
+ */
+export interface IdentityRepository {
+  getIdentity(): Promise<{ displayName: string; avatarPath: string | null }>;
+  saveDisplayName(name: string): Promise<void>;
+  /** Converts to WebP in the browser, uploads, and returns the stored path. */
+  setAvatar(file: File | Blob): Promise<string>;
+  removeAvatar(): Promise<void>;
+  /** A time-limited URL, or null when there is no picture or it cannot be had. */
+  avatarUrl(path: string | null): Promise<string | null>;
+}
+
 export interface CalibrationRepository {
   listCalibrations(): Promise<Calibration[]>;
   saveCalibrations(list: readonly Calibration[]): Promise<Calibration[]>;
 }
 
 export interface Repository
-  extends RecipeImageRepository,
+  extends GroupRepository,
+    IdentityRepository,
+    RecipeImageRepository,
     RecipeRepository,
     PlanRepository,
     PrefsRepository,

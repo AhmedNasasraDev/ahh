@@ -115,6 +115,29 @@ export function convertErrorText(f: ConvertFailure): string {
   }
 }
 
+/**
+ * The size budget a conversion has to fit into.
+ *
+ * ADDED FOR AVATARS (migration 0031), and the reason is worth stating: the
+ * `avatars` bucket takes 512 KB, not the recipe bucket's 2 MB, and 512 pixels
+ * is plenty for a picture drawn at 40. Without this the caller's choices were
+ * to duplicate the whole conversion for one different number — which is how a
+ * second code path with different EXIF handling gets written — or to discover
+ * the limit as a 400 from storage.
+ *
+ * The defaults are the recipe-photograph constants, so every existing caller
+ * behaves exactly as before.
+ */
+export interface SizeLimits {
+  maxBytes: number;
+  maxEdge: number;
+}
+
+export const RECIPE_LIMITS: SizeLimits = { maxBytes: MAX_BYTES, maxEdge: MAX_EDGE };
+
+/** The `avatars` bucket's own limit (0031), and a size an avatar is drawn at. */
+export const AVATAR_LIMITS: SizeLimits = { maxBytes: 512 * 1024, maxEdge: 512 };
+
 export interface ConvertDeps {
   /**
    * Decode to something drawable, honouring EXIF orientation. The default uses
@@ -165,6 +188,7 @@ async function defaultEncode(
 export async function convertToWebp(
   file: File | Blob,
   deps: Partial<ConvertDeps> = {},
+  limits: SizeLimits = RECIPE_LIMITS,
 ): Promise<ConvertResult> {
   const type = file.type || '';
   /*
@@ -190,7 +214,7 @@ export async function convertToWebp(
   }
   if (!source.width || !source.height) return { ok: false, reason: 'undecodable' };
 
-  const size = targetSize({ width: source.width, height: source.height });
+  const size = targetSize({ width: source.width, height: source.height }, limits.maxEdge);
 
   /*
     Down the ladder, keeping the SMALLEST result seen. Encoders are not strictly
@@ -203,7 +227,7 @@ export async function convertToWebp(
     const blob = await encode(source, size, quality);
     if (!blob) continue;
     if (!best || blob.size < best.blob.size) best = { blob, quality };
-    if (blob.size <= MAX_BYTES) {
+    if (blob.size <= limits.maxBytes) {
       return {
         ok: true,
         blob,
