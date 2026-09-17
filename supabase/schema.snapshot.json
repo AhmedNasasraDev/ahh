@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema after migrations 0001-0022. Not used at runtime.",
+    "information_schema after migrations 0001-0026. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -39,6 +39,12 @@
     "tool_ml_assumed": "required",
     "user_id": "required"
   },
+  "courses": {
+    "group_id": "required",
+    "id": "required",
+    "name": "required",
+    "ord": "required"
+  },
   "density_data_gaps": {
     "name": "required"
   },
@@ -57,6 +63,37 @@
     "sources": "required",
     "updated_at": "required",
     "word_match": "required"
+  },
+  "group_members": {
+    "group_id": "required",
+    "joined_at": "required",
+    "role": "required",
+    "user_id": "required"
+  },
+  "group_recipe_items": {
+    "created_at": "required",
+    "id": "required",
+    "lesson_id": "required",
+    "name": "required",
+    "ord": "required",
+    "perm_download": "required",
+    "perm_print": "required",
+    "perm_save": "required",
+    "perm_share_out": "required",
+    "perm_view": "required",
+    "recipe_id": "required"
+  },
+  "groups": {
+    "code": "nullable",
+    "created_at": "required",
+    "id": "required",
+    "join_by": "required",
+    "kind": "required",
+    "name": "required",
+    "note": "required",
+    "owner_id": "required",
+    "privacy": "required",
+    "updated_at": "required"
   },
   "ingredient_catalog": {
     "allergens": "required",
@@ -122,6 +159,15 @@
     "problem": "required",
     "recipe_id": "required",
     "solution": "required"
+  },
+  "lessons": {
+    "course_id": "required",
+    "date": "nullable",
+    "done": "required",
+    "id": "required",
+    "name": "required",
+    "ord": "required",
+    "summary": "required"
   },
   "private_notes": {
     "body": "required",
@@ -247,6 +293,14 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "can_read_recipe": {
+      "args": [
+        "p_recipe_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "check_plan_item_owner": {
       "args": [],
       "security_definer": true,
@@ -258,6 +312,24 @@
       "security_definer": true,
       "anon_execute": false,
       "authenticated_execute": false
+    },
+    "course_rank": {
+      "args": [
+        "p_course_id"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "create_group": {
+      "args": [
+        "p_name",
+        "p_kind",
+        "p_note"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
     },
     "delete_production_plan": {
       "args": [
@@ -275,11 +347,39 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "group_rank": {
+      "args": [
+        "p_group_id"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "guard_group_item_recipe": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    "guard_recipe_group_move": {
+      "args": [],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
     "handle_new_user": {
       "args": [],
       "security_definer": true,
       "anon_execute": false,
       "authenticated_execute": false
+    },
+    "lesson_rank": {
+      "args": [
+        "p_lesson_id"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
     },
     "next_version_tag": {
       "args": [

@@ -323,6 +323,85 @@ export type DensityTableRow = {
  * the purchase list and the cost are derived from the recipes and the
  * ingredient centre every time the plan is opened.
  */
+/* ── §10 groups, courses, lessons and items (migrations 0023-0026) ───────── */
+
+export type GroupRole = 'owner' | 'instructor' | 'member';
+
+/** §10.2's four ways in. Stored as a text[] so a group can accept a subset. */
+export type JoinMethod = 'invite' | 'link' | 'code' | 'request';
+
+export type GroupRow = {
+  id: string;
+  name: string;
+  kind: string;
+  /**
+   * §10.2: private by default, and the column is CHECKed to this one value.
+   * Nothing implements a public group — no policy admits a non-member and
+   * there is no discovery path — so the type says so rather than leaving a
+   * `string` that looks like it could hold something else.
+   */
+  privacy: 'private';
+  /**
+   * The join code. §6: it is NOT a credential — it creates a REQUEST that an
+   * admin approves. Nullable because a group that does not accept a code
+   * should not carry one that works.
+   */
+  code: string | null;
+  join_by: JoinMethod[];
+  owner_id: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GroupMemberRow = {
+  group_id: string;
+  user_id: string;
+  role: GroupRole;
+  joined_at: string;
+};
+
+export type CourseRow = {
+  id: string;
+  group_id: string;
+  name: string;
+  ord: number;
+};
+
+export type LessonRow = {
+  id: string;
+  course_id: string;
+  name: string;
+  /** A calendar date: "the lesson on 18.9" is the same lesson in every zone. */
+  date: string | null;
+  summary: string;
+  done: boolean;
+  ord: number;
+};
+
+/**
+ * §10.4 — the five per-recipe permissions.
+ *
+ * Five booleans rather than one jsonb `perms`, because a default belongs in the
+ * column: a jsonb object arriving without a key would have to be interpreted by
+ * every reader, and the first reader to read a missing `perm_save` as `true`
+ * hands out a recipe the instructor never released. The database defaults are
+ * the spec's: view true, everything else false.
+ */
+export type GroupRecipeItemRow = {
+  id: string;
+  lesson_id: string;
+  recipe_id: string;
+  name: string;
+  ord: number;
+  perm_view: boolean;
+  perm_save: boolean;
+  perm_print: boolean;
+  perm_download: boolean;
+  perm_share_out: boolean;
+  created_at: string;
+};
+
 export type ProductionPlanRow = {
   id: string;
   owner_id: string;
@@ -390,6 +469,11 @@ export type Database = {
       production_plan_stock: Table<ProductionPlanStockRow>;
       density_table: Table<DensityTableRow>;
       density_data_gaps: Table<{ name: string }>;
+      groups: Table<GroupRow>;
+      group_members: Table<GroupMemberRow>;
+      courses: Table<CourseRow>;
+      lessons: Table<LessonRow>;
+      group_recipe_items: Table<GroupRecipeItemRow>;
     };
     // Empty MAPPED types, not `Record<string, never>`. Record<string, never>
     // says every possible name is a view whose row type is `never`, so
@@ -398,6 +482,21 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       owns_recipe: { Args: { p_recipe_id: string }; Returns: boolean };
+      /*
+        migration 0023/0024/0026 — §10 groups.
+
+        `create_group` exists because a group is TWO rows: the group and its
+        owner's membership. Two requests from the browser can fail between
+        them and leave a group its creator cannot see, edit or delete.
+
+        The three rank helpers are NOT declared here. They are called by RLS
+        policies, not by this app, and the grant they need is documented in
+        supabase/scripts/check-types-against-schema.mjs.
+      */
+      create_group: {
+        Args: { p_name: string; p_kind: string; p_note: string };
+        Returns: string;
+      };
       // migration 0007 — the atomic write paths (§9, stage-5 requirement 9)
       save_recipe: {
         Args: {

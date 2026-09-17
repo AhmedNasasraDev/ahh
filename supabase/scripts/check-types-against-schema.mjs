@@ -136,6 +136,36 @@ for (const [name, args] of declaredFns) {
   }
 }
 
+/*
+  RLS POLICY HELPERS — the one exemption from the definer rule below, and why
+  it is not a loophole.
+
+  A policy expression is evaluated with the QUERYING ROLE's privileges, so a
+  function a policy calls must be executable by that role. This was measured,
+  not assumed: EXECUTE was revoked from `authenticated` on the group helpers
+  and the whole group flow broke with `permission denied for function
+  is_group_member` from inside the `members_bootstrap` policy. See migration
+  0026.
+
+  These three also cannot be written as SECURITY INVOKER, because a policy on
+  `group_members` that reads `group_members` recurses — Postgres raises
+  `infinite recursion detected in policy`.
+
+  So the grant is unavoidable, and what makes it safe is the SHAPE of what is
+  exposed. Every function on this list must:
+
+    · answer only about `auth.uid()` — no parameter naming a user, so it can
+      never be asked about somebody else;
+    · return a rank or a boolean, never a row and never an id. 0026 withdrew
+      three earlier helpers (`course_group`, `lesson_group`, `item_group`)
+      precisely because they returned somebody else's group id;
+    · be `set search_path = ''` with every reference schema-qualified.
+
+  Adding a name here is a security decision. If a helper does not meet all
+  three conditions, the answer is to change the helper, not this list.
+*/
+const RLS_POLICY_HELPERS = new Set(['group_rank', 'course_rank', 'lesson_rank']);
+
 // The security posture, over EVERY function and not only the declared ones.
 for (const [name, fn] of Object.entries(fnSnapshot)) {
   if (fn.anon_execute) {
@@ -144,12 +174,20 @@ for (const [name, fn] of Object.entries(fnSnapshot)) {
         `— see migrations 0006 and 0010.`,
     );
   }
-  if (fn.security_definer && (fn.authenticated_execute || fn.anon_execute)) {
+  if (
+    fn.security_definer &&
+    (fn.authenticated_execute || fn.anon_execute) &&
+    !RLS_POLICY_HELPERS.has(name)
+  ) {
     problems.push(
       `${name}(): SECURITY DEFINER and directly callable by a client role. ` +
         `A definer function runs as its owner, so it must only ever be reached ` +
         `through the trigger or function that owns the decision.`,
     );
+  }
+  // An RLS helper must never be reachable unauthenticated, exemption or not.
+  if (RLS_POLICY_HELPERS.has(name) && fn.anon_execute) {
+    problems.push(`${name}(): an RLS policy helper must not be callable by \`anon\`.`);
   }
 }
 
