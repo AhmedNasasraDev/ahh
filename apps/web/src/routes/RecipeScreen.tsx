@@ -221,6 +221,19 @@ export function RecipeScreen() {
     [pricedRecipe, pricedNotebook, factor, prefs],
   );
 
+  /**
+   * The scale, as something an order sheet can be linked to. `recipe` mode and
+   * a value that produced no change both come out as an empty string, so the
+   * plain URL means "as written" rather than "×1.00", which is the same thing
+   * said less clearly.
+   */
+  const orderQuery = (() => {
+    if (scaleMode === 'recipe' || factor === 1) return '';
+    const q = new URLSearchParams({ mode: scaleMode, v: scaleValue });
+    if (scaleMode === 'stock' && scaleIngredient) q.set('ing', scaleIngredient);
+    return `?${q.toString()}`;
+  })();
+
   if (!recipe || !computed || !baseline) {
     return (
       <div className={styles.missing}>
@@ -422,6 +435,34 @@ export function RecipeScreen() {
           מצב הכנה
         </Link>
       )}
+
+      {/*
+        ── §2 screens 8 and 9: the two things this recipe can become on paper ──
+
+        The order link carries the CURRENT "כמה להכין" setting in its query
+        string, because that is the whole point of an order sheet: the
+        quantities for this order, not the quantities as written. It is in the
+        URL rather than in router state so that reloading or re-printing the
+        sheet gives the same page, and so the link can be sent to whoever is
+        doing the weighing. OrderScreen rebuilds the factor with the same
+        `scaleFactor()` used here.
+
+        Neither is gated by profile. §3 is explicit: "הפרופיל קובע ברירות מחדל
+        ורמת חשיפה ראשונית בלבד. הוא אינו נועל שום פיצ'ר." What `pro` does
+        control — the cost line and the baker's percentages — is gated inside
+        the sheet itself.
+      */}
+      <div className={styles.printRow} role="group" aria-label="פלטים להדפסה">
+        <Link to={`/recipe/${recipe.id}/label`} className={styles.printLink}>
+          תווית מוצר
+        </Link>
+        <Link
+          to={`/recipe/${recipe.id}/order${orderQuery}`}
+          className={styles.printLink}
+        >
+          דף הזמנה
+        </Link>
+      </div>
 
       {/* ── stage 4: edit / duplicate / delete ─────────────────────────── */}
       <div className={styles.actionRow} role="group" aria-label="פעולות על המתכון">

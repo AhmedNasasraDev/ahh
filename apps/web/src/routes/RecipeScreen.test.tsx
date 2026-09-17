@@ -628,3 +628,69 @@ describe('stage-11: the page follows a price change without being remounted', ()
     expect(screen.queryAllByText('₪4')).toHaveLength(0);
   });
 });
+
+/*
+  ── §2 screens 8 and 9: getting to the two print outputs ───────────────────
+
+  The link to the order sheet has to carry the CURRENT "כמה להכין" setting,
+  because an order sheet showing the recipe quantities instead of the order's
+  quantities is worse than no order sheet: it looks right at the bench.
+
+  It travels in the query string rather than in router state so that reloading
+  or re-printing the page produces the same sheet, and so the link can be sent
+  to whoever is weighing. These tests are about the link, not about the sheet —
+  OrderScreen.test.tsx holds the other end.
+*/
+describe('§2 the way to the label and the order sheet', () => {
+  it('offers both, on any profile', async () => {
+    renderRecipe('brioche');
+    const group = await screen.findByRole('group', { name: 'פלטים להדפסה' });
+    expect(within(group).getByRole('link', { name: 'תווית מוצר' })).toHaveAttribute(
+      'href',
+      '/recipe/brioche/label',
+    );
+    expect(within(group).getByRole('link', { name: 'דף הזמנה' })).toBeInTheDocument();
+  });
+
+  it('links to the order sheet with no scale while nothing is scaled', async () => {
+    renderRecipe('brioche');
+    const group = await screen.findByRole('group', { name: 'פלטים להדפסה' });
+    // A bare URL means "as written", which is clearer than "?mode=recipe".
+    expect(within(group).getByRole('link', { name: 'דף הזמנה' })).toHaveAttribute(
+      'href',
+      '/recipe/brioche/order',
+    );
+  });
+
+  it('carries the units the user asked for into the link', async () => {
+    const user = userEvent.setup();
+    renderRecipe('brioche');
+    await screen.findByRole('heading', { name: 'בריוש נאנטר' });
+
+    await user.click(screen.getByRole('button', { name: 'יחידות' }));
+    await user.type(screen.getByLabelText('מספר יחידות'), '36');
+
+    const group = screen.getByRole('group', { name: 'פלטים להדפסה' });
+    await waitFor(() =>
+      expect(within(group).getByRole('link', { name: 'דף הזמנה' })).toHaveAttribute(
+        'href',
+        '/recipe/brioche/order?mode=units&v=36',
+      ),
+    );
+  });
+
+  it('does not put a scale in the link when the value changes nothing', async () => {
+    const user = userEvent.setup();
+    renderRecipe('brioche');
+    await screen.findByRole('heading', { name: 'בריוש נאנטר' });
+
+    // An empty box in "יחידות" mode is not a scale of any kind, and a link
+    // saying ?mode=units&v= would be a promise about nothing.
+    await user.click(screen.getByRole('button', { name: 'יחידות' }));
+    const group = screen.getByRole('group', { name: 'פלטים להדפסה' });
+    expect(within(group).getByRole('link', { name: 'דף הזמנה' })).toHaveAttribute(
+      'href',
+      '/recipe/brioche/order',
+    );
+  });
+});

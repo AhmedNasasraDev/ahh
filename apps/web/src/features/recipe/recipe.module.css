@@ -1184,3 +1184,27 @@
   font-weight: 600;
   text-decoration: none;
 }
+
+/* ── §2 screens 8 and 9: the print outputs ───────────────────────────────── */
+/* Quieter than .cookBtn on purpose. "מצב הכנה" is what you press to start
+   working; these two produce a document, which is a less frequent act. */
+.printRow {
+  display: flex;
+  gap: var(--gap-in-group);
+  margin-block-end: var(--gap-between-groups);
+  margin-inline: var(--pad-card);
+}
+
+.printLink {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--hit-min);
+  border: 1px solid var(--c-green);
+  border-radius: var(--r-control);
+  background: var(--c-white);
+  color: var(--c-green);
+  font-size: var(--fs-secondary);
+  text-decoration: none;
+}

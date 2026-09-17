@@ -236,11 +236,34 @@ export function compute(
   const target = num(recipe.yieldUnits, 0) * f;
   const unitsWarn = !!target && Math.abs(unitsActual - target) / target > 0.05;
 
+  /*
+    ALLERGENS, AND WHY THIS WALKS `sub.allergens` AND NOT ONLY `sub.rows`
+
+    Two sources feed the set: names recognised by the allergen table, and
+    `manualAllergens` — what the maker declared BY HAND because no name gives
+    it away ("this praline is made on a line that also runs hazelnut").
+
+    Until stage 11 the walk collected recognised NAMES recursively but read
+    `manualAllergens` only from the top-level recipe. A base recipe's
+    hand-declared allergen therefore stopped at the base recipe and never
+    reached the cake that used it. The defect hid behind a coincidence: a base
+    called "פרלינה" resolved to nuts through its NAME, so the common case
+    looked right and only a base with a neutral name exposed it.
+
+    It was found while building the product label (§2 screen 8), which is the
+    one place in the app where a missing allergen is not a display bug. Reading
+    `sub.allergens` — which each sub-recipe's own computation has already
+    assembled, its manual declarations included — makes the roll-up complete at
+    any depth. `packages/engine/test/compute.test.ts` holds it.
+  */
   const allergenSet = new Set(recipe.manualAllergens ?? []);
   const collect = (rs: ComputedRow[]): void => {
     for (const r of rs) {
       for (const a of allergensFor(r.ing.name)) allergenSet.add(a);
-      if (r.sub) collect(r.sub.rows);
+      if (r.sub) {
+        for (const a of r.sub.allergens) allergenSet.add(a);
+        collect(r.sub.rows);
+      }
     }
   };
   collect(rows);

@@ -111,3 +111,34 @@ ol {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Print. §2 screens 8 and 9 are print outputs, and §2 also says why they are
+ * depth screens: a tab bar has no business on a page whose job is to become
+ * paper.
+ *
+ * `.noprint` is the prototype's own class name, kept so the markup reads the
+ * same way it did there. It marks the chrome — back link, the order form, the
+ * guidance notes, the print button itself — and only that. Anything NOT marked
+ * is part of the document.
+ *
+ * The surface turns white because §16's "רקע חוץ" is a screen colour: a
+ * printer either floods the page with grey ink or drops it and then the edge of
+ * the "paper" disappears. Colour-adjust is left alone deliberately — the
+ * allergen and HACCP chips carry meaning in their colour, and a driver that
+ * prints them grey still prints their text.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media print {
+  .noprint {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}

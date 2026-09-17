@@ -225,6 +225,61 @@ describe('professional calculations survive the merge', () => {
     expect(c.allergens).toContain('חלב');
   });
 
+  /*
+    STAGE-11 REGRESSION. An allergen the maker declared BY HAND on a base
+    recipe used to stop at that base recipe. The base is deliberately called
+    "תערובת סודית" — a name the allergen table knows nothing about — because a
+    base called "פרלינה" resolves to nuts through its NAME and would pass this
+    test while the roll-up was still broken. That coincidence is what hid the
+    defect. Found while building the product label, where a missing allergen is
+    not a display bug.
+  */
+  it('a manual allergen declared on a BASE recipe reaches the recipe that uses it', () => {
+    const base: Recipe = {
+      id: 'secret',
+      name: 'תערובת סודית',
+      isSub: true,
+      manualAllergens: ['אגוזים'],
+      yieldActual: 1000,
+      ingredients: [{ id: 'b1', name: 'סוכר', qty: 1000, unit: 'g' }],
+    };
+    const cake: Recipe = {
+      id: 'cake',
+      name: 'עוגה',
+      ingredients: [
+        { id: 'c1', name: 'סוכר', qty: 200, unit: 'g' },
+        { id: 'c2', name: 'תערובת סודית', subId: 'secret', qty: 100, unit: 'g' },
+      ],
+    };
+    const c = compute(cake, [base, cake], { prefs: DEFAULT_PREFS });
+    expect(c.allergens).toContain('אגוזים');
+  });
+
+  it('carries a manual allergen up through TWO levels of base recipe', () => {
+    const deep: Recipe = {
+      id: 'deep',
+      name: 'בסיס פנימי',
+      isSub: true,
+      manualAllergens: ['שומשום'],
+      yieldActual: 1000,
+      ingredients: [{ id: 'd1', name: 'סוכר', qty: 1000, unit: 'g' }],
+    };
+    const mid: Recipe = {
+      id: 'mid',
+      name: 'בסיס אמצעי',
+      isSub: true,
+      yieldActual: 1000,
+      ingredients: [{ id: 'm1', name: 'בסיס פנימי', subId: 'deep', qty: 1000, unit: 'g' }],
+    };
+    const top: Recipe = {
+      id: 'top',
+      name: 'מוצר',
+      ingredients: [{ id: 't1', name: 'בסיס אמצעי', subId: 'mid', qty: 500, unit: 'g' }],
+    };
+    const c = compute(top, [deep, mid, top], { prefs: DEFAULT_PREFS });
+    expect(c.allergens).toContain('שומשום');
+  });
+
   it('sub-recipe cost is rolled up per gram', () => {
     const sub: Recipe = {
       id: 'sub',

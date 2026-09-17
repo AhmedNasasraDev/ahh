@@ -13,6 +13,8 @@ import { PlansScreen } from './routes/PlansScreen.js';
 import { PlanScreen } from './routes/PlanScreen.js';
 import { MoreScreen } from './routes/MoreScreen.js';
 import { CookScreen } from './routes/CookScreen.js';
+import { LabelScreen } from './routes/LabelScreen.js';
+import { OrderScreen } from './routes/OrderScreen.js';
 import { PasteScreen } from './routes/PasteScreen.js';
 import { HomeScreen } from './routes/HomeScreen.js';
 import { SettingsScreen } from './routes/SettingsScreen.js';
@@ -83,6 +85,28 @@ export function App() {
                 element={
                   <OnboardingGate>
                     <CookScreen />
+                  </OnboardingGate>
+                }
+              />
+              {/*
+                §2 screens 8 and 9, outside the shell for the same reason and
+                one more: both exist to become paper, and a tab bar is not part
+                of a printed label. `@media print` in styles/global.css hides
+                what is marked `.noprint` on them.
+              */}
+              <Route
+                path="/recipe/:recipeId/label"
+                element={
+                  <OnboardingGate>
+                    <LabelScreen />
+                  </OnboardingGate>
+                }
+              />
+              <Route
+                path="/recipe/:recipeId/order"
+                element={
+                  <OnboardingGate>
+                    <OrderScreen />
                   </OnboardingGate>
                 }
               />
