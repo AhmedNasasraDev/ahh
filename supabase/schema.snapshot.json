@@ -1,7 +1,7 @@
 {
   "_comment": [
     "The applied schema of project qxdpsomelzpvphkhkqrw, read back from",
-    "information_schema after migrations 0001-0026. Not used at runtime.",
+    "information_schema after migrations 0001-0028. Not used at runtime.",
     "",
     "Its job is to keep apps/web/src/lib/database.types.ts honest. Those types",
     "are hand-written on purpose: `supabase gen types` widens every CHECK",
@@ -63,6 +63,24 @@
     "sources": "required",
     "updated_at": "required",
     "word_match": "required"
+  },
+  "group_invites": {
+    "created_at": "required",
+    "created_by": "required",
+    "expires_at": "required",
+    "group_id": "required",
+    "id": "required",
+    "label": "required",
+    "token": "required",
+    "used_at": "nullable",
+    "used_by": "nullable"
+  },
+  "group_join_requests": {
+    "created_at": "required",
+    "group_id": "required",
+    "id": "required",
+    "note": "required",
+    "user_id": "required"
   },
   "group_members": {
     "group_id": "required",
@@ -293,6 +311,15 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "approve_group_join": {
+      "args": [
+        "p_group_id",
+        "p_user_id"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "can_read_recipe": {
       "args": [
         "p_recipe_id"
@@ -326,6 +353,15 @@
         "p_name",
         "p_kind",
         "p_note"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "create_group_invite": {
+      "args": [
+        "p_group_id",
+        "p_label"
       ],
       "security_definer": false,
       "anon_execute": false,
@@ -464,6 +500,14 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "redeem_group_invite": {
+      "args": [
+        "p_token"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "replace_recipe_children": {
       "args": [
         "p_recipe_id",
@@ -475,9 +519,26 @@
       "anon_execute": false,
       "authenticated_execute": true
     },
+    "request_group_join": {
+      "args": [
+        "p_code",
+        "p_note"
+      ],
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
     "restore_recipe_version": {
       "args": [
         "p_version_id"
+      ],
+      "security_definer": false,
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    "save_group_recipe_copy": {
+      "args": [
+        "p_item_id"
       ],
       "security_definer": false,
       "anon_execute": false,

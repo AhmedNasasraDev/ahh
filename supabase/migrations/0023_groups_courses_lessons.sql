@@ -545,10 +545,18 @@ create policy steps_readable on public.steps
   using (public.can_read_recipe(recipe_id));
 
 /*
-  `trials`, `issues` and `batches` get NO group policy. A group recipe's trial
-  log and its HACCP batch records belong to whoever produced them, and §12.3
-  puts them out of reach. `duplicateRecipe` in the app already refuses to copy
-  batches for the same reason.
+  `trials` and `batches` get NO group policy. A group recipe's trial log and
+  its HACCP batch records belong to whoever produced them, and §12.3 puts them
+  out of reach. `duplicateRecipe` in the app refuses to copy them for the same
+  reason.
+
+  CORRECTION, made in 0028: `issues` was listed here too, and that was wrong.
+  A `תקלה → פתרון` list is knowledge about the formula, not a record of a
+  production run, and for a course it is one of the most useful things the
+  instructor wrote. Withholding it also made `save_group_recipe_copy` drop the
+  list silently, because the copy is an `insert ... select` and an unreadable
+  source yields no rows. 0028 gives it the same read policy as `ingredients`
+  and `steps`.
 */
 
 /*

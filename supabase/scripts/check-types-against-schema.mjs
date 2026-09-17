@@ -166,6 +166,38 @@ for (const [name, args] of declaredFns) {
 */
 const RLS_POLICY_HELPERS = new Set(['group_rank', 'course_rank', 'lesson_rank']);
 
+/*
+  PRIVILEGED RPCs — a second, separate exemption, and a narrower one.
+
+  Joining a group is the only thing a NON-member does, so it cannot run under
+  the caller's own privileges: they cannot read the group, cannot read the
+  invitation, and cannot insert into `group_members`. There is no policy that
+  would help, because the authorisation is not "does this row belong to me" but
+  "is this token valid" — which no `using` clause can express.
+
+  So these three functions ARE the decision they own, and each one makes it in
+  its own body. What every name on this list must satisfy:
+
+    · the authorisation check is the FIRST thing the body does, and it is a
+      check on `auth.uid()` or on a secret the caller presented;
+    · the only row it can create is a plain 'member' membership. None of them
+      accepts a role, so none can be used to promote anybody — promotion stays
+      an UPDATE under `members_role`, which is the owner's alone;
+    · `approve_group_join` is the one that can name a DIFFERENT user, so it
+      checks the caller's rank first AND requires that the person actually
+      asked. It cannot put an arbitrary account into a group.
+
+  Note what is NOT on this list: `save_group_recipe_copy`. It looked like it
+  belonged here and does not — every step of §11's copy is within the caller's
+  own RLS, so it is SECURITY INVOKER (see migration 0027). If a function can be
+  written as INVOKER, it does not go on this list.
+*/
+const PRIVILEGED_RPCS = new Set([
+  'redeem_group_invite',
+  'request_group_join',
+  'approve_group_join',
+]);
+
 // The security posture, over EVERY function and not only the declared ones.
 for (const [name, fn] of Object.entries(fnSnapshot)) {
   if (fn.anon_execute) {
@@ -177,7 +209,8 @@ for (const [name, fn] of Object.entries(fnSnapshot)) {
   if (
     fn.security_definer &&
     (fn.authenticated_execute || fn.anon_execute) &&
-    !RLS_POLICY_HELPERS.has(name)
+    !RLS_POLICY_HELPERS.has(name) &&
+    !PRIVILEGED_RPCS.has(name)
   ) {
     problems.push(
       `${name}(): SECURITY DEFINER and directly callable by a client role. ` +
@@ -185,9 +218,12 @@ for (const [name, fn] of Object.entries(fnSnapshot)) {
         `through the trigger or function that owns the decision.`,
     );
   }
-  // An RLS helper must never be reachable unauthenticated, exemption or not.
-  if (RLS_POLICY_HELPERS.has(name) && fn.anon_execute) {
-    problems.push(`${name}(): an RLS policy helper must not be callable by \`anon\`.`);
+  // Neither exemption extends to `anon`. Both kinds of function decide
+  // something about `auth.uid()`, which is null for an unauthenticated caller.
+  if ((RLS_POLICY_HELPERS.has(name) || PRIVILEGED_RPCS.has(name)) && fn.anon_execute) {
+    problems.push(
+      `${name}(): an exempted definer function must not be callable by \`anon\`.`,
+    );
   }
 }
 

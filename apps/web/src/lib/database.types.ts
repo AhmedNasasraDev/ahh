@@ -402,6 +402,49 @@ export type GroupRecipeItemRow = {
   created_at: string;
 };
 
+/* ── §10.2 joining a group (migration 0027) ──────────────────────────────── */
+
+/**
+ * An invitation. §6: single use, seven days, both checked server-side.
+ *
+ * `token` is stored in plaintext, which is not the usual advice for a bearer
+ * token. Migration 0027 has the reasoning: without a mail service the only way
+ * an invitation reaches anyone is the instructor copying the link and sending
+ * it themselves, so the link has to be readable again afterwards. If a mailer
+ * is added, this should become a hash.
+ */
+export type GroupInviteRow = {
+  id: string;
+  group_id: string;
+  /**
+   * Who it was meant for — a LABEL, not a check. Redemption is by token, so
+   * this never decides who may join. An `email` column that looked like a
+   * check but was not would be the more dangerous design.
+   */
+  label: string;
+  token: string;
+  expires_at: string;
+  created_by: string;
+  created_at: string;
+  used_at: string | null;
+  used_by: string | null;
+};
+
+/**
+ * A pending request to join, from the §10.2 code path.
+ *
+ * Its own table rather than a `status` column on `group_members`, because a
+ * row here grants NOTHING: no policy anywhere references this table, so there
+ * is no `and status = 'active'` for a future policy to forget. See 0027.
+ */
+export type GroupJoinRequestRow = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  note: string;
+  created_at: string;
+};
+
 export type ProductionPlanRow = {
   id: string;
   owner_id: string;
@@ -474,6 +517,8 @@ export type Database = {
       courses: Table<CourseRow>;
       lessons: Table<LessonRow>;
       group_recipe_items: Table<GroupRecipeItemRow>;
+      group_invites: Table<GroupInviteRow>;
+      group_join_requests: Table<GroupJoinRequestRow>;
     };
     // Empty MAPPED types, not `Record<string, never>`. Record<string, never>
     // says every possible name is a view whose row type is `never`, so
@@ -497,6 +542,34 @@ export type Database = {
         Args: { p_name: string; p_kind: string; p_note: string };
         Returns: string;
       };
+      /*
+        migration 0027 — §10.2 joining, and §11's copy.
+
+        Every comment here sits ABOVE its entry, never between `Args` and
+        `Returns`: check-types-against-schema.mjs reads this block with a
+        regex, and a comment inside an entry makes it run on into the next one
+        and report an argument list stitched from both.
+
+        create_group_invite     → the token; the caller builds the link
+        redeem_group_invite     → the group joined, so the UI can navigate
+        request_group_join      → §6: a REQUEST, never membership. Returns the
+                                  group's NAME, so the person can see what they
+                                  asked to join.
+        approve_group_join      → void; staff only, and only for someone who
+                                  actually asked
+        save_group_recipe_copy  → §11, and HANDOFF §4 requires it server-side
+                                  because a client-side perm_save check is UX
+                                  only. Returns the new recipe, or the existing
+                                  copy when there already was one.
+      */
+      create_group_invite: { Args: { p_group_id: string; p_label: string }; Returns: string };
+      redeem_group_invite: { Args: { p_token: string }; Returns: string };
+      request_group_join: { Args: { p_code: string; p_note: string }; Returns: string };
+      approve_group_join: {
+        Args: { p_group_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      save_group_recipe_copy: { Args: { p_item_id: string }; Returns: string };
       // migration 0007 — the atomic write paths (§9, stage-5 requirement 9)
       save_recipe: {
         Args: {
