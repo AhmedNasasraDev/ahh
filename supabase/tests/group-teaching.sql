@@ -41,10 +41,12 @@
 -- Run: every statement below in one session, inside a transaction that ends in
 -- ROLLBACK. Every row must have pass = true.
 --
--- Measured 29/32 on the run that wrote this file. All three failures were my
--- own expectations, each corrected against what was then measured directly:
--- the note is stored verbatim rather than trimmed, and "the student's copy
--- survives" was being asked as the INSTRUCTOR, who cannot see it (§12.3).
+-- Measured 36/36 on the live project. The run that WROTE this file measured
+-- 29/32, and all three failures were my own expectations: the note is stored
+-- verbatim rather than trimmed (as `save_private_note` does too), and "the
+-- student's copy survives" was being asked as the INSTRUCTOR, who cannot see
+-- it — the 0 was §12.3 working. Both readings are now checked, and the extra
+-- checks that came out of the corrections bring the count to 36.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 begin;

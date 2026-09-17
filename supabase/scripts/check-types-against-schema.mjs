@@ -179,6 +179,13 @@ for (const [name, args] of declaredFns) {
 
   Adding a name here is a security decision. If a helper does not meet all
   three conditions, the answer is to change the helper, not this list.
+
+  CROSS-CHECKED against Supabase's own linter after 0036: its
+  `authenticated_security_definer_function_executable` finding names exactly
+  nine functions, and they are exactly the nine on the three lists in this file
+  — the three rank helpers, `shares_group_with`, `group_roster`, and the four
+  privileged RPCs. Two independent tools agreeing on the same set is what makes
+  "deliberate" checkable by somebody who did not write it.
 */
 const RLS_POLICY_HELPERS = new Set([
   'group_rank',
