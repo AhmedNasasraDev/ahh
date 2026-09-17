@@ -50,11 +50,16 @@ import { DEMO_RECIPES } from '../../apps/web/src/data/demoRecipes.js';
 import { basePriceOf, type CatalogItem } from '../../apps/web/src/features/pricing/catalog.js';
 import type { ProductionPlan } from '../../apps/web/src/features/planning/plan.js';
 import type { PurchaseRecord } from '../../apps/web/src/features/pricing/purchases.js';
-import type {
-  PlanSummary,
-  Repository,
-  RepositoryCapabilities,
+import {
+  RecipeInUseError,
+  WriteNotAllowedError,
+  type PlanSummary,
+  type RecipeImage,
+  type Repository,
+  type RepositoryCapabilities,
+  type StoredVersion,
 } from '../../apps/web/src/data/repository.js';
+import { convertErrorText, convertToWebp } from '../../apps/web/src/features/images/convert.js';
 import type { ChatMessage, GroupMember } from '../../apps/web/src/features/groups/types.js';
 import type { InviteView } from '../../apps/web/src/features/groups/invites.js';
 
@@ -409,6 +414,51 @@ export function createViewerRepository(): Repository {
     brioche: 'לישה ארוכה מדי — הבצק מתחמם. לעצור בשלב הצלקת.',
   };
   let calib: readonly Calibration[] = [];
+  let images: RecipeImage[] = [];
+  const objectUrls = new Map<string, string>();
+  let identity = { displayName: 'אחמד נסאסרה', avatarPath: null as string | null };
+  let avatarUrl: string | null = null;
+
+  /*
+    §9 — two stored versions on one recipe, so the history, the comparison and
+    the restore are all reachable by clicking. The snapshots are the live
+    recipe with one number changed, which is what a real snapshot is: the
+    whole recipe as it was.
+  */
+  const versionsOf = (recipeId: string): StoredVersion[] => {
+    const live = recipes.find((r) => r.id === recipeId);
+    /*
+      Two recipes, on purpose. `brioche` is `locked: true` in the demo data, so
+      its history shows the versions with the restore DISABLED — which is §9's
+      rule about an approved formula, and worth seeing. `ganache` is unlocked,
+      so the restore actually runs there.
+    */
+    if (!live || (recipeId !== 'brioche' && recipeId !== 'ganache')) return [];
+    const older = {
+      ...live,
+      ingredients: (live.ingredients ?? []).map((ing, i) =>
+        i === 0 ? { ...ing, qty: Math.round(((ing.qty ?? 0) as number) * 0.9) } : ing,
+      ),
+    };
+    return [
+      {
+        id: `fixture-version-2-${recipeId}`,
+        recipeId,
+        tag: 'V2',
+        what: 'העלאת אחוז החמאה, וקיצור הלישה',
+        createdAt: '2026-09-12T07:00:00Z',
+        snapshot: older as Recipe,
+      },
+      {
+        id: `fixture-version-1-${recipeId}`,
+        recipeId,
+        tag: 'V1',
+        what: 'הנוסחה כפי שנכתבה בשיעור',
+        createdAt: '2026-09-05T07:00:00Z',
+        snapshot: older as Recipe,
+      },
+    ];
+  };
   /*
     `done: true`, so the onboarding gate lets the tabs render. The gate itself
     is real: with `done: false` every route redirects to /onboarding, which is
@@ -514,6 +564,107 @@ export function createViewerRepository(): Repository {
           ? { ...p, locked, lockedAt: locked ? new Date().toISOString() : null, snapshot }
           : p,
       );
+    },
+
+    /*
+      §9 versions. The demo repository answers "there is no history at all",
+      which is true of it and would leave the panel empty here; these two make
+      the history, the comparison and the restore clickable.
+    */
+    listVersions: async (recipeId: string) => versionsOf(recipeId),
+    restoreVersion: async (versionId: string) => {
+      const all = recipes.flatMap((r) => versionsOf(r.id));
+      const v = all.find((x) => x.id === versionId);
+      if (!v) throw new WriteNotAllowedError('הגרסה אינה קיימת בסימולציה.');
+      const restored = { ...v.snapshot, id: v.recipeId } as Recipe;
+      recipes = recipes.map((r) => (r.id === v.recipeId ? restored : r));
+      return restored;
+    },
+
+    /*
+      The delete guard. `ingredients.sub_recipe_id` is NO ACTION in migration
+      0008, so deleting a recipe another recipe uses as a base is refused BY
+      THE DATABASE — and the demo set really does have such a link (the
+      chocolate brioche uses the ganache). Mirrored here so the refusal is
+      demonstrable instead of the fixture quietly deleting what the server
+      would not.
+    */
+    deleteRecipe: async (id: string) => {
+      const usedBy = recipes
+        .filter((r) => r.id !== id && (r.ingredients ?? []).some((i) => i.subId === id))
+        .map((r) => ({ id: r.id, name: String(r.name ?? '') }));
+      if (usedBy.length > 0) throw new RecipeInUseError(usedBy);
+      recipes = recipes.filter((r) => r.id !== id);
+    },
+    recipesUsing: async (id: string) =>
+      recipes
+        .filter((r) => r.id !== id && (r.ingredients ?? []).some((i) => i.subId === id))
+        .map((r) => ({ id: r.id, name: String(r.name ?? '') })),
+
+    /*
+      §5 photographs. The real path converts to WebP in the browser and uploads
+      to a private bucket; the conversion is the product's own code and runs
+      here unchanged — only the upload is replaced by an object URL, so a photo
+      chosen on the device really appears on the recipe.
+    */
+    listRecipeImages: async (recipeId: string) =>
+      images.filter((i) => i.recipeId === recipeId),
+    addRecipeImage: async (recipeId: string, file: File | Blob) => {
+      const converted = await convertToWebp(file);
+      if (!converted.ok) throw new WriteNotAllowedError(convertErrorText(converted));
+      const image: RecipeImage = {
+        id: `fixture-image-${images.length + 1}`,
+        recipeId,
+        storagePath: `${recipeId}/fixture-${images.length + 1}.webp`,
+        ord: images.filter((i) => i.recipeId === recipeId).length,
+        width: converted.width,
+        height: converted.height,
+        bytes: converted.bytes,
+        caption: '',
+        createdAt: new Date().toISOString(),
+      };
+      objectUrls.set(image.storagePath, URL.createObjectURL(converted.blob));
+      images = [...images, image];
+      return image;
+    },
+    removeRecipeImage: async (image: RecipeImage) => {
+      const url = objectUrls.get(image.storagePath);
+      if (url) URL.revokeObjectURL(url);
+      objectUrls.delete(image.storagePath);
+      images = images.filter((i) => i.id !== image.id);
+    },
+    signedImageUrl: async (storagePath: string) => objectUrls.get(storagePath) ?? null,
+
+    /*
+      §10.1 identity. `createFakeGroups` keeps a name and a path; this keeps
+      the PICTURE too, as an object URL, so uploading an avatar in הגדרות
+      actually shows the avatar — in the settings card and beside the reader's
+      own chat messages.
+    */
+    getIdentity: async () => ({ ...identity }),
+    saveDisplayName: async (name: string) => {
+      identity = { ...identity, displayName: name.trim() };
+    },
+    setAvatar: async (file: File | Blob) => {
+      const converted = await convertToWebp(file, {}, { maxBytes: 512 * 1024, maxEdge: 512 });
+      if (!converted.ok) throw new WriteNotAllowedError(convertErrorText(converted));
+      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+      avatarUrl = URL.createObjectURL(converted.blob);
+      identity = { ...identity, avatarPath: `${VIEWER_USER_ID}/avatar.webp` };
+      return identity.avatarPath as string;
+    },
+    removeAvatar: async () => {
+      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+      avatarUrl = null;
+      identity = { ...identity, avatarPath: null };
+    },
+    avatarUrl: async (path: string | null) => (path ? avatarUrl : null),
+    avatarUrls: async (paths: readonly string[]) => {
+      const out: Record<string, string> = {};
+      for (const p of paths) {
+        if (identity.avatarPath && p === identity.avatarPath && avatarUrl) out[p] = avatarUrl;
+      }
+      return out;
     },
 
     // §8 personal notes.
