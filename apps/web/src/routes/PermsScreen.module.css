@@ -8,8 +8,15 @@
   gap: 6px;
 }
 
+/* A 12px-high link was the way back out of this screen. §15's rule is 44 and
+   the rest of the app keeps it (Cook Mode's "יציאה" is `min-height:
+   var(--hit-min)`); this is the same control doing the same job. The text size
+   is unchanged — what grew is the box you can hit. */
 .back {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
   font-size: var(--fs-meta);
   color: var(--c-green);
 }
@@ -116,12 +123,26 @@
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+/* The five per-recipe permissions. The box was the browser's unstyled 13px,
+   which is under WCAG 2.5.8's 24px floor; the LABEL wraps the box and the
+   word, so the target is this whole row — and it is now at least 40px tall,
+   with a 24px box inside it in the app's own green. */
 .inline {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  min-height: var(--hit-compact);
   font-size: var(--fs-meta-lg);
   color: var(--c-ink);
+  cursor: pointer;
+}
+
+.inline input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  accent-color: var(--c-green);
+  cursor: pointer;
 }
 
 .form {
@@ -180,10 +201,16 @@
   font-size: var(--fs-meta-lg);
 }
 
+/* "הסרה", "דחייה", "אישור" and "שליחה מחדש" sit in rows beside a 40px select, so they take the compact 40px target the design system already has
+   for a control of this weight. They were 16px — a real action at a size the
+   project's own tokens do not allow. */
 .link {
   border: 0;
   background: none;
-  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-compact);
+  padding: 2px 6px;
   color: var(--c-green);
   font: inherit;
   font-size: var(--fs-meta);

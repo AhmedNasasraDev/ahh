@@ -65,23 +65,16 @@ await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${PORT}/index.html`;
 
 /*
-  Screens whose small tap targets are a KNOWN finding in the product, not a
-  defect of the viewer and not something this audit may change.
+  Empty, and that is the result of an approved fix rather than an oversight.
 
-  Measured on the §10 screens: the back link is 12px high, the inline text
-  buttons ("יציאה מהקבוצה", "הסרה", "דחייה", "שליחה מחדש") are 16px, and the
-  five per-recipe permission checkboxes are the browser's unstyled 13px. The
-  project's own design system sets `--hit-min: 44px` and `--hit-compact: 40px`,
-  and the rest of the app follows them — Cook Mode's Mise en place tick is 28px
-  inside a 64px row. So this is a real inconsistency with the product's own
-  rule, reported for Ahmed to decide on, at the same size on every viewport
-  because the CSS has no breakpoint for it.
+  It used to hold 'chat' and 'perms', whose controls were measured at 12px, 16px
+  and the browser's unstyled 13px against the project's own 44/40 tokens
+  (finding F26). The CSS was fixed — back links at 44, row actions at 40, the
+  message actions at 32 with the trade written into the stylesheet, every
+  checkbox at 24 — so every screen is now held to the same floor here. Anything
+  that appears in this set again is a regression, not a known state.
 */
-/* Narrow on purpose: the recipe and settings screens were in this list until
-   the hidden file inputs were classified out, and they pass on their own now.
-   An allowlist that covers a screen it does not need to would hide the next
-   real finding there. */
-const KNOWN_SMALL_TARGETS = new Set(['chat', 'perms']);
+const KNOWN_SMALL_TARGETS = new Set([]);
 
 const results = [];
 const check = (label, pass, detail = '', known = false) => {

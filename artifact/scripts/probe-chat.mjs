@@ -318,7 +318,9 @@ try {
     return {
       dir: getComputedStyle(chat).direction,
       pageScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      docScroll: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      // See the note at the check below: the BODY is the honest measure here.
+      bodyOver: document.body.scrollHeight - document.documentElement.clientHeight,
+      docTop: document.documentElement.scrollTop + document.body.scrollTop,
       scrollable: scroller.scrollHeight > scroller.clientHeight + 4,
       atBottom:
         Math.abs(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop) < 40,
@@ -332,7 +334,26 @@ try {
   check('three messages in a row from one person are all drawn as his', layout.consecutiveMine === true);
   check('the conversation scrolls inside its own frame', layout.scrollable === true);
   check('and the newest message is in view', layout.atBottom === true, `${layout.total} messages`);
-  check('the page itself still does not scroll', layout.docScroll === 0, `${layout.docScroll}px`);
+  /*
+    THE PAGE ITSELF MUST NOT SCROLL — MEASURED ON THE BODY, NOT ON <html>
+
+    The defect this guards against was a stray text node in <body>: the
+    BODY grew past the viewport and the app's bottom tab bar went under the
+    fold. `documentElement.scrollHeight` is the wrong proxy for that —
+    Chromium counts overflow from descendants of an internally scrolling
+    container in it, so a screen whose content area legitimately scrolls
+    (the group chat: a 58dvh message list plus a composer) reports 56px of
+    "page scroll" while the body is exactly the viewport and nothing ever
+    moves. Measured: body 860 of 860, `scrollTop` 0, tab bar 815-860.
+
+    So: the body is not taller than the viewport, and the document is never
+    actually scrolled.
+  */
+  check(
+    'the page itself still does not scroll',
+    layout.bodyOver <= 0 && layout.docTop === 0,
+    `body ${layout.bodyOver}px over, scrolled ${layout.docTop}px`,
+  );
 
   /* ── 8. history paging still works over a session-grown conversation ─── */
   const older = await page.$(`${CHAT} button:has-text("הודעות קודמות")`);

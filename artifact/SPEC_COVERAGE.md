@@ -64,7 +64,7 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | §14 Mise en place — שקילה לפני ביצוע | CookScreen (שלב ראשון) + features/cook/mise.ts | `/recipe/:id/cook` | `routes/CookScreen.tsx · features/cook/mise.ts` | כן | IndexedDB בלבד — אין שינוי DB | mise.test.ts (20) · CookScreen.test.tsx (15 חדשות) | stage14 (40) · journeys.mjs C | **COMPLETED** | הכמויות מ-compute() לפי ה-scale שב-URL; סימון נשמר עם חתימת ה-scale |
 | §6 scale — מעבר בין מסכים | scaleLink.ts | `/recipe/:id → /order · /cook` | `features/recipe/scaleLink.ts` | כן | — | scaleLink.test.ts (14) | journeys.mjs B/F | **COMPLETED** | מנתח אחד; קודם היה עותק בכל מסך |
 
-## ממצאים (26)
+## ממצאים (27)
 
 | # | סוג | מה | איפה | חומרה |
 |---|---|---|---|---|
@@ -92,8 +92,9 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | F22 | החלטה מתועדת | טוקן הזמנה נשמר כטקסט גלוי — הנימוק ב-0027 (קישור פתוח חייב להיות קריא שוב) | `supabase/migrations/0027` | נמוך |
 | F23 | UX במוצר | שמירת תוכנית ייצור מצליחה בלי שום אישור על המסך — אין «נשמר», אין toast, המסך זהה לפני ואחרי. נמצא בסריקת הכפתורים | `apps/web/src/routes/PlanScreen.tsx (onSave)` | נמוך |
 | F24 | מגבלת Artifact | שלושת כפתורי «הדפסה» (תווית, דף הזמנה, מתכון קבוצתי) קוראים ל-window.print(). בתוך ה-Artifact ייתכן שה-sandbox חוסם הדפסה — הכפתורים הם של המוצר ולא נשתנו | `LabelScreen · OrderScreen · GroupRecipeScreen` | — |
-| F25 | state — production | ה-scale במסך המתכון נשמר ב-state של הקומפוננטה ואינו מתאפס כשה-recipeId מתחלף. מסלול במוצר: «שכפול» → המתכון החדש נפתח עם ה-scale של הקודם (נמדד: קרואסון ×0.71 · 24 יחידות). המסך כן מציג איזה scale מוצג, ולכן המספר אינו סמוי. | `apps/web/src/routes/RecipeScreen.tsx (scaleMode/scaleValue/scaleIngredient)` | נמוך — דורש אישור אחמד לתיקון |
-| F26 | נגישות/מגע — production | במסכי §10 יש פקדים קטנים מהמינימום של מערכת העיצוב עצמה (--hit-min 44px): קישור «חזרה» בגובה 12px, כפתורי טקסט («יציאה מהקבוצה», «תשובה», «הסרה», «דחייה», «שליחה מחדש») בגובה 16px, וחמש תיבות ההרשאה כ-13px ברירת מחדל של הדפדפן. נמדד בחמישה רוחבים — אין breakpoint שמשנה זאת. | `GroupScreen.module.css · GroupChat.module.css · PermsScreen.module.css` | בינוני — דורש אישור אחמד לתיקון |
+| F25 | state — production | תוקן (באישור). ה-scale במסך המתכון היה ב-state של הקומפוננטה ולא התאפס כשה-recipeId התחלף, ולכן «שכפול» פתח את העותק עם ה-scale של הקודם (נמדד: ×0.71 · 24 יחידות). האיפוס נעשה עכשיו בזמן ה-render (התבנית של React ל"איפוס state כשה-prop משתנה") ולא ב-effect, כדי שלא יצויר פריים אחד עם הכמויות של המתכון הקודם. בדיקת רגרסיה: RecipeScreen.test.tsx — אדומה בלי התיקון, ירוקה איתו. | `apps/web/src/routes/RecipeScreen.tsx (scaleMode/scaleValue/scaleIngredient)` | תוקן |
+| F26 | נגישות/מגע — production | תוקן (באישור). פקדים במסכי §10 היו מתחת למינימום של מערכת העיצוב: קישורי «חזרה» 12px → 44px (--hit-min), כפתורי הטקסט בשורות 16px → 40px (--hit-compact), פעולות ההודעה בצ׳אט 16px → 32px (חריג מתועד: שלוש פעולות בכל בועה ב-40px גוזלות ~24px לכל הודעה, ו-32 עובר בנוחות את 24px של WCAG 2.5.8), וכל תיבות הסימון 13px → 24px בירוק של האפליקציה. בדיקת רגרסיה: responsive.mjs — 345/345 בחמישה רוחבים, ורשימת ההיתר רוקנה כך שכל מסך נמדד באותו רף. | `GroupScreen.module.css · GroupChat.module.css · PermsScreen.module.css` | תוקן |
+| F27 | layout — production | בטלפון 402×860 שדה הכתיבה וכפתור «שליחה» של הצ׳אט יושבים מתחת לקו הקיפול וצריך לגלול את אזור התוכן כדי להגיע אליהם. נמדד לפני ואחרי תיקון F26: לפני — 154px גלילה והכפתור ב-934 (מחוץ ל-860); אחרי — 210px והכפתור באותו מקום. כלומר F26 הוסיף 56px למסך שכבר גלל, ולא יצר את הבעיה. המקור: כותרת הקבוצה + הטאבים + רשימת הודעות של 58dvh + ה-composer גדולים יחד מהמסגרת. תיקון אפשרי: שהצ׳אט יהיה עמודה שממלאת את המסגרת עם composer מוצמד לתחתית — שינוי layout במסך של המוצר, ולכן לא נעשה בלי אישור. | `apps/web/src/features/groups/GroupChat.module.css (.scroll max-height: 58dvh) · routes/GroupScreen.module.css` | בינוני — דורש אישור אחמד |
 
 ## הערות התצוגה (ARTIFACT FIXTURE)
 

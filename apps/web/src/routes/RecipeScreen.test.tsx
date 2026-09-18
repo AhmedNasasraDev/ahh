@@ -695,6 +695,52 @@ describe('§2 the way to the label and the order sheet', () => {
   });
 
   /*
+    A SCALE BELONGS TO ONE RECIPE (audit finding F25)
+
+    This screen stays mounted when one recipe leads to another — same route
+    pattern, same component — and "שכפול" is the path in the product: it saves
+    a copy and navigates to it. The copy used to open with the previous
+    recipe's scale still applied, on a recipe nobody had asked to scale.
+
+    The duplicate needs a writable repository, which is also what makes this
+    the real path rather than a simulated one.
+  */
+  it('does not carry a scale from one recipe into the next (F25)', async () => {
+    const user = userEvent.setup();
+    renderRoute(<RecipeScreen />, {
+      path: '/recipe/:recipeId',
+      route: '/recipe/brioche',
+      repository: fakeRepository({
+        prefs: prefsAt(240),
+        recipes: [...DEMO_RECIPES],
+        canWrite: true,
+      }),
+    });
+    await screen.findByRole('heading', { name: 'בריוש נאנטר' });
+
+    await user.click(screen.getByRole('button', { name: 'יחידות' }));
+    await user.type(screen.getByLabelText('מספר יחידות'), '24');
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'מצב הכנה' })).toHaveAttribute(
+        'href',
+        '/recipe/brioche/cook?mode=units&v=24',
+      ),
+    );
+
+    await user.click(screen.getByRole('button', { name: /^שכפול/ }));
+    await screen.findByRole('heading', { name: /עותק/ });
+
+    // The copy is the recipe as written: no factor, and nothing in the link.
+    const cook = screen.getByRole('link', { name: 'מצב הכנה' });
+    expect(cook.getAttribute('href')).toMatch(/^\/recipe\/[^?]+\/cook$/);
+    expect(screen.getByRole('button', { name: 'כמויות כמו במתכון' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByLabelText('מספר יחידות')).not.toBeInTheDocument();
+  });
+
+  /*
     §14 Cook Mode is the third screen that needs the scale, and the one where
     being wrong is worst: the order sheet is read at a desk, Mise en place is
     weighed. The link carries the same three parameters, built by the same

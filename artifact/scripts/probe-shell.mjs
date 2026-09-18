@@ -94,7 +94,16 @@ try {
         stray: [...document.body.childNodes]
           .filter((n) => n.nodeType === 3 && (n.textContent || '').trim())
           .map((n) => (n.textContent || '').trim().slice(0, 50)),
-        pageScroll: document.documentElement.scrollHeight - window.innerHeight,
+        /*
+          The BODY, not `documentElement.scrollHeight`. The defect this guards
+          against made the body taller than the viewport (a stray text node)
+          and put the tab bar under the fold. Chromium also counts overflow
+          from inside an internally scrolling container in the document's
+          scrollHeight, so that number reports "page scroll" on a screen whose
+          content area is legitimately scrolling and nothing is wrong.
+        */
+        pageScroll: document.body.scrollHeight - document.documentElement.clientHeight,
+        scrolled: document.documentElement.scrollTop + document.body.scrollTop,
         tabBottom: r ? Math.round(r.bottom) : -1,
         viewport: window.innerHeight,
         tabs: tb ? tb.querySelectorAll('a').length : 0,
@@ -102,7 +111,11 @@ try {
     });
 
     check(`${label}: nothing leaked out of a tag into <body>`, m.stray.length === 0, m.stray.join(' | '));
-    check(`${label}: the page itself does not scroll`, m.pageScroll <= 1, `${m.pageScroll}px`);
+    check(
+      `${label}: the page itself does not scroll`,
+      m.pageScroll <= 1 && m.scrolled === 0,
+      `body ${m.pageScroll}px over, scrolled ${m.scrolled}px`,
+    );
     check(
       `${label}: all four tabs are on screen`,
       m.tabs === 4 && m.tabBottom > 0 && m.tabBottom <= m.viewport + 1,

@@ -104,6 +104,33 @@ export function RecipeScreen() {
   const [scaleValue, setScaleValue] = useState('');
   const [scaleIngredient, setScaleIngredient] = useState('');
   const [view, setView] = useState<ViewMode>('orig');
+
+  /*
+    "כמה להכין" BELONGS TO THE RECIPE ON SCREEN, AND ONLY TO IT
+
+    This screen stays mounted when one recipe leads to another — the route
+    pattern does not change, so React keeps the component and its state. The
+    path in the product is "שכפול": duplicate, `navigate` to the copy, and the
+    copy opened with the previous recipe's scale still in force (measured:
+    croissant at "24 יחידות", ×0.71, on a recipe nobody had asked to scale).
+    Nothing was saved wrongly and the screen did say which scale it was
+    showing, but a recipe you have just opened should be the recipe as written.
+
+    Adjusted DURING RENDER rather than in an effect, which is what React
+    documents for "reset some state when a prop changes". An effect would
+    paint one frame with the previous recipe's factor applied to this recipe's
+    ingredients — a frame of wrong weights on the screen people weigh from.
+
+    `view` is deliberately NOT reset: §5.4's grams/home/as-written choice is a
+    preference about how to read a recipe, not a fact about which recipe it is.
+  */
+  const [scaleFor, setScaleFor] = useState(recipeId);
+  if (scaleFor !== recipeId) {
+    setScaleFor(recipeId);
+    setScaleMode('recipe');
+    setScaleValue('');
+    setScaleIngredient('');
+  }
   const [showProduction, setShowProduction] = useState(false);
   const [convertIngredient, setConvertIngredient] = useState<IngredientLike | null>(null);
   const [calibrateFor, setCalibrateFor] = useState<string | null>(null);

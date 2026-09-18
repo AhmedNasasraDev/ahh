@@ -163,10 +163,25 @@
   gap: 10px;
 }
 
+/*
+  "תשובה", "עריכה", "מחיקה" under each message.
+
+  They were 16px high. §15's floor is 44 and the compact token is 40, and three
+  of those on every bubble is roughly 24px of extra height per message — on a
+  402px phone that is a message and a half less conversation on screen, which
+  is its own kind of unusable in a kitchen. So these take 32px: comfortably
+  over WCAG 2.5.8's 24px minimum, a real thumb target, and the bubble grows by
+  16px rather than 24. It is a deliberate exception to the 40/44 tokens for
+  three secondary actions INSIDE a message, and it is written here so the next
+  person sees the trade rather than the number.
+*/
 .link {
   border: 0;
   background: none;
-  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 2px 6px;
   color: var(--c-green);
   font: inherit;
   font-size: var(--fs-meta);
@@ -236,12 +251,24 @@
   justify-content: space-between;
 }
 
+/* The הכרזה switch. The label is the target, so it gets the compact height,
+   and the box inside it is 24px rather than the browser's 13px default. */
 .check {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  min-height: var(--hit-compact);
   font-size: var(--fs-meta);
   color: var(--c-ink);
+  cursor: pointer;
+}
+
+.check input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  accent-color: var(--c-green);
+  cursor: pointer;
 }
 
 .send {

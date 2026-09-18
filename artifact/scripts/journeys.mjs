@@ -72,26 +72,15 @@ const BASE = `http://127.0.0.1:${PORT}/index.html`;
 /* ── bookkeeping ─────────────────────────────────────────────────────────── */
 
 /*
-  A check that fails because of a defect in the PRODUCT, not in the viewer.
+  A list for checks that fail because of a defect in the PRODUCT rather than in
+  the viewer — reported, printed as PROD, and never silently deleted.
 
-  The audit's rule is that a production defect is reported and left alone until
-  Ahmed decides, so such a check must neither be deleted (the audit would stop
-  measuring it) nor left as a plain failure (the run would never go green and a
-  new defect would hide among the old ones). It is listed here with what it
-  costs, and printed as PROD. If one of these ever PASSES, the run says so —
-  the list cannot quietly rot.
+  It is EMPTY: the one entry it held (F25, the recipe screen carrying its scale
+  into the next recipe through "שכפול") was approved and fixed, so that check is
+  an ordinary check again and a failure there is a regression. The mechanism
+  stays because the next audit will need it.
 */
-const KNOWN_PRODUCTION = new Map([
-  [
-    'a scale set on one recipe does not follow to another',
-    'RecipeScreen keeps `scaleMode`/`scaleValue`/`scaleIngredient` in component ' +
-      'state and never resets them when `recipeId` changes. In the product the ' +
-      'reachable path is "שכפול" (duplicate → navigate to the new recipe, same ' +
-      'route, same mounted component); in the artifact any recipe→recipe move ' +
-      'shows it, because a hash change does not reload the page. The screen ' +
-      'does say which scale it is showing, so the number is not silent.',
-  ],
-]);
+const KNOWN_PRODUCTION = new Map([]);
 
 const findings = [];
 const results = [];
