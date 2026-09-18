@@ -36,7 +36,7 @@
   route, and the inspector labels it as a component preview.
 */
 
-import { StrictMode, useEffect, useMemo } from 'react';
+import { StrictMode, useEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   MemoryRouter,
@@ -78,7 +78,25 @@ import { SimUserBar, useActiveSimUser } from './SimUserBar.js';
 import '../../apps/web/src/styles/tokens.css';
 import '../../apps/web/src/styles/global.css';
 
-/** Tells the inspector where the product navigated, and takes its requests. */
+/**
+ * Tells the inspector where the product navigated, takes its requests, and
+ * keeps the page's hash in step with the route.
+ *
+ * THE HASH IS NOT DECORATION — IT IS WHAT MAKES A RELOAD BEHAVE
+ *
+ * In production the router is `BrowserRouter`: a reload lands on the same URL,
+ * with the same query string, so the scale a person set is still in force and
+ * a deep link opens the screen it names. This page cannot own the address bar,
+ * so the route is mirrored into the hash and read back at boot. Without it a
+ * reload inside the artifact silently returned to whatever route the page was
+ * opened at, which is a behaviour the product does not have — and the audit
+ * asked for reload and deep links to be tested, which they cannot be against a
+ * page that forgets where it is.
+ *
+ * `replaceState` rather than assigning `location.hash`, because assigning adds
+ * a history entry and would make the browser's Back button walk the same route
+ * twice.
+ */
 function InspectorBridge() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,6 +107,59 @@ function InspectorBridge() {
       '*',
     );
   }, [location.pathname]);
+
+  /*
+    PUSH, so the browser's own Back and Forward work.
+
+    `MemoryRouter` keeps its history in memory and never touches the browser's,
+    so before this the page had exactly one browser entry and Back left the app
+    entirely — measured: the hash came back empty. Mirroring each location into
+    a pushed entry gives Back and Forward something to walk, and `popstate`
+    (below) applies whatever entry the browser lands on back into the router.
+    The hash is the single source of truth for which screen is on the page, in
+    both directions.
+
+    The first sync REPLACES rather than pushes: a page opened with no hash
+    would otherwise get a spare entry, and Back would appear to do nothing.
+  */
+  const first = useRef(true);
+
+  /*
+    NO "am I inside a popstate" FLAG, and that is the fix rather than the
+    omission: the first version kept one, and when a pop landed the router
+    exactly where it already was, the effect never ran to clear it — so the
+    NEXT real navigation was swallowed and Back walked to the wrong screen.
+    The comparison below is enough on its own. After a pop the hash and the
+    router agree, so it returns without pushing; if the router redirects
+    somewhere else (an unknown route goes to the notebook), pushing the place
+    it actually landed is what should happen anyway.
+  */
+  useEffect(() => {
+    const here = `${location.pathname}${location.search}`;
+    if (window.location.hash.replace(/^#/, '') === here) {
+      first.current = false;
+      return;
+    }
+    try {
+      if (first.current) window.history.replaceState(null, '', `#${here}`);
+      else window.history.pushState(null, '', `#${here}`);
+    } catch {
+      /* a sandboxed frame may refuse; the page still works, it just forgets
+         where it was on reload. */
+    }
+    first.current = false;
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const onPop = (): void => {
+      const there = window.location.hash.replace(/^#/, '') || '/notebook';
+      // `replace`: the browser already moved, so this puts the router where
+      // the browser is rather than adding a step of its own.
+      navigate(there, { replace: true });
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [navigate]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {

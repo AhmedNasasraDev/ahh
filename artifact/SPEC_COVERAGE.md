@@ -3,7 +3,7 @@
 
 # Spec Coverage — המפרט כ-checklist
 
-50 דרישות. **COMPLETED**: 36 · **PARTIAL**: 8 · **NOT BUILT**: 4 · **BLOCKED**: 2
+52 דרישות. **COMPLETED**: 38 · **PARTIAL**: 8 · **NOT BUILT**: 4 · **BLOCKED**: 2
 
 COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכיח אותה מהקוד ומהבדיקות — לא «מצאתי קומפוננטה».
 
@@ -48,7 +48,7 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | §12 מודל פרטיות | RLS + roster ללא מייל | `—` | `migrations 0023-0037` | כן | RLS | rls-isolation.sql + group-teaching.sql | לא | **COMPLETED** |  |
 | §13 יכולות מקצועיות | תמחור, food cost, DDT, HACCP חלקי | `/recipe/:id` | `features/pricing/*` | חלקי | ingredient_catalog | foodCost.test.ts ועוד | לא | **PARTIAL** | אצוות וניסיונות אינם מוצגים/נכתבים מה-UI |
 | §13a HACCP ומעקב אצוות | haccpOf + שורת תווית | `/recipe/:id/label` | `features/batch/haccp.ts` | חלקי | batches (קריאה בלבד) | haccp.test.ts (13) | לא | **PARTIAL** | אין מסך אצוות, אין תיעוד מצולם, אין נתיב כתיבה (F3) |
-| §14 Cook Mode | CookScreen | `/recipe/:id/cook` | `routes/CookScreen.tsx` | כן | mirror | CookScreen.test.tsx | כן | **COMPLETED** |  |
+| §14 Cook Mode | CookScreen + Mise en place | `/recipe/:id/cook` | `routes/CookScreen.tsx` | כן | mirror (ticks + started + step) | CookScreen.test.tsx (35) · mise.test.ts (20) | stage14 (40) | **COMPLETED** | שלב Mise en place חוסם את השלבים עד 100% |
 | §15 RTL ומספרים | dir=rtl + פורמט מספרים | `כל המסכים` | `styles/global.css` | כן | — | probe-nav (RTL) + בדיקות מסך | כן | **COMPLETED** |  |
 | §15 ערבית | — | `—` | `routes/SettingsScreen.tsx (הצהרה)` | לא | — | SettingsScreen.test.tsx | לא | **NOT BUILT** | ההגדרות אומרות במפורש «בהכנה» ואין מתג שאינו עושה דבר |
 | §16 Design System | tokens.css + בדיקת ניגודיות | `כל המסכים` | `styles/tokens.css` | כן | — | tokens.test.ts (80) | כן | **COMPLETED** |  |
@@ -61,8 +61,10 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | HANDOFF §6 Security — proxy ל-Claude | — | `—` | `—` | לא | — | — | — | **NOT BUILT** | «פענוח חכם» דורש proxy עם מפתח בצד שרת. לא נבנה |
 | HANDOFF §4 מייל הזמנות | Edge Function send-group-invite | `(נקראת מ-PermsScreen)` | `supabase/functions/send-group-invite` | כן | Resend | — | לא | **BLOCKED** | נפרסה ופעילה; ממתינה לאימות דומיין ול-3 secrets. מעולם לא נקראה |
 | §10 צ׳אט בזמן אמת | Realtime Broadcast | `/group/:id` | `migrations 0032 + GroupChat.tsx` | כן | realtime.messages RLS | group-chat.sql (45) + GroupChat.test.tsx (34) | לא | **BLOCKED** | הסביבה הזאת חוסמת *.supabase.co — הערוץ לא נפתח אף פעם מדפדפן |
+| §14 Mise en place — שקילה לפני ביצוע | CookScreen (שלב ראשון) + features/cook/mise.ts | `/recipe/:id/cook` | `routes/CookScreen.tsx · features/cook/mise.ts` | כן | IndexedDB בלבד — אין שינוי DB | mise.test.ts (20) · CookScreen.test.tsx (15 חדשות) | stage14 (40) · journeys.mjs C | **COMPLETED** | הכמויות מ-compute() לפי ה-scale שב-URL; סימון נשמר עם חתימת ה-scale |
+| §6 scale — מעבר בין מסכים | scaleLink.ts | `/recipe/:id → /order · /cook` | `features/recipe/scaleLink.ts` | כן | — | scaleLink.test.ts (14) | journeys.mjs B/F | **COMPLETED** | מנתח אחד; קודם היה עותק בכל מסך |
 
-## ממצאים (24)
+## ממצאים (26)
 
 | # | סוג | מה | איפה | חומרה |
 |---|---|---|---|---|
@@ -90,6 +92,8 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | F22 | החלטה מתועדת | טוקן הזמנה נשמר כטקסט גלוי — הנימוק ב-0027 (קישור פתוח חייב להיות קריא שוב) | `supabase/migrations/0027` | נמוך |
 | F23 | UX במוצר | שמירת תוכנית ייצור מצליחה בלי שום אישור על המסך — אין «נשמר», אין toast, המסך זהה לפני ואחרי. נמצא בסריקת הכפתורים | `apps/web/src/routes/PlanScreen.tsx (onSave)` | נמוך |
 | F24 | מגבלת Artifact | שלושת כפתורי «הדפסה» (תווית, דף הזמנה, מתכון קבוצתי) קוראים ל-window.print(). בתוך ה-Artifact ייתכן שה-sandbox חוסם הדפסה — הכפתורים הם של המוצר ולא נשתנו | `LabelScreen · OrderScreen · GroupRecipeScreen` | — |
+| F25 | state — production | ה-scale במסך המתכון נשמר ב-state של הקומפוננטה ואינו מתאפס כשה-recipeId מתחלף. מסלול במוצר: «שכפול» → המתכון החדש נפתח עם ה-scale של הקודם (נמדד: קרואסון ×0.71 · 24 יחידות). המסך כן מציג איזה scale מוצג, ולכן המספר אינו סמוי. | `apps/web/src/routes/RecipeScreen.tsx (scaleMode/scaleValue/scaleIngredient)` | נמוך — דורש אישור אחמד לתיקון |
+| F26 | נגישות/מגע — production | במסכי §10 יש פקדים קטנים מהמינימום של מערכת העיצוב עצמה (--hit-min 44px): קישור «חזרה» בגובה 12px, כפתורי טקסט («יציאה מהקבוצה», «תשובה», «הסרה», «דחייה», «שליחה מחדש») בגובה 16px, וחמש תיבות ההרשאה כ-13px ברירת מחדל של הדפדפן. נמדד בחמישה רוחבים — אין breakpoint שמשנה זאת. | `GroupScreen.module.css · GroupChat.module.css · PermsScreen.module.css` | בינוני — דורש אישור אחמד לתיקון |
 
 ## הערות התצוגה (ARTIFACT FIXTURE)
 
@@ -104,3 +108,8 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 - כלי בדיקה אחד שאינו במוצר: «משתמש פעיל בסימולציה» מעל הצ׳אט. הוא מחליף את החשבון שה-Artifact מדמה בין חברי ה-roster של אותה קבוצה, דרך אותו תפר שהבדיקות משתמשות בו (AppDataProvider repository + userId). אין במוצר מחליף משתמשים, והכלי מסומן במסגרת מקוטעת ובשורת הסבר.
 - ההרשאות בצ׳אט אינן מגיעות מהכלי אלא מ-features/groups/roles.ts ומ-test/fakeGroups.ts: תלמיד אינו מקבל «הכרזה», דרגה≥2 מוחקת הודעה של אחר ואינה עורכת אותה, וקבוצה שבה החשבון אינו חבר אינה נראית כלל.
 - מה נשמר במעבר בין משתמשים בסימולציה: הודעות, סימני קריאה, שמות, תמונות פרופיל ותפקידי חברים. מה נבנה מחדש מהזרע: קורסים, שיעורים, פריטים והרשאות פריט שנוצרו באותה סשן.
+- שתי הוספות של plumbing בתצוגה בלבד (לא במוצר): ה-route ממופה ל-hash של העמוד ומוחזר ממנו בטעינה, ו-popstate מוחזר לראוטר — כדי שרענון, deep link וכפתורי Back/Forward של הדפדפן יתנהגו כמו BrowserRouter בפרודקשן. בלי זה רענון בתוך ה-Artifact חזר לנתיב הפתיחה, וזו התנהגות שאין למוצר.
+- סימוני ה-Mise en place וההתקדמות בשלבים נשמרים ב-IndexedDB של הדפדפן — זהו קוד המוצר עצמו (offlineMirror), לא סימולציה. אם המסגרת שבה ה-Artifact מוצג אינה מרשה IndexedDB, המוצר סופג את זה בשקט (כל הגישות עוטפות try/catch) והשקילה מתחילה מאפס.
+- מאיפה כל התנהגות ב-Artifact מגיעה — סיווג מלא: (A) קוד production אמיתי: כל המסכים, הקומפוננטות, ה-CSS, ה-routing, המנוע (compute/scaleFactor/rowLabel), Cook Mode ושלב ה-Mise en place, כל הבדיקות של הרשאות (roles.ts), ו-offlineMirror — סימוני השקילה וההתקדמות בשלבים נשמרים ב-IndexedDB האמיתי של הדפדפן.
+- (B) simulation שנדרשת כי אין backend: repository הפיקסצ'ר (קבוצות, צ׳אט, הזמנות, בקשות, תוכנית ייצור, שישה חומרי גלם, גרסאות), capabilities() שמדווח חשבון מחובר, ומחליף המשתמש הפעיל בצ׳אט. אין Supabase, אין auth, אין Realtime, אין Storage ואין מייל.
+- (C) viewer plumbing שאינו פיצ'ר של המוצר ואינו מוצג כפיצ'ר: MemoryRouter במקום BrowserRouter, מיפוי ה-route ל-hash ו-popstate חזרה לראוטר (כדי שרענון/deep link/Back יתנהגו כמו בפרודקשן), AuthProvider עם client={null}, תג «סימולציה מקומית», והנתיב /__inspector/auth.

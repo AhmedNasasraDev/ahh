@@ -17,7 +17,7 @@
 | `/recipe/new` | מתכון חדש | RecipeEditScreen | `apps/web/src/routes/RecipeEditScreen.tsx` | מחברת → «מתכון חדש» | draft מקומי | save_recipe |
 | `/recipe/:recipeId/edit` | עריכת מתכון | RecipeEditScreen | `apps/web/src/routes/RecipeEditScreen.tsx` | מסך מתכון → «עריכה» · תווית → קישור אזהרה · Cook Mode → יציאה | getRecipe(id) | save_recipe (עם expected_updated_at) |
 | `/recipe/:recipeId` | מתכון | RecipeScreen | `apps/web/src/routes/RecipeScreen.tsx` | כרטיס במחברת · «המשך מאיפה שעצרת» בבית · מתכוני בסיס · חומרי גלם | getRecipe + catalog + prefs → compute() | recipes/ingredients/steps/issues · recipe_versions · private_notes · recipe_images (bucket פרטי) |
-| `/recipe/:recipeId/cook` | Cook Mode | CookScreen | `apps/web/src/routes/CookScreen.tsx` | מסך מתכון → «Cook Mode» · בית → «המשך» | getRecipe + mirror (offlineMirror: התקדמות) | קריאה בלבד; ההתקדמות נשמרת ב-IndexedDB מקומית |
+| `/recipe/:recipeId/cook` | מצב הכנה (Mise en place → שלבים) | CookScreen | `apps/web/src/routes/CookScreen.tsx` | מסך מתכון → «מצב הכנה» (הקישור נושא את ה-scale) · בית → «המשך» | compute(recipe, notebook, {factor}) לפי ה-scale שב-URL + mirror (ticks, started, step) | קריאה בלבד; ההתקדמות והסימונים נשמרים ב-IndexedDB מקומית |
 | `/recipe/:recipeId/label` | תווית | LabelScreen | `apps/web/src/routes/LabelScreen.tsx` | מסך מתכון → «תווית» | compute() + labelComposition() + lastBatch()/haccpOf() | קריאה בלבד (batches נקראות, לא נכתבות) |
 | `/recipe/:recipeId/order` | דף הזמנה | OrderScreen | `apps/web/src/routes/OrderScreen.tsx` | מסך מתכון → «דף הזמנה» (כולל פרמטרי scale ב-URL) | compute() בקנה המידה שב-URL | קריאה בלבד |
 | `/home` | בית | HomeScreen | `apps/web/src/routes/HomeScreen.tsx` | טאב «בית» | listRecipes + mirror (lastOpened) | recipes |
@@ -36,7 +36,7 @@
 | `(אין route)` | התחברות / הרשמה | AuthScreen | `apps/web/src/routes/AuthScreen.tsx` | AuthGate מציג אותו כאשר status === 'signed-out' (כלומר: פרויקט מוגדר והמשתמש אינו מחובר) | auth session | Supabase GoTrue (signUp/signIn/reset) |
 | `(אין route)` | NotImplementedScreen | NotImplementedScreen | `apps/web/src/routes/NotImplementedScreen.tsx` | אין — אף route ואף קומפוננטה אינם מפנים אליו יותר | — | — |
 
-## קומפוננטות, גליות ופאנלים (15)
+## קומפוננטות, גליות ופאנלים (18)
 
 | שם | קובץ | מוצג בתוך | מה הוא | בדיקות |
 |---|---|---|---|---|
@@ -55,3 +55,6 @@
 | SourceBadge | `apps/web/src/components/SourceBadge.tsx` | RecipeScreen · RecipeEditScreen · ConvertSheet | מקור הצפיפות/הנתון (§5.1) | דרך מסכי המתכון |
 | AuthGate | `apps/web/src/auth/AuthGate.tsx` | App | loading / unconfigured / signed-out / signed-in | AppSession.test.tsx |
 | OnboardingGate | `apps/web/src/app/OnboardingGate.tsx` | App | §4 חוסם את הטאבים עד לסיום | AppSession.test.tsx |
+| Mise en place (בתוך CookScreen) | `apps/web/src/routes/CookScreen.tsx + features/cook/mise.ts` | /recipe/:recipeId/cook | רשימת השקילה ושער הכניסה לשלבים; הלוגיקה (זהות סימון, «הושלם», חתימת scale) ב-mise.ts | mise.test.ts (20) · CookScreen.test.tsx (35) |
+| rowLabel | `apps/web/src/features/recipe/rowLabel.ts` | מסך מתכון + Mise en place | מה שורת רכיב מציגה (§5.4) — מימוש אחד לשני המסכים | דרך RecipeScreen.test.tsx ו-CookScreen.test.tsx |
+| scaleLink | `apps/web/src/features/recipe/scaleLink.ts` | מסך מתכון → דף הזמנה / מצב הכנה | כתיבת וקריאת ה-scale ב-URL; מנתח אחד לשלושה מסכים | scaleLink.test.ts (14) |

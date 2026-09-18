@@ -458,16 +458,31 @@ try {
     recipe.cook,
     `h1="${recipe.h1}" link="${recipe.label}"`,
   );
-  await page.click('a[href="/recipe/brioche/cook"]');
+  await page.click('a[href^="/recipe/brioche/cook"]');
   await page.waitForTimeout(900);
+  /*
+    §14 now opens on Mise en place, so this check measures THAT screen — it
+    used to count the step controls and still passed after the stage was
+    added, which is a check that had stopped describing the product. What is
+    asserted is what is true of both: Cook Mode takes the whole screen, with
+    no tab bar, and the weighing list is what greets you.
+  */
   const inCook = await page.evaluate(() => ({
-    steps: document.querySelectorAll('button, [role="button"]').length,
+    controls: document.querySelectorAll('button, [role="button"]').length,
     tabs: document.querySelectorAll('nav[aria-label="ניווט ראשי"]').length,
+    mise: document.querySelectorAll('section[aria-label="הכנת חומרי גלם"]').length,
+    ticks: document.querySelectorAll('section[aria-label="הכנת חומרי גלם"] input[type="checkbox"]')
+      .length,
   }));
   check(
     'Cook Mode takes the whole screen, with no tab bar — as it does in the product',
-    inCook.tabs === 0 && inCook.steps > 0,
-    `controls=${inCook.steps} tabbars=${inCook.tabs}`,
+    inCook.tabs === 0 && inCook.controls > 0,
+    `controls=${inCook.controls} tabbars=${inCook.tabs}`,
+  );
+  check(
+    'and it opens on the weighing stage, with one tick per ingredient',
+    inCook.mise === 1 && inCook.ticks > 0,
+    `${inCook.ticks} ticks`,
   );
 
   check('no uncaught error anywhere in the run', errors.length === 0, errors.slice(0, 3).join(' | '));

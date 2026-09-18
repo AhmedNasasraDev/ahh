@@ -75,6 +75,56 @@ const BASE = 'http://127.0.0.1:8135/index.html';
 /* Every screen a person can reach by using the app, with the fixture's own
    ids. `/join/:token` is not here: in the product it is an email link, and in
    the artifact it is reached by the page's hash — it gets its own pass below. */
+/*
+  A screen may sit BEHIND something, and the walk has to get there the way a
+  person does. §14's steps are behind Mise en place: the ingredient list has to
+  be ticked and the gate pressed before a step exists on the page, so the steps
+  screen is listed with a `prepare` that does exactly that. Without it the walk
+  simply stopped covering the step controls when the stage was added, and a
+  suite that quietly covers less is worse than one that fails.
+*/
+const PREPARE = {
+  '/recipe/brioche/cook#steps': async (page) => {
+    const gate = page.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' });
+    // Idempotent: a preparation that is already under way has no gate on
+    // screen, and the steps are already there.
+    if (!(await gate.count())) return;
+    const boxes = page.locator('section[aria-label="הכנת חומרי גלם"] input[type="checkbox"]');
+    const n = await boxes.count();
+    for (let i = 0; i < n; i += 1) {
+      if (!(await boxes.nth(i).isChecked())) await boxes.nth(i).click();
+    }
+    await gate.click();
+    await page.waitForTimeout(400);
+  },
+};
+
+/*
+  Routes whose stored progress is wiped before every load.
+
+  The walk's whole method is "one click, from the same start, every time", and
+  §14 deliberately REMEMBERS where a preparation got to — on the device, in
+  IndexedDB, which survives a reload by design. Without wiping it, clicking the
+  gate once would put every later load of the cook route on the steps screen,
+  and the ticks measured after that would be measured on a different screen.
+  Clearing the store is test isolation, not a change to the product: the
+  product's own "סיום ההכנה" does the same thing at the end of a bake.
+*/
+/*
+  Wiped before EVERY load, not only before Cook Mode's.
+
+  The walk's method is "one click, from a known start, every time", and more of
+  the product writes to the device than Cook Mode does: choosing a measurement
+  profile in הגדרות writes `prefs` through `offlineMirror`, and IndexedDB
+  survives a reload by design. So a click early in a screen could change what
+  the screen renders for every click after it — which is how this walk came to
+  report the settings screen's "← עוד" link as dead: the link works (measured
+  directly), but the control list had shifted under the index the walk had
+  recorded. Clearing the store removes the drift at its source; clicking by
+  identity rather than by index (below) removes the rest.
+*/
+const RESET_EVERY_LOAD = true;
+
 const SCREENS = [
   '/notebook',
   '/home',
@@ -83,6 +133,8 @@ const SCREENS = [
   '/recipe/brioche/edit',
   '/recipe/new',
   '/recipe/brioche/cook',
+  // the same route, walked again after the weighing stage has been cleared
+  '/recipe/brioche/cook#steps',
   '/recipe/brioche/label',
   '/recipe/brioche/order',
   '/groups',
@@ -159,9 +211,46 @@ try {
   });
 
   const load = async (route) => {
-    await page.goto(`${BASE}#${route}`, { waitUntil: 'load' });
-    await page.reload({ waitUntil: 'load' });
+    // `#steps` and friends are labels for a STATE of a route, not part of it.
+    const url = route.split('#')[0];
+    /*
+      Only once the page is ON the served origin: `about:blank` has no origin
+      and the IndexedDB API is denied there, which took down the first run of
+      this — the wipe has to happen between two loads, not before the first.
+    */
+    if (RESET_EVERY_LOAD && page.url().startsWith('http://127.0.0.1')) {
+      await page.evaluate(
+        () =>
+          new Promise((done) => {
+            try {
+              const req = indexedDB.deleteDatabase('keyval-store');
+              req.onsuccess = () => done(null);
+              req.onerror = () => done(null);
+              req.onblocked = () => done(null);
+            } catch {
+              // A frame may refuse the API altogether; the product tolerates
+              // that (offlineMirror's accessors all swallow it) and so does this.
+              done(null);
+            }
+          }),
+      );
+    }
+    /*
+      A UNIQUE query string, so this is always a real document load.
+
+      `goto` to the same page with a different hash is a SAME-DOCUMENT
+      navigation: the app handles it, and if the screen it lands on redirects
+      (resetting the opening questions sends you to /onboarding) the hash is
+      rewritten before the reload — so the reload then boots at the redirected
+      route, not the one asked for. That is how this walk came to enumerate
+      /settings and click on /onboarding, and report a working back link as
+      unclickable. A changing query makes every load a fresh document and the
+      question "which screen is this" unambiguous.
+    */
+    await page.goto(`${BASE}?w=${Date.now()}#${url}`, { waitUntil: 'load' });
     await page.waitForTimeout(650);
+    const prepare = PREPARE[route];
+    if (prepare) await prepare(page);
   };
 
   /*
@@ -239,15 +328,53 @@ try {
       const before = await snapshot();
       let clicked = true;
       try {
-        await page.evaluate(
-          ({ sel, i }) => {
-            const el = document.querySelectorAll(sel)[i];
-            if (el) (el instanceof HTMLElement ? el : null)?.click();
+        /*
+          Found again by WHAT IT IS — tag, label, href — and only then by its
+          position as a tie-breaker. The index alone was a bug: it is taken
+          from one render and used against another, and a screen that renders
+          a different number of controls (a profile that hides the pro rows, a
+          list that finished loading) silently moves every control after the
+          change. The verdict then describes whatever element inherited the
+          number.
+        */
+        clicked = await page.evaluate(
+          ({ sel, want }) => {
+            const list = [...document.querySelectorAll(sel)];
+            // The same normalisation as the enumeration above, including the
+            // 40-character truncation and the `<tag>` fallback for a control
+            // with no text — a matcher that normalises differently finds
+            // nothing and reports a working control as unclickable.
+            const nameOf = (el) =>
+              (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 40) || `<${el.tagName.toLowerCase()}>`;
+            const same = (el) =>
+              Boolean(el) &&
+              el.tagName === want.tag &&
+              (el.getAttribute('href') ?? '') === want.href &&
+              nameOf(el) === want.label;
+            const el = list.find(same) ?? (same(list[want.i]) ? list[want.i] : null);
+            if (!el) return false;
+            (el instanceof HTMLElement ? el : null)?.click();
+            return true;
           },
-          { sel: CLICKABLE, i: c.i },
+          { sel: CLICKABLE, want: { tag: c.tag, href: c.href ?? '', label: c.label, i: c.i } },
         );
-      } catch {
+      } catch (e) {
         clicked = false;
+        if (process.env['WALK_DEBUG']) console.log('   threw:', String(e).slice(0, 120));
+      }
+      if (process.env['WALK_DEBUG'] && !clicked) {
+        // What the screen looked like when the control could not be found —
+        // this is what showed that the walk was on the wrong screen.
+        const now = await page.evaluate(() => location.hash);
+        console.log(
+          '   not found:',
+          JSON.stringify({ tag: c.tag, href: c.href, label: c.label, i: c.i }),
+          'page at',
+          now,
+        );
       }
       await page.waitForTimeout(520);
       const after = await snapshot();
@@ -264,7 +391,8 @@ try {
       /* A link or tab that points at the screen you are already on is
          SUPPOSED to do nothing — the "מחברת" tab while standing in the
          notebook is not a dead button. */
-      else if (c.href && (c.href === route || c.href === before.route)) verdict = 'same-route';
+      else if (c.href && (c.href === route.split('#')[0] || c.href === before.route))
+        verdict = 'same-route';
       else verdict = 'DEAD';
 
       rows.push({ route, label: c.label, tag: c.tag, href: c.href, verdict, alert: newAlert ?? '' });
