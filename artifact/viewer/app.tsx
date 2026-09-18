@@ -36,7 +36,7 @@
   route, and the inspector labels it as a component preview.
 */
 
-import { StrictMode, useEffect } from 'react';
+import { StrictMode, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   MemoryRouter,
@@ -73,7 +73,8 @@ import { GroupRecipeScreen } from '../../apps/web/src/routes/GroupRecipeScreen.j
 import { JoinScreen } from '../../apps/web/src/routes/JoinScreen.js';
 import { AuthScreen } from '../../apps/web/src/routes/AuthScreen.js';
 
-import { createViewerRepository, VIEWER_USER_ID } from './fixtures.js';
+import { createViewerRepository } from './fixtures.js';
+import { SimUserBar, useActiveSimUser } from './SimUserBar.js';
 import '../../apps/web/src/styles/tokens.css';
 import '../../apps/web/src/styles/global.css';
 
@@ -102,15 +103,29 @@ function InspectorBridge() {
   return null;
 }
 
-const repository = createViewerRepository();
 const initialPath = window.location.hash.replace(/^#/, '') || '/notebook';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+/*
+  ONE MORE VIEWER-ONLY SEAM, AND IT IS THE SAME ONE THE TESTS USE
+
+  `AppDataProvider` already takes `repository` and `userId` — the injection
+  point screen tests are written against. The viewer builds a repository for
+  whoever the switcher says is acting (see ./SimUserBar.tsx), so switching
+  person changes both props and nothing else: every screen below re-reads,
+  exactly as it would after a sign-in, because that is all that changed as far
+  as the product can tell. The router is NOT remounted, so the switch happens
+  where you are standing and leaves you in the conversation.
+*/
+function Viewer() {
+  const activeUserId = useActiveSimUser();
+  const repository = useMemo(() => createViewerRepository(activeUserId), [activeUserId]);
+
+  return (
     <MemoryRouter initialEntries={[initialPath]}>
       <AuthProvider client={null}>
-        <AppDataProvider repository={repository} userId={VIEWER_USER_ID}>
+        <AppDataProvider repository={repository} userId={activeUserId}>
           <InspectorBridge />
+          <SimUserBar />
           <Routes>
             <Route path="/onboarding" element={<OnboardingScreen />} />
             <Route
@@ -176,5 +191,11 @@ createRoot(document.getElementById('root')!).render(
         </AppDataProvider>
       </AuthProvider>
     </MemoryRouter>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <Viewer />
   </StrictMode>,
 );
