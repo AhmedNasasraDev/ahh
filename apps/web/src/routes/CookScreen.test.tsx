@@ -16,6 +16,9 @@
 // does — ticks the list, presses the button — and the tests that assert the
 // gate itself are in their own block at the bottom.
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { memoryIdb, resetMemoryIdb } from '../test/memoryIdb.js';
 
@@ -714,5 +717,41 @@ describe('§14 Mise en place — the stage that cannot be skipped', () => {
     expect(gate).toBeEnabled();
     await user.click(gate);
     expect(await screen.findByText('להמיס ל־45°')).toBeInTheDocument();
+  });
+
+  /*
+    THE GATE AND THE COUNT ARE PINNED TO THE BOTTOM OF THE SCREEN
+
+    Cook Mode is the one screen rendered OUTSIDE the AppShell (§14 asks for a
+    full screen without tabs), so the DOCUMENT scrolls it. With the gate at the
+    end of the ingredient list it fell below the fold — measured on the
+    published page at 412×620: the gate's bottom edge at 775 in a 620px
+    viewport — and the count that says whether the stage is finished was off
+    the other end, so nothing on screen answered "can I start?".
+
+    jsdom has no layout, so this asserts the rules that hold the shape, the way
+    `styles/tokens.test.ts` pins the tokens; the measuring is done in a real
+    browser by `artifact/scripts/responsive.mjs`, which checks at five widths —
+    including a deliberately short one — that the gate is inside the viewport,
+    that the list scrolls to its end, and that the last ingredient and the gate
+    are both reachable there.
+  */
+  it('pins the progress line and the gate to the bottom of the screen', async () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(path.join(here, 'CookScreen.module.css'), 'utf8');
+
+    expect(css).toMatch(/\.gateBar\s*\{[^}]*position:\s*sticky/s);
+    expect(css).toMatch(/\.gateBar\s*\{[^}]*inset-block-end:\s*0/s);
+    // Opaque: the rows scroll underneath it.
+    expect(css).toMatch(/\.gateBar\s*\{[^}]*background:\s*var\(--c-ink\)/s);
+
+    // And the two things it carries are really inside it, not merely styled.
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    const bar = screen.getByRole('status').closest('div');
+    expect(bar?.className).toMatch(/gateBar/);
+    expect(
+      bar?.contains(screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' })),
+    ).toBe(true);
   });
 });

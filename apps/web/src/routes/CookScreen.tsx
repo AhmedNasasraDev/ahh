@@ -305,19 +305,6 @@ export function CookScreen() {
             </p>
           ) : (
             <>
-              <p className={styles.count} role="status">
-                <span className="ltr">{mise.ready}</span> מתוך{' '}
-                <span className="ltr">{mise.total}</span> חומרי גלם מוכנים
-              </p>
-              {/* No second `role="status"`: the count above is the live region,
-                  and two of them announce over each other. This line is the
-                  same fact said in the words §14's request asked for. */}
-              {mise.complete && (
-                <p className={styles.miseDone}>
-                  <span className="ltr">100%</span> — Mise en place הושלם
-                </p>
-              )}
-
               <ul className={styles.miseList}>
                 {rows.map((row, i) => {
                   const key = miseKeyOf(row, i);
@@ -353,19 +340,46 @@ export function CookScreen() {
             </>
           )}
 
-          <button
-            type="button"
-            className={styles.start}
-            /*
-              The gate. Not a link to somewhere else, not a confirmation that
-              can be dismissed: while this is disabled the steps are not on the
-              page at all, and this is the only thing that puts them there.
-            */
-            disabled={!mise.complete && mise.total > 0}
-            onClick={() => setStartedHere(true)}
-          >
-            הכול מוכן — מתחילים בהכנה
-          </button>
+          {/*
+            THE PROGRESS AND THE GATE RIDE ALONG AT THE BOTTOM.
+
+            This screen is outside the AppShell (§14: a full screen without
+            tabs), so it is the DOCUMENT that scrolls it — and with eight or
+            ten ingredients the gate sat below the fold, where a cook had to
+            scroll to find out whether the stage was finished. The two things
+            that answer "can I start?" are pinned instead: the count, which is
+            the live region, and the gate itself.
+          */}
+          <div className={styles.gateBar}>
+            {mise.total > 0 && (
+              <p className={styles.count} role="status">
+                <span className="ltr">{mise.ready}</span> מתוך{' '}
+                <span className="ltr">{mise.total}</span> חומרי גלם מוכנים
+              </p>
+            )}
+            {/* No second `role="status"`: the count above is the live region,
+                and two of them announce over each other. This line is the
+                same fact said in the words §14's request asked for. */}
+            {mise.complete && (
+              <p className={styles.miseDone}>
+                <span className="ltr">100%</span> — Mise en place הושלם
+              </p>
+            )}
+            <button
+              type="button"
+              className={styles.start}
+              /*
+                The gate. Not a link to somewhere else, not a confirmation that
+                can be dismissed: while this is disabled the steps are not on
+                the page at all, and this is the only thing that puts them
+                there.
+              */
+              disabled={!mise.complete && mise.total > 0}
+              onClick={() => setStartedHere(true)}
+            >
+              הכול מוכן — מתחילים בהכנה
+            </button>
+          </div>
         </section>
       </div>
     );

@@ -84,6 +84,14 @@ const check = (label, pass, detail = '', known = false) => {
 };
 
 const SIZES = [
+  /*
+    412×620 is not a phone's full screen — it is what is LEFT of one inside
+    the artifact's own chrome, and it is the size that caught the worst defect
+    of this whole audit: Cook Mode's weighing list overflowed it, the page was
+    clamped with `overflow: hidden`, and the gate could not be reached at all.
+    A tall viewport hid it, so a short one is measured from now on.
+  */
+  ['412×620', 412, 620],
   ['360×800', 360, 800],
   ['402×874', 402, 874],
   ['430×932', 430, 932],
@@ -258,7 +266,24 @@ try {
           return r.top >= -1 && r.bottom <= doc.clientHeight + 1;
         };
 
+        /*
+          THE MISE EN PLACE GATE MUST BE ON SCREEN
+
+          Cook Mode is outside the AppShell, so the DOCUMENT scrolls it, and
+          the gate used to sit at the end of the ingredient list — below the
+          fold on a short screen. It is pinned now, so it is measured the same
+          way the chat's two edges are.
+        */
+        const gate = [...document.querySelectorAll('button')].find((b) =>
+          (b.textContent || '').includes('מתחילים בהכנה'),
+        );
         return {
+          gate: gate
+            ? {
+                bottom: Math.round(gate.getBoundingClientRect().bottom),
+                inView: inView(gate),
+              }
+            : null,
           composer: send
             ? { bottom: Math.round(send.getBoundingClientRect().bottom), inView: inView(send) }
             : null,
@@ -271,7 +296,6 @@ try {
           overflowX: doc.scrollWidth - doc.clientWidth,
           wide: [...new Set(wide)].slice(0, 4),
           tabBottom: tab ? Math.round(tab.getBoundingClientRect().bottom) : null,
-          viewportH: doc.clientHeight,
           dir: el ? getComputedStyle(el).direction : 'missing',
           viewportH: doc.clientHeight,
           smallest,
@@ -291,6 +315,53 @@ try {
         m.badgeCovers.length === 0,
         m.badgeCovers.join(' · '),
       );
+      if (m.gate) {
+        check(
+          `${tag}: the Mise en place gate is on screen`,
+          m.gate.inView === true,
+          `gate bottom ${m.gate.bottom} of ${m.viewportH}`,
+        );
+        /*
+          And the list itself can be worked through: scroll the document to
+          its end, the last ingredient has to come into view, and the gate has
+          to still be there when it does. This is the pair of facts that was
+          false on the published page — measured at 412×620: body 704px in a
+          620px viewport and `scrollTop` stuck at 0 after a 3000px wheel.
+        */
+        const reach = await page.evaluate(async () => {
+          const doc = document.documentElement;
+          const before = doc.scrollHeight - doc.clientHeight;
+          const scroller = document.scrollingElement ?? doc;
+          scroller.scrollTop = scroller.scrollHeight;
+          await new Promise((r) => requestAnimationFrame(() => r(null)));
+          const rows = [...document.querySelectorAll('section[aria-label="הכנת חומרי גלם"] li')];
+          const last = rows.at(-1);
+          const g = [...document.querySelectorAll('button')].find((b) =>
+            (b.textContent || '').includes('מתחילים בהכנה'),
+          );
+          const on = (el) => {
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return r.top >= -1 && r.bottom <= doc.clientHeight + 1;
+          };
+          return {
+            overflow: before,
+            scrolled: Math.round(scroller.scrollTop),
+            lastRow: on(last),
+            gate: on(g),
+          };
+        });
+        check(
+          `${tag}: the weighing list can be scrolled to its end`,
+          reach.overflow <= 1 || reach.scrolled > 0,
+          `${reach.overflow}px over the viewport, scrolled ${reach.scrolled}`,
+        );
+        check(
+          `${tag}: the last ingredient and the gate are both reachable`,
+          reach.lastRow === true && reach.gate === true,
+          `last row ${reach.lastRow}, gate ${reach.gate}`,
+        );
+      }
       if (m.composer) {
         check(
           `${tag}: the chat composer is on screen`,

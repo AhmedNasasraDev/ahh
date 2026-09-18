@@ -197,10 +197,33 @@
   color: #e6ebe8;
 }
 
+/* ── the progress line and the gate, pinned to the bottom ────────────────
+   Cook Mode is the one screen the product renders OUTSIDE the AppShell (§14
+   asks for a full screen without tabs), so the DOCUMENT is what scrolls it.
+   With six ingredients on a 620px-tall phone the gate was already off screen,
+   and the count that says whether the stage is finished was off the other end
+   — so the answer to "can I start?" was nowhere to be seen. Both ride along
+   at the bottom now.
+
+   `--c-ink` is this screen's own surface, and the bar has to be opaque
+   because the rows scroll underneath it. The shadow in the same colour is a
+   short fade, so a row is not sliced by a hard line. */
+.gateBar {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 1;
+  margin-block-start: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  padding-block: 10px;
+  background: var(--c-ink);
+  box-shadow: 0 -10px 14px 10px var(--c-ink);
+}
+
 /* The gate. Full width, 60px, and unmistakably inert until the list is done. */
 .start {
   min-height: 60px;
-  margin-block-start: auto;
   padding: 12px 18px;
   border: 1px solid var(--c-green);
   border-radius: var(--r-control);

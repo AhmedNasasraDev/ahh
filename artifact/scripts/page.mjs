@@ -66,23 +66,41 @@ const page = `<title>מחברת מתכונים</title>
 ${fonts}
 <style>
 /* ── the host page, not the product ──────────────────────────────
-   Four rules and a badge. Everything else on this page is the product's own
+   Three rules and a badge. Everything else on this page is the product's own
    stylesheet, inlined below exactly as the build emitted it.
 
-   "overflow: hidden" on the page and "height: 100%" down the chain: the app is
-   a one-screen application that scrolls INSIDE its own frame (AppShell's
-   content area), and the page around it must not scroll at all — a page that
-   scrolls is a page whose bottom tab bar can end up below the fold.
+   "height: 100%" down the chain: the app is a one-screen application whose
+   frame asks for the whole viewport and scrolls INSIDE it (AppShell's content
+   area), so the chain from the viewport to #root has to have a height for the
+   frame to fill.
 
-   The ":root" padding reset is the same problem from the other side. The
-   artifact skeleton pads :root by the phone's safe-area insets, and the
-   product's frame asks for 100dvh INSIDE that padding, so the sum overflows
-   the viewport by exactly the inset and the tab bar goes under the edge. The
-   product's frame is designed to own the whole screen — on a phone it drops
-   its own rounding and shadow to do exactly that — so the padding is dropped
-   here and the frame gets the screen it expects. */
-html, body { height: 100%; margin: 0; overflow: hidden; }
-#root { height: 100%; }
+   THERE IS NO "overflow: hidden" HERE, AND THERE MUST NOT BE.
+
+   It was here, to keep the page around the app from scrolling — a page that
+   scrolls is a page whose bottom tab bar can end up below the fold. It cost
+   Ahmed the ability to cook: Cook Mode is the one screen the product renders
+   OUTSIDE the AppShell (App.tsx: "§14 asks for a full screen without tabs"),
+   so it is the DOCUMENT that scrolls it, and "overflow: hidden" on the
+   document clipped it. Measured on the published page at 412x620: the body
+   704px in a 620px viewport, the "מתחילים בהכנה" gate at 622 — off screen —
+   and after a 3000px wheel the scroll offset still 0. The stage could not be
+   completed at all, which no product code did: the product's own index.html
+   has no such rule.
+
+   What the rule was guarding is measured instead, per screen and per width,
+   by probe-shell.mjs and responsive.mjs (the body is never taller than the
+   viewport on a shell screen, and the document is never actually scrolled) —
+   a measurement rather than a clamp that hides the thing it measures.
+
+   The ":root" padding reset is a different problem, and it stays. The artifact
+   skeleton pads :root by the phone's safe-area insets, and the product's frame
+   asks for 100dvh INSIDE that padding, so the sum overflows the viewport by
+   exactly the inset and the tab bar goes under the edge. The product's frame is
+   designed to own the whole screen — on a phone it drops its own rounding and
+   shadow to do exactly that — so the padding is dropped here and the frame
+   gets the screen it expects. */
+html, body { height: 100%; margin: 0; }
+#root { min-height: 100%; }
 :root { padding: 0 !important; }
 
 .simBadge {

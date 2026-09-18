@@ -7,7 +7,7 @@
 
 COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכיח אותה מהקוד ומהבדיקות — לא «מצאתי קומפוננטה».
 
-מקור האמת: הקוד ב-commit `2957c9a`. כל שורה כאן ניתנת למיפוי לקובץ בפרויקט.
+מקור האמת: הקוד ב-commit `03d22d6`. כל שורה כאן ניתנת למיפוי לקובץ בפרויקט.
 
 | דרישה | מימוש | Route | קובץ | UI | Backend | Test | E2E | Status | הערה |
 |---|---|---|---|---|---|---|---|---|---|
@@ -64,7 +64,7 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | §14 Mise en place — שקילה לפני ביצוע | CookScreen (שלב ראשון) + features/cook/mise.ts | `/recipe/:id/cook` | `routes/CookScreen.tsx · features/cook/mise.ts` | כן | IndexedDB בלבד — אין שינוי DB | mise.test.ts (20) · CookScreen.test.tsx (15 חדשות) | stage14 (40) · journeys.mjs C | **COMPLETED** | הכמויות מ-compute() לפי ה-scale שב-URL; סימון נשמר עם חתימת ה-scale |
 | §6 scale — מעבר בין מסכים | scaleLink.ts | `/recipe/:id → /order · /cook` | `features/recipe/scaleLink.ts` | כן | — | scaleLink.test.ts (14) | journeys.mjs B/F | **COMPLETED** | מנתח אחד; קודם היה עותק בכל מסך |
 
-## ממצאים (27)
+## ממצאים (28)
 
 | # | סוג | מה | איפה | חומרה |
 |---|---|---|---|---|
@@ -95,6 +95,7 @@ COMPLETED פירושו שהיכולת קיימת בפועל וניתן להוכ�
 | F25 | state — production | תוקן (באישור). ה-scale במסך המתכון היה ב-state של הקומפוננטה ולא התאפס כשה-recipeId התחלף, ולכן «שכפול» פתח את העותק עם ה-scale של הקודם (נמדד: ×0.71 · 24 יחידות). האיפוס נעשה עכשיו בזמן ה-render (התבנית של React ל"איפוס state כשה-prop משתנה") ולא ב-effect, כדי שלא יצויר פריים אחד עם הכמויות של המתכון הקודם. בדיקת רגרסיה: RecipeScreen.test.tsx — אדומה בלי התיקון, ירוקה איתו. | `apps/web/src/routes/RecipeScreen.tsx (scaleMode/scaleValue/scaleIngredient)` | תוקן |
 | F26 | נגישות/מגע — production | תוקן (באישור). פקדים במסכי §10 היו מתחת למינימום של מערכת העיצוב: קישורי «חזרה» 12px → 44px (--hit-min), כפתורי הטקסט בשורות 16px → 40px (--hit-compact), פעולות ההודעה בצ׳אט 16px → 32px (חריג מתועד: שלוש פעולות בכל בועה ב-40px גוזלות ~24px לכל הודעה, ו-32 עובר בנוחות את 24px של WCAG 2.5.8), וכל תיבות הסימון 13px → 24px בירוק של האפליקציה. בדיקת רגרסיה: responsive.mjs — 345/345 בחמישה רוחבים, ורשימת ההיתר רוקנה כך שכל מסך נמדד באותו רף. | `GroupScreen.module.css · GroupChat.module.css · PermsScreen.module.css` | תוקן |
 | F27 | layout — production | תוקן (באישור), ואחר כך שונה לפי בקשה. בתחילה: שדה הכתיבה וכפתור «שליחה» היו מתחת לקו הקיפול בטלפון, כי רשימת ההודעות הוגבלה ב-58dvh — שבר מגובה החלון, שאינו יודע כמה מקום כבר לקחו כותרת הקבוצה והטאבים. התיקון הראשון היה עמודה חסומה (.pageChat) שבה רשימת ההודעות היא הגלילן היחיד. לפי בקשת אחמד («תעביר את הכותרת לגלילה עם טאבים דביקים») המסך הוא עכשיו גלילן אחד — הגלילן של ה-shell: כותרת הקבוצה נגללת ויוצאת, הטאבים דביקים למעלה (position: sticky, inset-block-start: 0), ה-composer דביק למטה, ולרשימת ההודעות אין עוד גובה או overflow משל עצמה. נמדד ב-402×874: בפתיחת הצ׳אט הגלילה בסוף, הטאבים תקועים 0–52, ה-composer 695–815 מתוך 860, וההודעה האחרונה 573–671 — נקייה מהסרגל, בזכות .bottomAnchor { scroll-margin-block-end: 150px }; בגלילה למעלה הכותרת חוזרת ל-0–184 וה-composer נשאר על המסך. בדיקות רגרסיה: GroupScreen.test.tsx (אינוואריאנטים של ה-CSS הדביק, נקראים מהקבצים עצמם) ו-responsive.mjs (שתי עמדות גלילה, בחמישה רוחבים). | `apps/web/src/routes/GroupScreen.tsx · GroupScreen.module.css (.tabs sticky) · features/groups/GroupChat.tsx · GroupChat.module.css (.composer sticky, .bottomAnchor)` | תוקן |
+| F28 | layout — Artifact + production | תוקן. אחמד לא הצליח לגלול במסך «הכנת חומרי גלם» בטלפון ולא הצליח להתחיל בהכנה. שני דברים נפרדים: (1) תקלת Artifact שלי — דף המאחסן החזיק html, body { overflow: hidden } כדי שהדף סביב האפליקציה לא ייגלל, ומצב הכנה הוא המסך היחיד שהמוצר מרנדר מחוץ ל-AppShell (§14: מסך מלא בלי טאבים), ולכן הוא גולל את הדף עצמו — וה-overflow חתך אותו. נמדד על הדף המפורסם ב-412×620: גוף 704px בחלון 620px, הכפתור «מתחילים בהכנה» ב-622 (מחוץ למסך), ואחרי גלילת גלגלת של 3000px ה-scrollTop נשאר 0. השער לא היה בר-השגה כלל. בקוד המוצר אין כלל כזה — הכלל הוסר, ומה שהוא שמר עליו נמדד עכשיו לפי מסך ולפי רוחב ב-probe-shell.mjs וב-responsive.mjs. (2) שיפור production באישור אחמד — שורת ההתקדמות והשער מוצמדים לתחתית המסך (.gateBar: position sticky, inset-block-end 0, רקע --c-ink אטום כי השורות נגללות מתחתיו), כך שהתשובה ל«אפשר להתחיל?» תמיד על המסך. בדיקות רגרסיה: CookScreen.test.tsx (אינוואריאנטים של ה-CSS + ששתי השורות באמת בתוך הסרגל — אדומה בלי התיקון) ו-responsive.mjs שקיבל רוחב נמוך חדש (412×620) ושתי בדיקות חדשות: השער בתוך החלון, הרשימה נגללת עד סופה, והשורה האחרונה והשער שניהם בר-השגה שם. | `artifact/scripts/page.mjs (host CSS) · apps/web/src/routes/CookScreen.tsx · CookScreen.module.css` | תוקן |
 
 ## הערות התצוגה (ARTIFACT FIXTURE)
 
