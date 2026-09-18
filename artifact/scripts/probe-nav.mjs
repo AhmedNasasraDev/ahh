@@ -20,11 +20,27 @@ const PW = process.env['PW'] ?? '/opt/node22/lib/node_modules/playwright/index.j
 const { chromium } = (await import(PW)).default ?? (await import(PW));
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DIST = path.join(HERE, '..', 'dist');
+const DIST = process.env['DIST'] ?? path.join(HERE, '..', 'dist');
 const CHROME = process.env['CHROME'] ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+
+/* The platform's OWN skeleton, copied verbatim from the published page. */
+const HEAD =
+  '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
+/* With PAGE set, every HTML request is answered with the PUBLISHED page inside
+   that skeleton instead of the build's own app.html, so this can be run over
+   the files the artifact service actually serves:
+     PAGE=<dir>/index.html DIST=<dir> node artifact/scripts/<this>.mjs */
+const LIVE =
+  process.env['PAGE'] === undefined
+    ? null
+    : `${HEAD}${fs.readFileSync(process.env['PAGE'], 'utf8')}</body></html>`;
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url ?? '/').split('?')[0].split('#')[0]);
+  if (LIVE !== null && (url === '/' || url.endsWith('.html'))) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(LIVE);
+  }
   let file = path.join(DIST, url === '/' ? '/app.html' : url);
   if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(DIST, 'app.html');
   const type = file.endsWith('.js')
@@ -51,8 +67,25 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 402, height: 874 } });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(e.message));
+  /*
+    The page's one cross-origin request is the Google Fonts stylesheet, and this
+    sandbox blocks it (measured: that URL and nothing else, with no uncaught
+    error). Its console line carries no URL, so failures are classified by URL
+    here and the bare "Failed to load resource" line is not counted — while a
+    failure of anything else still is.
+  */
+  const fontsBlocked = [];
+  page.on('requestfailed', (r) => {
+    const url = r.url();
+    if (/fonts\.(googleapis|gstatic)\.com/.test(url)) {
+      fontsBlocked.push(url);
+      return;
+    }
+    errors.push(`request failed: ${url} (${r.failure()?.errorText ?? '?'})`);
+  });
   page.on('console', (m) => {
     if (m.type() !== 'error') return;
+    if (/Failed to load resource/.test(m.text())) return;
     if (/ERR_CERT_AUTHORITY_INVALID|fonts\.(googleapis|gstatic)/.test(m.text())) return;
     errors.push(`console: ${m.text()}`);
   });

@@ -123,8 +123,26 @@ try {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  /*
+    The one cross-origin request on the page is the Google Fonts stylesheet,
+    and this sandbox's egress terminates TLS with its own CA, so it fails here
+    with ERR_CERT_AUTHORITY_INVALID — measured by logging `requestfailed`
+    URLs: that URL, nothing else, and no uncaught error. Its console line
+    carries no URL, so failures are classified by URL below and the bare
+    "Failed to load resource" line is not counted. Anything else still is.
+  */
+  const fontsBlocked = [];
+  page.on('requestfailed', (r) => {
+    const url = r.url();
+    if (/fonts\.(googleapis|gstatic)\.com/.test(url)) {
+      fontsBlocked.push(url);
+      return;
+    }
+    errors.push(`request failed: ${url} (${r.failure()?.errorText ?? '?'})`);
+  });
   page.on('console', (m) => {
     if (m.type() !== 'error') return;
+    if (/Failed to load resource/.test(m.text())) return;
     if (/ERR_CERT_AUTHORITY_INVALID|fonts\.(googleapis|gstatic)/.test(m.text())) return;
     errors.push(`console: ${m.text()}`);
   });
@@ -258,7 +276,10 @@ try {
   }
 
   fs.writeFileSync(path.join(OUT, 'walk.json'), JSON.stringify(rows, null, 2));
-  console.log(`\npage errors during the walk: ${errors.length}`);
+  console.log(
+    `\nblocked font requests (this sandbox's TLS, not the page): ${fontsBlocked.length}`,
+  );
+  console.log(`page errors during the walk: ${errors.length}`);
   errors.slice(0, 5).forEach((e) => console.log(`  ${e}`));
   await ctx.close();
 } finally {

@@ -74,6 +74,17 @@ await page.route('**/*', (r) =>
   r.request().url().startsWith('http://127.0.0.1:8144') ? r.continue() : r.abort(),
 );
 
+/* Every uncaught error for the whole run, reported at the end. The fonts are
+   blocked by this environment's egress, so a failed request is not an error
+   here — an exception is. */
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+page.on('console', (m) => {
+  if (m.type() === 'error' && !/ERR_FAILED|ERR_BLOCKED|net::/.test(m.text())) {
+    errors.push(m.text());
+  }
+});
+
 /* ── helpers, all of them over the product's own DOM ─────────────────────── */
 
 const CHAT = 'section[aria-label="צ׳אט הקבוצה"]';
@@ -364,6 +375,102 @@ try {
   );
 
   await page.screenshot({ path: path.join(OUT, 'chat-simulation.png'), fullPage: false });
+
+  /* ── 10. the rest of the app, while acting as somebody else ──────────────
+     The switch replaces the repository and the user id for EVERY screen, not
+     only the chat, and the account-level fixture state (the five demo
+     recipes, the catalog, the plan) is shared rather than rebuilt. So the
+     regression to look for is a screen that empties, or data that disappears,
+     because somebody else spoke in a group. Navigated by clicking, as a
+     person would. */
+  const screen = async (label, clicks, expect) => {
+    for (const c of clicks) {
+      await page.click(c);
+      await page.waitForTimeout(700);
+    }
+    const seen = await page.evaluate(() => ({
+      h1: document.querySelector('h1')?.textContent?.trim() ?? '',
+      recipes: document.querySelectorAll('a[href^="/recipe/"]').length,
+      rows: document.querySelectorAll('li, tr').length,
+      state: document.body.textContent?.includes('נכשל') === true,
+    }));
+    check(
+      `${label} still renders while acting as somebody else`,
+      seen.h1.includes(expect) && !seen.state,
+      `h1="${seen.h1}" recipes=${seen.recipes} rows=${seen.rows}`,
+    );
+    return seen;
+  };
+
+  const TAB = 'nav[aria-label="ניווט ראשי"]';
+  const MORE = (to) => `a[href="${to}"]`;
+
+  const notebook = await screen('המחברת', [`${TAB} a[href="/notebook"]`], 'מחברת');
+  check(
+    'and the five demo recipes are all still there',
+    notebook.recipes >= 5,
+    `${notebook.recipes} recipe links`,
+  );
+  await screen('הבית', [`${TAB} a[href="/home"]`], 'בית');
+  await screen('עוד', [`${TAB} a[href="/more"]`], 'עוד');
+  const materials = await screen('חומרי גלם', [MORE('/ingredients')], 'חומרי גלם');
+  check('with the six catalog materials intact', materials.rows >= 6, `${materials.rows} rows`);
+  await screen('עוד', [`${TAB} a[href="/more"]`], 'עוד');
+  await screen('תכנון ייצור', [MORE('/plans')], 'תכנון ייצור');
+  await screen('יום ייצור', ['a[href="/plan/fixture-plan-1"]'], 'יום ייצור');
+  await screen('עוד', [`${TAB} a[href="/more"]`], 'עוד');
+  await screen('כלי המדידה', [MORE('/tools')], 'כלי המדידה');
+  await screen('עוד', [`${TAB} a[href="/more"]`], 'עוד');
+  await screen('הגדרות', [MORE('/settings')], 'הגדרות');
+
+  /* §10.1 identity follows the active person: the name in הגדרות is the one
+     the roster shows in the chat, because in production both read one
+     `profiles` row. */
+  const nameField = await page.evaluate(() => {
+    const inputs = [...document.querySelectorAll('input')];
+    const named = inputs.find((i) => /שם/.test(i.labels?.[0]?.textContent ?? ''));
+    return named?.value ?? null;
+  });
+  check(
+    'and הגדרות shows the active person’s own name, not the first person’s',
+    nameField === 'דנה לוי',
+    `«${nameField}»`,
+  );
+
+  /* A recipe, its Cook Mode and back — the screens furthest from §10. */
+  await page.click(`${TAB} a[href="/notebook"]`);
+  await page.waitForTimeout(700);
+  await page.click('a[href="/recipe/brioche"]');
+  await page.waitForTimeout(900);
+  /* By href, not by label: the first version of this check looked for a link
+     reading "Cook Mode" and failed on a working screen — the product calls it
+     "מצב הכנה". The route is the contract; the wording is the product's. */
+  const recipe = await page.evaluate(() => {
+    const link = document.querySelector('a[href$="/cook"]');
+    return {
+      h1: document.querySelector('h1')?.textContent?.trim() ?? '',
+      cook: Boolean(link),
+      label: link?.textContent?.trim() ?? '',
+    };
+  });
+  check(
+    'a recipe screen opens and offers the cook route',
+    recipe.cook,
+    `h1="${recipe.h1}" link="${recipe.label}"`,
+  );
+  await page.click('a[href="/recipe/brioche/cook"]');
+  await page.waitForTimeout(900);
+  const inCook = await page.evaluate(() => ({
+    steps: document.querySelectorAll('button, [role="button"]').length,
+    tabs: document.querySelectorAll('nav[aria-label="ניווט ראשי"]').length,
+  }));
+  check(
+    'Cook Mode takes the whole screen, with no tab bar — as it does in the product',
+    inCook.tabs === 0 && inCook.steps > 0,
+    `controls=${inCook.steps} tabbars=${inCook.tabs}`,
+  );
+
+  check('no uncaught error anywhere in the run', errors.length === 0, errors.slice(0, 3).join(' | '));
 } catch (e) {
   check(`the run itself: ${e.message}`, false);
 } finally {
