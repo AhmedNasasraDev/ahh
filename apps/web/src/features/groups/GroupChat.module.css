@@ -1,19 +1,37 @@
+/*
+  A column: the history takes whatever height is left and the composer keeps
+  its own. `flex: 1` and `min-block-size: 0` are about the PARENT — GroupScreen
+  gives the chat tab a box exactly as tall as the frame allows — and are inert
+  if this component is ever rendered somewhere unbounded.
+*/
 .chat {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  flex: 1;
+  min-block-size: 0;
 }
 
 /*
-  A bounded, scrolling history with the composer below it. `dvh` rather than
-  `vh`: on a phone the address bar makes `vh` taller than the visible page, and
-  the composer ends up under it — which is the one element that must never be
-  out of reach.
+  A bounded, scrolling history with the composer below it.
+
+  It used to be bounded by `max-height: 58dvh` — a fraction of the VIEWPORT,
+  which knows nothing about how much room the group header and the tabs above
+  it have already taken. The sum overflowed the frame and the composer went
+  below the fold, which is the one element that must never be out of reach
+  (that was the point of using `dvh` over `vh` in the first place; the unit was
+  right and the reference frame was wrong). Now the parent column bounds it:
+  this takes the height that is left, and it is the only thing that scrolls.
+
+  `min-block-size: 0` because a flex item's default minimum is its content —
+  without it the list refuses to shrink and pushes the composer out again.
 */
 .scroll {
   display: grid;
   gap: 10px;
   align-content: start;
-  max-height: 58dvh;
+  flex: 1;
+  min-block-size: 0;
   overflow-y: auto;
   padding: 4px;
 }
@@ -216,7 +234,10 @@
   gap: 6px;
 }
 
+/* Never shrinks, never scrolls out of reach: this is the control the screen
+   exists for. */
 .composer {
+  flex: none;
   display: grid;
   gap: 8px;
   padding: 10px;

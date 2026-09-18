@@ -117,7 +117,21 @@ export function GroupScreen() {
   const ownRecipes = recipes.filter((r) => r.id !== '');
 
   return (
-    <div className={styles.page}>
+    /*
+      THE CHAT TAB IS A BOUNDED COLUMN, THE LESSONS TAB IS A DOCUMENT
+
+      A chat's composer has to be where your thumb is, not below the fold: on a
+      402×860 phone the header, the tabs, a message list sized as a fraction of
+      the VIEWPORT and the composer added up to more than the frame, so the
+      screen scrolled and the one control you use every few seconds was off
+      screen (measured: the send button's top at 825 in an 815px area).
+
+      So on the chat tab this screen fills the frame exactly and hands the
+      leftover height to the message list, which becomes the only thing that
+      scrolls. The lessons tab keeps ordinary document flow, because a course
+      list is meant to be scrolled through.
+    */
+    <div className={tab === 'chat' ? `${styles.page} ${styles.pageChat}` : styles.page}>
       <header className={styles.head}>
         <Link to="/groups" className={styles.back}>
           ← לכל הקבוצות

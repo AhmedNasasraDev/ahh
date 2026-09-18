@@ -110,22 +110,33 @@ function useChatHost(): HTMLElement | null {
 
 /* ── the bar ─────────────────────────────────────────────────────────────── */
 
+/*
+  COMPACT ON PURPOSE
+
+  The chat tab is now a bounded column (product fix F27): the message list gets
+  the height that is left after the header, the tabs — and this bar. Every
+  pixel this tool takes is a pixel of conversation the artifact does not show,
+  which makes the product look tighter than it is. So it is one caption line,
+  one row of chips and one short note, and it was measured at 402: 120px before,
+  about 70 after.
+*/
 const box: React.CSSProperties = {
   border: '1px dashed #9aa0a6',
   borderRadius: '8px',
   background: '#f4f4f5',
   color: '#3c4043',
-  padding: '8px 10px',
+  padding: '6px 8px',
   /* No margin: the host sits in GroupScreen's `.page`, which is a grid with a
      14px gap, and a margin on a grid item is added to the row rather than
      collapsed — 10px of it was enough to push the frame past the viewport. */
   margin: '0',
-  font: '500 13px/1.4 system-ui, sans-serif',
+  font: '500 12px/1.3 system-ui, sans-serif',
+  flex: 'none',
 };
 
 const caption: React.CSSProperties = {
-  margin: '0 0 6px',
-  font: '600 11px/1.3 system-ui, sans-serif',
+  margin: '0 0 4px',
+  font: '600 10px/1.2 system-ui, sans-serif',
   letterSpacing: '0.02em',
   color: '#5f6368',
 };
@@ -133,7 +144,7 @@ const caption: React.CSSProperties = {
 const list: React.CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '6px',
+  gap: '4px',
 };
 
 const chip = (on: boolean): React.CSSProperties => ({
@@ -141,15 +152,18 @@ const chip = (on: boolean): React.CSSProperties => ({
   borderRadius: '999px',
   background: on ? '#3c4043' : '#ffffff',
   color: on ? '#ffffff' : '#3c4043',
-  padding: '5px 10px',
-  font: '500 12px/1 system-ui, sans-serif',
+  padding: '3px 8px',
+  font: `500 11px/1 system-ui, sans-serif`,
   cursor: 'pointer',
-  minHeight: '28px',
+  // Still a real target — the product's own floor for a compact control is 40
+  // and this is a test tool, but it is operated with a thumb like everything
+  // else on this page.
+  minHeight: '26px',
 });
 
 const note: React.CSSProperties = {
-  margin: '6px 0 0',
-  font: '400 10px/1.4 system-ui, sans-serif',
+  margin: '4px 0 0',
+  font: '400 9.5px/1.3 system-ui, sans-serif',
   color: '#5f6368',
 };
 
@@ -187,10 +201,7 @@ export function SimUserBar() {
           );
         })}
       </div>
-      <p style={note}>
-        אינו חלק מ־Recipe Notebook. אין Realtime ואין שרת: המסך מחליף חשבון
-        מקומית וקורא מחדש מאותה סימולציה.
-      </p>
+      <p style={note}>אינו חלק מ־Recipe Notebook · אין שרת ואין Realtime</p>
     </div>,
     host,
   );

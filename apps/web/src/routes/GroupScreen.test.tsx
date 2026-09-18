@@ -283,6 +283,33 @@ describe('the chat tab', () => {
     expect(await screen.findByLabelText('הודעה חדשה')).toBeInTheDocument();
   });
 
+  /*
+    F27: the composer used to sit below the fold on a phone, because the screen
+    was a document that scrolled and the message list was sized as a fraction of
+    the viewport. On the chat tab the screen is now a bounded column — the list
+    takes what is left and the composer keeps its place.
+
+    jsdom has no layout, so what is asserted here is the contract this
+    component owns: WHICH layout it asks for, per tab. The measurement is in
+    artifact/scripts/responsive.mjs, which checks the send button is inside the
+    viewport and that nothing around it scrolls, at five widths.
+  */
+  it('asks for a bounded column on the chat tab and document flow on the lessons tab', async () => {
+    const { container } = render_({ groups: [seed('member')] });
+    await screen.findByRole('tab', { name: 'צ׳אט' });
+
+    const page = () => container.querySelector('div[class*="page"]');
+    const onChat = () => /pageChat/.test(page()?.className ?? '');
+
+    expect(onChat()).toBe(false);
+    await userEvent.click(screen.getByRole('tab', { name: 'צ׳אט' }));
+    await screen.findByLabelText('הודעה חדשה');
+    expect(onChat()).toBe(true);
+
+    await userEvent.click(screen.getByRole('tab', { name: 'שיעורים' }));
+    expect(onChat()).toBe(false);
+  });
+
   it('carries the unread count on the tab', async () => {
     render_({
       groups: [seed('member')],

@@ -234,13 +234,39 @@ try {
           });
         }
 
+        /*
+          THE CHAT'S COMPOSER MUST BE ON SCREEN (finding F27)
+
+          The control the screen exists for used to sit below the fold on a
+          phone: the group header, the tabs, a message list sized as a fraction
+          of the viewport and the composer added up to more than the frame, so
+          the content area scrolled and the send button was off screen. The
+          three numbers that say it is fixed: the send button's bottom is
+          inside the viewport, the shell's content area does not scroll at all
+          on this screen, and the message list is the thing that does.
+        */
+        const content = document.querySelector('main[class*="content"]');
+        const send = [...document.querySelectorAll('button')].find(
+          (b) => (b.textContent || '').trim() === 'שליחה',
+        );
+        const list = document.querySelector('section[aria-label="צ׳אט הקבוצה"] div[class*="scroll"]');
+
         return {
+          composer: send
+            ? {
+                bottom: Math.round(send.getBoundingClientRect().bottom),
+                inView: send.getBoundingClientRect().bottom <= doc.clientHeight + 1,
+              }
+            : null,
+          contentScroll: content ? content.scrollHeight - content.clientHeight : null,
+          listScrolls: list ? list.scrollHeight > list.clientHeight : null,
           badgeCovers: [...new Set(covered)],
           overflowX: doc.scrollWidth - doc.clientWidth,
           wide: [...new Set(wide)].slice(0, 4),
           tabBottom: tab ? Math.round(tab.getBoundingClientRect().bottom) : null,
           viewportH: doc.clientHeight,
           dir: el ? getComputedStyle(el).direction : 'missing',
+          viewportH: doc.clientHeight,
           smallest,
           small: small.slice(0, 5).map((t) => `${t.h}px «${t.label}»`),
           smallCount: small.length,
@@ -258,6 +284,18 @@ try {
         m.badgeCovers.length === 0,
         m.badgeCovers.join(' · '),
       );
+      if (m.composer) {
+        check(
+          `${tag}: the chat composer is on screen`,
+          m.composer.inView,
+          `send bottom ${m.composer.bottom} of ${m.viewportH}`,
+        );
+        check(
+          `${tag}: and the screen around it does not scroll`,
+          m.contentScroll === 0,
+          `content scrolls ${m.contentScroll}px`,
+        );
+      }
       if (m.tabBottom !== null) {
         check(
           `${tag}: the tab bar is on screen`,

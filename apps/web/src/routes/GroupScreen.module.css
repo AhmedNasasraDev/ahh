@@ -3,6 +3,23 @@
   gap: 14px;
 }
 
+/*
+  The chat tab only. `block-size: 100%` against the shell's content area, which
+  is a flex item of a frame with a definite height — so this box is exactly as
+  tall as the space available, and `min-block-size: 0` lets the message list
+  inside it shrink instead of pushing the composer out of view.
+
+  Declared after `.page` on purpose: both are single classes of equal
+  specificity, so source order is what makes `display: flex` win over the grid
+  above when both are applied.
+*/
+.pageChat {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  min-block-size: 0;
+}
+
 .head {
   display: grid;
   gap: 6px;
