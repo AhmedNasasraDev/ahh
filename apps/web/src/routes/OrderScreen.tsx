@@ -36,22 +36,12 @@
 
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { compute, formatGrams, formatNis, scaleFactor } from '@recipe-notebook/engine';
+import { compute, formatGrams, formatNis } from '@recipe-notebook/engine';
 import { useAppData } from '../app/AppDataProvider.js';
 import { resolveFromCatalog } from '../features/pricing/catalog.js';
 import { calcState } from '../features/recipe/completeness.js';
+import { readScale, SCALE_MODE_TEXT } from '../features/recipe/scaleLink.js';
 import styles from './OrderScreen.module.css';
-
-type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
-
-const MODES: readonly ScaleMode[] = ['recipe', 'units', 'weight', 'stock'];
-
-const MODE_TEXT: Record<ScaleMode, string> = {
-  recipe: 'כמויות כמו במתכון',
-  units: 'לפי מספר יחידות',
-  weight: 'לפי משקל סופי',
-  stock: 'לפי מלאי של רכיב',
-};
 
 interface OrderDetails {
   client: string;
@@ -96,19 +86,11 @@ export function OrderScreen() {
     [pricedRecipe, priced, prefs],
   );
 
-  /** The scale the link asked for, or the recipe's own quantities. */
-  const scale = useMemo(() => {
-    const raw = params.get('mode');
-    const mode: ScaleMode = MODES.includes(raw as ScaleMode) ? (raw as ScaleMode) : 'recipe';
-    const value = Number(params.get('v') ?? '');
-    const ing = params.get('ing') ?? undefined;
-    if (!baseline || mode === 'recipe') return { mode: 'recipe' as ScaleMode, factor: 1 };
-    const factor = scaleFactor(mode, value, baseline, ing);
-    // `scaleFactor` returns 1 for anything it cannot use, and a factor of 1 is
-    // indistinguishable from "as written" — which is what the sheet should then
-    // say, rather than claiming an adjustment it did not make.
-    return factor === 1 ? { mode: 'recipe' as ScaleMode, factor: 1 } : { mode, factor };
-  }, [params, baseline]);
+  /* The scale the link asked for, or the recipe's own quantities. The reading
+     moved to `features/recipe/scaleLink.ts` when Cook Mode became the third
+     screen that needs it — the reasoning above is still why it is in the URL,
+     and now there is one parser rather than one per screen. */
+  const scale = useMemo(() => readScale(params, baseline), [params, baseline]);
 
   const computed = useMemo(
     () => (pricedRecipe ? compute(pricedRecipe, priced, { factor: scale.factor, prefs }) : null),
@@ -166,7 +148,7 @@ export function OrderScreen() {
           </p>
           <p className={styles.formNote}>
             הכמויות בדף נלקחות מ&quot;כמה להכין&quot; שבמתכון:{' '}
-            <strong>{MODE_TEXT[scale.mode]}</strong>
+            <strong>{SCALE_MODE_TEXT[scale.mode]}</strong>
             {scale.factor !== 1 && (
               <>
                 {' · מקדם ×'}

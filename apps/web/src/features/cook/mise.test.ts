@@ -1,0 +1,160 @@
+// §14 Mise en place — the state, without a screen around it.
+//
+// The screen test (`routes/CookScreen.test.tsx`) proves the stage cannot be
+// got past. This proves the four rules it rests on: what a tick is keyed by,
+// what "complete" means, when saved ticks may be trusted, and when a saved
+// start still counts. Each of them has a wrong answer that would be invisible
+// on screen until it mattered — a tick that followed a row's position, or
+// ticks from a ×1 run restored into a ×2 bake.
+
+import { describe, expect, it } from 'vitest';
+import { compute, defaultPrefs, type Recipe } from '@recipe-notebook/engine';
+import {
+  miseKeyOf,
+  miseSignature,
+  miseState,
+  restoreMise,
+  startedFrom,
+  toggleMise,
+} from './mise.js';
+
+const PREFS = { ...defaultPrefs('pro'), done: true };
+
+const CAKE = {
+  id: 'cake',
+  name: 'עוגה',
+  category: 'עוגות',
+  ingredients: [
+    { id: 'a1', name: 'קמח', qty: 500, unit: 'g', flour: true },
+    { id: 'a2', name: 'חמאה', qty: 220, unit: 'g' },
+  ],
+  steps: [{ id: 's1', text: 'לאפות', minutes: 40 }],
+} as unknown as Recipe;
+
+const rowsOf = (recipe: Recipe, factor = 1) =>
+  compute(recipe, [recipe], { factor, prefs: PREFS }).rows;
+
+describe('a tick belongs to an ingredient, not to a position', () => {
+  it('keys by the ingredient id when there is one', () => {
+    const rows = rowsOf(CAKE);
+    expect(miseKeyOf(rows[0]!, 0)).toBe('a1');
+    expect(miseKeyOf(rows[1]!, 1)).toBe('a2');
+  });
+
+  it('follows the ingredient when the list is reordered', () => {
+    const rows = rowsOf(CAKE);
+    const reversed = [...rows].reverse();
+    const ticks = { a2: true };
+    // Butter is ticked in both lists, whichever line it is on.
+    expect(miseState(rows, ticks).ready).toBe(1);
+    expect(miseState(reversed, ticks).ready).toBe(1);
+    expect(miseKeyOf(reversed[0]!, 0)).toBe('a2');
+  });
+
+  it('falls back to the index for a row with no id, which is all that is left', () => {
+    const anon = {
+      ...CAKE,
+      ingredients: [{ name: 'קמח', qty: 500, unit: 'g' }],
+    } as unknown as Recipe;
+    expect(miseKeyOf(rowsOf(anon)[0]!, 0)).toBe('#0');
+  });
+});
+
+describe('complete means every line on screen, and at least one line', () => {
+  it('counts the ticks that match the rows', () => {
+    const rows = rowsOf(CAKE);
+    expect(miseState(rows, {})).toEqual({ total: 2, ready: 0, complete: false });
+    expect(miseState(rows, { a1: true })).toEqual({ total: 2, ready: 1, complete: false });
+    expect(miseState(rows, { a1: true, a2: true })).toEqual({
+      total: 2,
+      ready: 2,
+      complete: true,
+    });
+  });
+
+  it('is not complete with no rows — nothing can be ready', () => {
+    expect(miseState([], { a1: true })).toEqual({ total: 0, ready: 0, complete: false });
+  });
+
+  it('ignores a tick for a row that is no longer in the recipe', () => {
+    const rows = rowsOf(CAKE);
+    expect(miseState(rows, { a1: true, a2: true, gone: true }).complete).toBe(true);
+    expect(miseState(rows, { a1: true, a2: true, gone: true }).ready).toBe(2);
+  });
+
+  it('closes again when a line is added to the recipe mid-preparation', () => {
+    const bigger = {
+      ...CAKE,
+      ingredients: [...CAKE.ingredients!, { id: 'a3', name: 'סוכר', qty: 150, unit: 'g' }],
+    } as unknown as Recipe;
+    const ticks = { a1: true, a2: true };
+    expect(miseState(rowsOf(CAKE), ticks).complete).toBe(true);
+    expect(miseState(rowsOf(bigger), ticks).complete).toBe(false);
+  });
+});
+
+describe('toggling', () => {
+  it('adds and removes, and does not mutate what it was given', () => {
+    const before = { a1: true };
+    const off = toggleMise(before, 'a1');
+    expect(off).toEqual({});
+    expect(before).toEqual({ a1: true });
+    expect(toggleMise(off, 'a2')).toEqual({ a2: true });
+  });
+});
+
+describe('ticks are only true at the scale they were taken at', () => {
+  it('signs a factor stably, and distinguishes two different ones', () => {
+    expect(miseSignature(1)).toBe(miseSignature(1));
+    expect(miseSignature(2)).not.toBe(miseSignature(1));
+    expect(miseSignature(24 / 18)).toBe(miseSignature(24 / 18));
+  });
+
+  it('treats an unusable factor as "as written" rather than as a new scale', () => {
+    expect(miseSignature(Number.NaN)).toBe(miseSignature(1));
+    expect(miseSignature(0)).toBe(miseSignature(1));
+    expect(miseSignature(-2)).toBe(miseSignature(1));
+  });
+
+  it('restores ticks taken at the same factor', () => {
+    const saved = { mise: { a1: true }, miseScale: miseSignature(1) };
+    expect(restoreMise(saved, miseSignature(1))).toEqual({ a1: true });
+  });
+
+  it('restores nothing when the factor has changed — 500 g weighed is not 1 kg', () => {
+    const saved = { mise: { a1: true, a2: true }, miseScale: miseSignature(1) };
+    expect(restoreMise(saved, miseSignature(2))).toEqual({});
+  });
+
+  it('restores nothing from a record written before this stage existed', () => {
+    expect(restoreMise({}, miseSignature(1))).toEqual({});
+    expect(restoreMise(null, miseSignature(1))).toEqual({});
+  });
+});
+
+describe('a start that was saved earlier', () => {
+  const complete = { total: 2, ready: 2, complete: true };
+  const partial = { total: 2, ready: 1, complete: false };
+  const nothing = { total: 0, ready: 0, complete: false };
+
+  it('counts only when it was saved AND the list is complete now', () => {
+    expect(startedFrom(true, complete)).toBe(true);
+  });
+
+  it('does not count when nothing was saved — a complete list is not a decision', () => {
+    expect(startedFrom(false, complete)).toBe(false);
+  });
+
+  it('does not count when the list on screen is no longer complete', () => {
+    // A scale change (the ticks did not restore) or a recipe edited since.
+    expect(startedFrom(true, partial)).toBe(false);
+  });
+
+  it('does not count while the rows have not loaded yet', () => {
+    // The case that was a real bug: device storage resolves before the
+    // recipes do, and "no rows yet" must not read as "not started".
+    // `startedFrom` is asked during render instead, so this state is
+    // transient — but it must still answer "not yet" rather than "no".
+    expect(startedFrom(true, nothing)).toBe(false);
+  });
+});

@@ -15,6 +15,32 @@
 // it. Nothing is saved to the server — §14 holds completion in state, keyed by
 // step, and a cooking session is not a document.
 //
+// MISE EN PLACE COMES FIRST, AND THERE IS NO WAY ROUND IT
+//
+// A preparation starts by weighing everything out. So Cook Mode opens on the
+// ingredient list — the quantities for THIS batch, at the scale the recipe
+// page was set to — and the steps do not exist on screen until every line is
+// ticked. There is no "skip", no "start anyway", no alternative route: the
+// steps are not behind a disabled link, they are not rendered at all, and the
+// only thing that renders them is `started`, which only the button sets.
+//
+// The quantities are not computed here. `compute()` is the engine, called once
+// with the factor the link carries, and `rowLabel` is the one function in the
+// project that turns a computed row into words — the same one the recipe page
+// uses. A sub-recipe stays ONE line ("קרם פטיסייר — 500 גרם") because that is
+// how `compute()` returns it; nothing here expands it into milk and yolks, and
+// nothing here can list an ingredient twice.
+//
+// WHERE THE SCALE COMES FROM, AND WHY IT IS IN THE URL
+//
+// Cook Mode had no scale at all: it printed `ing.qty` as written, so a ×2 bake
+// was weighed from ×1 numbers. The project already answered this question for
+// the order sheet — the scale travels in the query string and is rebuilt with
+// the engine's own `scaleFactor()` (see `OrderScreen`'s header for why router
+// state and a stored field are both worse) — so the cook link now carries the
+// same three parameters through the same `scaleLink.ts`. One scaling rule,
+// three screens.
+//
 // WHERE THE PROGRESS LIVES
 //
 // `offlineMirror` has carried `CookProgress` — a per-step done map, the step
@@ -35,9 +61,21 @@
 // walked away from that step.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { unitLabel } from '@recipe-notebook/engine';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { compute } from '@recipe-notebook/engine';
 import { useAppData } from '../app/AppDataProvider.js';
+import { resolveFromCatalog } from '../features/pricing/catalog.js';
+import { readScale, SCALE_MODE_TEXT } from '../features/recipe/scaleLink.js';
+import { rowLabel } from '../features/recipe/rowLabel.js';
+import {
+  miseKeyOf,
+  miseSignature,
+  miseState,
+  restoreMise,
+  startedFrom,
+  toggleMise,
+  type MiseTicks,
+} from '../features/cook/mise.js';
 import {
   formatClock,
   startTimer,
@@ -57,8 +95,9 @@ const TICK_MS = 250;
 
 export function CookScreen() {
   const { recipeId } = useParams<{ recipeId: string }>();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { recipes, ready } = useAppData();
+  const { recipes, prefs, catalog, ready } = useAppData();
   const recipe = recipes.find((r) => r.id === recipeId) ?? null;
   const steps = useMemo(() => (recipe?.steps ?? []).filter((s) => s.text || s.minutes), [recipe]);
 
@@ -70,11 +109,64 @@ export function CookScreen() {
   /** false until the stored progress has been read, so the first write cannot
       overwrite it with an empty set. */
   const [restored, setRestored] = useState(false);
+  /** Mise en place: the ticks, and whether the preparation has been started. */
+  const [ticks, setTicks] = useState<MiseTicks>({});
+  /*
+    "Started" is two facts, and keeping them apart is what fixed a real bug.
 
-  // Read the progress for this recipe, once.
+    `startedHere` is the button being pressed in this session. `startedSaved`
+    is the flag that came back from the device. The EFFECTIVE answer (below,
+    during render) is `startedHere || (startedSaved && the list is complete
+    now)` — and it has to be decided during render, because the stored record
+    arrives before the recipes do on a cold start. Deciding it when storage
+    resolved meant asking "is the list complete?" against a row list that had
+    not loaded yet, and the cook was sent back to weigh a bake that was already
+    in the oven.
+  */
+  const [startedSaved, setStartedSaved] = useState(false);
+  const [startedHere, setStartedHere] = useState(false);
+
+  /*
+    The quantities for THIS batch, from the one engine.
+
+    Priced from the ingredient centre for the same reason the recipe page does
+    it — a row with no price of its own resolves one from there, and the
+    resolution is what makes a sub-recipe's figures whole. Cook Mode shows no
+    money at all (§14, and this screen is for working), but `compute()` takes
+    the priced recipe and it is cheaper to hand it the same input than to
+    maintain a second notion of what the recipe is.
+  */
+  const pricedNotebook = useMemo(
+    () => recipes.map((r) => resolveFromCatalog(r, catalog)),
+    [recipes, catalog],
+  );
+  const pricedRecipe = useMemo(
+    () => (recipe ? resolveFromCatalog(recipe, catalog) : null),
+    [recipe, catalog],
+  );
+  const baseline = useMemo(
+    () => (pricedRecipe ? compute(pricedRecipe, pricedNotebook, { prefs }) : null),
+    [pricedRecipe, pricedNotebook, prefs],
+  );
+  /** The scale the link carries, rebuilt with the engine's own rule. */
+  const scale = useMemo(() => readScale(params, baseline), [params, baseline]);
+  const computed = useMemo(
+    () =>
+      pricedRecipe
+        ? compute(pricedRecipe, pricedNotebook, { factor: scale.factor, prefs })
+        : null,
+    [pricedRecipe, pricedNotebook, scale.factor, prefs],
+  );
+  const rows = useMemo(() => computed?.rows ?? [], [computed]);
+  /** The ticks are only meaningful at the factor they were taken at. */
+  const signature = miseSignature(scale.factor);
+
+  // Read the progress for this recipe, once — and again if the scale changes,
+  // because ticks taken at another factor are not this preparation's.
   useEffect(() => {
     if (!recipeId) return;
     let cancelled = false;
+    setRestored(false);
     void readCookProgress(recipeId)
       .then((saved) => {
         if (cancelled) return;
@@ -84,18 +176,27 @@ export function CookScreen() {
             .map(([k]) => Number(k));
           setDone(new Set(marked));
           setAt(Number.isFinite(saved.step) ? saved.step : 0);
+          setTicks(restoreMise(saved, signature));
+          setStartedSaved(saved.started === true);
+        } else {
+          setDone(new Set());
+          setAt(0);
+          setTicks({});
+          setStartedSaved(false);
         }
+        setStartedHere(false);
         setRestored(true);
       })
       // Device storage can be blocked (a private window, cleared site data).
-      // Cook Mode still works; it just starts from the beginning.
+      // Cook Mode still works; it just starts from the beginning — which for
+      // Mise en place means weighing again, never skipping it.
       .catch(() => {
         if (!cancelled) setRestored(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [recipeId]);
+  }, [recipeId, signature]);
 
   // Write it back on a real change — not on a timer tick, which happens four
   // times a second and has nothing to do with progress.
@@ -103,8 +204,21 @@ export function CookScreen() {
     if (!recipeId || !restored) return;
     const map: Record<number, boolean> = {};
     for (const i of done) map[i] = true;
-    void writeCookProgress({ recipeId, done: map, step: at, updatedAt: Date.now() });
-  }, [recipeId, restored, done, at]);
+    void writeCookProgress({
+      recipeId,
+      done: map,
+      step: at,
+      updatedAt: Date.now(),
+      mise: { ...ticks },
+      miseScale: signature,
+      /*
+        The stored INTENT, not the effective value: while the recipes are still
+        loading the effective one is false, and writing that would erase a start
+        that really happened.
+      */
+      started: startedHere || startedSaved,
+    });
+  }, [recipeId, restored, done, at, ticks, signature, startedHere, startedSaved]);
 
   // One interval for the whole screen, and only while something is running.
   const hasTimers = timers.size > 0;
@@ -146,6 +260,113 @@ export function CookScreen() {
         <Link to={`/recipe/${recipe.id}`} className={styles.exit}>
           ← חזרה למתכון
         </Link>
+      </div>
+    );
+  }
+
+  /* ── Mise en place: the first stage, and the only way to the steps ────── */
+
+  const mise = miseState(rows, ticks);
+  const started = startedHere || startedFrom(startedSaved, mise);
+  const scaleLine =
+    scale.factor === 1
+      ? SCALE_MODE_TEXT.recipe
+      : `${SCALE_MODE_TEXT[scale.mode]} · ×${scale.factor.toFixed(2)}`;
+
+  if (!started) {
+    return (
+      <div className={styles.wrap} dir="rtl">
+        <header className={styles.head}>
+          <Link to={`/recipe/${recipe.id}`} className={`${styles.exit} nowrap`}>
+            ← יציאה
+          </Link>
+          <span className={styles.recipeName}>{recipe.name}</span>
+        </header>
+
+        <section className={styles.mise} aria-label="הכנת חומרי גלם">
+          <h1 className={styles.miseTitle}>הכנת חומרי גלם</h1>
+          <p className={styles.miseHelp}>
+            הכינו ושקלו את כל חומרי הגלם לפני שמתחילים בהכנה.
+          </p>
+          <p className={styles.miseScale}>
+            הכמויות כאן הן של ההכנה הזאת: {scaleLine}
+          </p>
+
+          {mise.total === 0 ? (
+            /*
+              A recipe with steps and no ingredients. There is nothing to
+              weigh, so there is no stage to complete — and a disabled button
+              with an empty list above it would be a dead end rather than a
+              rule. It says what it is instead.
+            */
+            <p className={styles.miseEmpty}>
+              למתכון הזה לא נרשמו חומרי גלם, ולכן אין מה לשקול לפני ההכנה. אפשר
+              להוסיף אותם בעריכת המתכון.
+            </p>
+          ) : (
+            <>
+              <p className={styles.count} role="status">
+                <span className="ltr">{mise.ready}</span> מתוך{' '}
+                <span className="ltr">{mise.total}</span> חומרי גלם מוכנים
+              </p>
+              {/* No second `role="status"`: the count above is the live region,
+                  and two of them announce over each other. This line is the
+                  same fact said in the words §14's request asked for. */}
+              {mise.complete && (
+                <p className={styles.miseDone}>
+                  <span className="ltr">100%</span> — Mise en place הושלם
+                </p>
+              )}
+
+              <ul className={styles.miseList}>
+                {rows.map((row, i) => {
+                  const key = miseKeyOf(row, i);
+                  const on = ticks[key] === true;
+                  /*
+                    The SAME `rowLabel` the recipe page prints, in grams —
+                    which is what a mise en place is. A sub-recipe row comes
+                    back as one weight of the base recipe, because that is how
+                    `compute()` returned it.
+                  */
+                  const label = rowLabel(row, 'g', scale.factor, prefs);
+                  return (
+                    <li key={key}>
+                      <label className={on ? styles.miseRowOn : styles.miseRow}>
+                        <input
+                          type="checkbox"
+                          className={styles.miseBox}
+                          checked={on}
+                          onChange={() => setTicks((prev) => toggleMise(prev, key))}
+                        />
+                        <span className={styles.miseName}>
+                          {row.ing.name || 'רכיב בלי שם'}
+                        </span>
+                        <span className={`${styles.miseQty} ltr`}>{label.text}</span>
+                        {label.hint !== '' && (
+                          <span className={styles.miseHint}>{label.hint}</span>
+                        )}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+
+          <button
+            type="button"
+            className={styles.start}
+            /*
+              The gate. Not a link to somewhere else, not a confirmation that
+              can be dismissed: while this is disabled the steps are not on the
+              page at all, and this is the only thing that puts them there.
+            */
+            disabled={!mise.complete && mise.total > 0}
+            onClick={() => setStartedHere(true)}
+          >
+            הכול מוכן — מתחילים בהכנה
+          </button>
+        </section>
       </div>
     );
   }
@@ -314,17 +535,20 @@ export function CookScreen() {
       )}
 
       {/* The ingredients, because a step that says "add the butter" is not
-          enough on its own and leaving the screen to check loses your place. */}
-      {(recipe.ingredients ?? []).length > 0 && (
+          enough on its own and leaving the screen to check loses your place.
+
+          The SAME rows and the same labels as the Mise en place list above it,
+          which is why this list changed: it printed `ing.qty` as written, so
+          on a ×2 bake this panel and the weighing list would have shown two
+          different numbers for the same ingredient on the same screen. */}
+      {rows.length > 0 && (
         <details className={styles.ings}>
           <summary className={styles.ingsSummary}>הרכיבים</summary>
           <ul className={styles.ingsList}>
-            {(recipe.ingredients ?? []).map((ing, i) => (
-              <li key={ing.id ?? i} className={styles.ingRow}>
-                <span>{ing.name}</span>
-                <span className="ltr">
-                  {ing.qty ?? ''} {unitLabel(ing.unit)}
-                </span>
+            {rows.map((row, i) => (
+              <li key={miseKeyOf(row, i)} className={styles.ingRow}>
+                <span>{row.ing.name || 'רכיב בלי שם'}</span>
+                <span className="ltr">{rowLabel(row, 'g', scale.factor, prefs).text}</span>
               </li>
             ))}
           </ul>

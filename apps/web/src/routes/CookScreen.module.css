@@ -87,6 +87,139 @@
   color: #c9d2cc;
 }
 
+/* ── Mise en place: the first stage ───────────────────────────────────────
+   Same dark surface, same tokens, same type scale as the rest of the screen —
+   it is a stage of Cook Mode, not a screen of its own. What is deliberately
+   bigger than the app's default is the tap target: a 64px row and a 28px box,
+   because this is operated with wet hands while looking at a scale, and the
+   penalty for a mis-tap here is weighing something twice. */
+.mise {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-in-group);
+  flex: 1;
+}
+
+/* The heading is the biggest thing here, and the instruction is not: the first
+   screenshot of this stage had a 16px title over 25px help text, which reads as
+   a caption over a headline. The ingredient NAMES stay at §14's 25px, because
+   those are what is read from arm's length at the scale. */
+.miseTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-cook-body);
+  line-height: 1.2;
+  color: var(--c-white);
+}
+
+.miseHelp {
+  font-size: var(--fs-body-lg);
+  line-height: 1.5;
+  color: #e6ebe8;
+}
+
+.miseScale,
+.miseEmpty {
+  font-size: var(--fs-secondary);
+  color: #c9d2cc;
+  line-height: 1.6;
+}
+
+.miseDone {
+  font-size: var(--fs-body-lg);
+  font-weight: 600;
+  color: var(--c-white);
+}
+
+.miseList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.miseRow,
+.miseRowOn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 1px solid #4a5550;
+  border-radius: var(--r-card);
+  background: #202623;
+  color: var(--c-white);
+  cursor: pointer;
+}
+
+/* Ticked: the green the rest of the app uses for "done", and the row stays
+   fully legible — a finished line still has to be readable at a glance to
+   answer "what is left". */
+.miseRowOn {
+  border-color: var(--c-green);
+  background: var(--c-green);
+}
+
+.miseBox {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  accent-color: var(--c-green);
+  cursor: pointer;
+}
+
+.miseRowOn .miseBox {
+  accent-color: var(--c-white);
+}
+
+.miseName {
+  font-size: var(--fs-cook-body);
+  line-height: 1.3;
+  flex: 1;
+  min-width: 0;
+}
+
+.miseQty {
+  font-size: var(--fs-cook-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.miseHint {
+  font-size: var(--fs-secondary);
+  color: #c9d2cc;
+  flex: none;
+}
+
+.miseRowOn .miseHint {
+  color: #e6ebe8;
+}
+
+/* The gate. Full width, 60px, and unmistakably inert until the list is done. */
+.start {
+  min-height: 60px;
+  margin-block-start: auto;
+  padding: 12px 18px;
+  border: 1px solid var(--c-green);
+  border-radius: var(--r-control);
+  background: var(--c-green);
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.start:disabled {
+  border-color: #4a5550;
+  background: transparent;
+  color: #c9d2cc;
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ── the step ─────────────────────────────────────────────────────────── */
 .stepBox {
   display: flex;

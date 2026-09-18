@@ -4,9 +4,7 @@ import {
   compute,
   formatGrams,
   formatNis,
-  homeMeasure,
   scaleFactor,
-  unitLabel,
   type ComputedRow,
   type IngredientLike,
 } from '@recipe-notebook/engine';
@@ -15,6 +13,8 @@ import { SourceBadge } from '../components/SourceBadge.js';
 import { ConvertSheet } from '../features/recipe/ConvertSheet.js';
 import { CalibrateSheet } from '../features/recipe/CalibrateSheet.js';
 import { calcState, type CalcState } from '../features/recipe/completeness.js';
+import { rowLabel, type ViewMode } from '../features/recipe/rowLabel.js';
+import { scaleQuery, type ScaleMode } from '../features/recipe/scaleLink.js';
 import { resolveFromCatalog, unpricedKeys } from '../features/pricing/catalog.js';
 import { foodCost } from '../features/pricing/foodCost.js';
 import {
@@ -32,8 +32,6 @@ import { writeLastOpened } from '../data/offlineMirror.js';
 import { RecipeInUseError, type StoredVersion } from '../data/repository.js';
 import styles from '../features/recipe/recipe.module.css';
 
-type ScaleMode = 'recipe' | 'units' | 'weight' | 'stock';
-type ViewMode = 'orig' | 'g' | 'home';
 
 /*
   `srLabel` exists for exactly one reason, found by the stage-10 §10 audit
@@ -232,12 +230,7 @@ export function RecipeScreen() {
    * plain URL means "as written" rather than "×1.00", which is the same thing
    * said less clearly.
    */
-  const orderQuery = (() => {
-    if (scaleMode === 'recipe' || factor === 1) return '';
-    const q = new URLSearchParams({ mode: scaleMode, v: scaleValue });
-    if (scaleMode === 'stock' && scaleIngredient) q.set('ing', scaleIngredient);
-    return `?${q.toString()}`;
-  })();
+  const scaleSearch = scaleQuery(scaleMode, scaleValue, scaleIngredient, factor);
 
   if (!recipe || !computed || !baseline) {
     return (
@@ -368,31 +361,10 @@ export function RecipeScreen() {
       ? `${Math.floor(totalMinutes / 60)} שע'${totalMinutes % 60 ? ` ${totalMinutes % 60} דק'` : ''}`
       : `${totalMinutes} דק'`;
 
-  /** What a row shows in the current view mode (§5.4). */
-  const rowLabel = (row: ComputedRow): { text: string; hint: string } => {
-    if (row.g === null) {
-      return { text: '—', hint: 'אין נתון אמין' };
-    }
-    if (view === 'g' || row.ing.subId) {
-      return { text: formatGrams(row.g), hint: '' };
-    }
-    if (view === 'home') {
-      const home = homeMeasure(row.ing, factor, prefs);
-      return home?.ok
-        ? { text: home.text, hint: formatGrams(row.g) }
-        : // §5.4: a row with no reliable data stays in grams and is marked as such
-          { text: formatGrams(row.g), hint: 'נשקל בגרם, אין נתון אמין' };
-    }
-    // "as written": keep the recipe's own unit, scaled
-    const qty = Number(row.ing.qty ?? 0) * factor;
-    const rounded =
-      Math.abs(qty - Math.round(qty)) < 0.01 ? Math.round(qty) : Math.round(qty * 100) / 100;
-    const text = `${rounded} ${unitLabel(row.ing.unit)}`;
-    const grams = formatGrams(row.g);
-    // The gram hint is only worth showing when it adds something. For an
-    // ingredient already written in grams it would just repeat the line.
-    return { text, hint: text === grams ? '' : grams };
-  };
+  /* §5.4's three views. The function moved to `features/recipe/rowLabel.ts`
+     when Cook Mode needed the same labels for Mise en place — one answer to
+     "how much flour", printed by both screens. */
+  const label = (row: ComputedRow) => rowLabel(row, view, factor, prefs);
 
   return (
     <div className={styles.page}>
@@ -436,7 +408,10 @@ export function RecipeScreen() {
         leading to a screen that apologises.
       */}
       {(recipe.steps ?? []).some((st) => st.text || st.minutes) && (
-        <Link to={`/recipe/${recipe.id}/cook`} className={styles.cookBtn}>
+        <Link
+          to={`/recipe/${recipe.id}/cook${scaleSearch}`}
+          className={styles.cookBtn}
+        >
           מצב הכנה
         </Link>
       )}
@@ -462,7 +437,7 @@ export function RecipeScreen() {
           תווית מוצר
         </Link>
         <Link
-          to={`/recipe/${recipe.id}/order${orderQuery}`}
+          to={`/recipe/${recipe.id}/order${scaleSearch}`}
           className={styles.printLink}
         >
           דף הזמנה
@@ -732,7 +707,7 @@ export function RecipeScreen() {
 
         <ul className={styles.ingredients}>
           {computed.rows.map((row) => {
-            const { text, hint } = rowLabel(row);
+            const { text, hint } = label(row);
             const unresolved = row.g === null;
             return (
               <li key={row.ing.id ?? row.ing.name}>

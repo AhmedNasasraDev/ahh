@@ -1,10 +1,20 @@
 // §14 Cook Mode.
 //
-// The arithmetic of the timers is tested in `features/cook/timers.test.ts`.
-// What is tested here is the screen: that marking a step advances and undoes,
-// that the bar can be jumped, that a timer started on one step is visible from
-// another — which is the whole point of a parallel timer — and that a recipe
-// with no steps says so instead of opening an empty dark screen.
+// The arithmetic of the timers is tested in `features/cook/timers.test.ts` and
+// the Mise en place state in `features/cook/mise.test.ts`. What is tested here
+// is the screen: that the weighing stage comes first and cannot be got round,
+// that marking a step advances and undoes, that the bar can be jumped, that a
+// timer started on one step is visible from another — which is the whole point
+// of a parallel timer — and that a recipe with no steps says so instead of
+// opening an empty dark screen.
+//
+// EVERY TEST ABOUT THE STEPS NOW PASSES THROUGH THE WEIGHING FIRST
+//
+// That is the feature, not an inconvenience: the steps are not rendered at all
+// until the ingredients are ticked, so a test that went straight to step 1 was
+// testing a screen that no longer exists. `startCooking()` does what a cook
+// does — ticks the list, presses the button — and the tests that assert the
+// gate itself are in their own block at the bottom.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { memoryIdb, resetMemoryIdb } from '../test/memoryIdb.js';
@@ -17,6 +27,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { defaultPrefs, type Recipe } from '@recipe-notebook/engine';
 import { CookScreen } from './CookScreen.js';
+import { writeCookProgress } from '../data/offlineMirror.js';
 import { AppDataProvider } from '../app/AppDataProvider.js';
 import { fakeRepository } from '../test/render.js';
 
@@ -39,9 +50,9 @@ const BREAD: Recipe = {
   ],
 } as unknown as Recipe;
 
-function show(recipe: Recipe = BREAD) {
+function show(recipe: Recipe = BREAD, search = '') {
   return render(
-    <MemoryRouter initialEntries={[`/recipe/${recipe.id}/cook`]}>
+    <MemoryRouter initialEntries={[`/recipe/${recipe.id}/cook${search}`]}>
       <AppDataProvider repository={fakeRepository({
         prefs: { ...defaultPrefs('pro'), done: true },
         recipes: [recipe],
@@ -57,9 +68,23 @@ function show(recipe: Recipe = BREAD) {
   );
 }
 
+/**
+ * Mise en place, the way a cook clears it: tick every line, press the button.
+ *
+ * Takes the user-event instance so the fake-timer block can pass its own.
+ */
+async function startCooking(user = userEvent.setup()): Promise<void> {
+  const boxes = await screen.findAllByRole('checkbox');
+  for (const box of boxes) await user.click(box);
+  await user.click(
+    screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' }),
+  );
+}
+
 describe('§14 one step at a time', () => {
   it('opens on the first step, with its number, text and timing', async () => {
     show();
+    await startCooking();
     expect(await screen.findByText('לשים 8 דקות')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 3');
@@ -68,6 +93,7 @@ describe('§14 one step at a time', () => {
   it('marks a step as done and advances, which is §14\'s rule', async () => {
     const user = userEvent.setup();
     show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
 
     await user.click(screen.getByRole('button', { name: 'סימון השלב כהושלם' }));
@@ -78,6 +104,7 @@ describe('§14 one step at a time', () => {
   it('un-marks on a second press, and does not move', async () => {
     const user = userEvent.setup();
     show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
 
     // Mark step 1 (advances to 2), jump back, press again.
@@ -93,6 +120,7 @@ describe('§14 one step at a time', () => {
   it('does not advance off the end when the LAST step is marked', async () => {
     const user = userEvent.setup();
     show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
     await user.click(screen.getByRole('button', { name: 'שלב 3' }));
     await user.click(screen.getByRole('button', { name: 'סימון השלב כהושלם' }));
@@ -104,6 +132,7 @@ describe('§14 one step at a time', () => {
   it('jumps straight to a step from the progress bar (§14)', async () => {
     const user = userEvent.setup();
     show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
     await user.click(screen.getByRole('button', { name: 'שלב 3' }));
     expect(screen.getByText('אפייה')).toBeInTheDocument();
@@ -113,6 +142,7 @@ describe('§14 one step at a time', () => {
   it('offers "סיום ההכנה" on the last step and nowhere else', async () => {
     const user = userEvent.setup();
     show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
     expect(screen.queryByRole('button', { name: 'סיום ההכנה' })).not.toBeInTheDocument();
 
@@ -123,6 +153,7 @@ describe('§14 one step at a time', () => {
 
   it('disables "הקודם" on the first step rather than hiding it', async () => {
     show();
+    await startCooking();
     await screen.findByText('לשים 8 דקות');
     expect(screen.getByRole('button', { name: 'הקודם' })).toBeDisabled();
   });
@@ -130,6 +161,7 @@ describe('§14 one step at a time', () => {
   it('keeps the ingredients one tap away, so checking does not lose your place', async () => {
     const user = userEvent.setup();
     show();
+    await startCooking(user);
     await user.click(await screen.findByText('הרכיבים'));
     expect(screen.getByText('קמח לחם')).toBeInTheDocument();
     // Still on the same step.
@@ -150,6 +182,7 @@ describe('§14 the parallel timers', () => {
   it('starts a timer for the step, from the step', async () => {
     const u = user();
     show();
+    await startCooking(u);
     await screen.findByText('לשים 8 דקות');
     await u.click(screen.getByRole('button', { name: /הפעלת טיימר/ }));
 
@@ -160,6 +193,7 @@ describe('§14 the parallel timers', () => {
   it('is still visible from ANOTHER step, which is what parallel means', async () => {
     const u = user();
     show();
+    await startCooking(u);
     await screen.findByText('לשים 8 דקות');
     await u.click(screen.getByRole('button', { name: /הפעלת טיימר/ }));
     await u.click(screen.getByRole('button', { name: 'שלב 3' }));
@@ -171,6 +205,7 @@ describe('§14 the parallel timers', () => {
   it('runs two at once, each with its own clock', async () => {
     const u = user();
     show();
+    await startCooking(u);
     await screen.findByText('לשים 8 דקות');
     await u.click(screen.getByRole('button', { name: /הפעלת טיימר/ }));
     await u.click(screen.getByRole('button', { name: 'שלב 2' }));
@@ -184,6 +219,7 @@ describe('§14 the parallel timers', () => {
   it('counts down in real time, and turns into an alert at zero', async () => {
     const u = user();
     show();
+    await startCooking(u);
     await screen.findByText('לשים 8 דקות');
     await u.click(screen.getByRole('button', { name: /הפעלת טיימר/ }));
 
@@ -201,6 +237,7 @@ describe('§14 the parallel timers', () => {
   it('pauses and resumes', async () => {
     const u = user();
     show();
+    await startCooking(u);
     await screen.findByText('לשים 8 דקות');
     await u.click(screen.getByRole('button', { name: /הפעלת טיימר/ }));
 
@@ -222,6 +259,7 @@ describe('§14 the parallel timers', () => {
   it('deletes one', async () => {
     const u = user();
     show();
+    await startCooking(u);
     await screen.findByText('לשים 8 דקות');
     await u.click(screen.getByRole('button', { name: /הפעלת טיימר/ }));
     await u.click(screen.getByRole('button', { name: 'מחיקת הטיימר של שלב 1' }));
@@ -268,6 +306,7 @@ describe('§17 a screen that cannot do its job says so', () => {
       steps: [{ id: 's1', minutes: 30, kind: 'chill' }],
     } as unknown as Recipe;
     show(odd);
+    await startCooking();
     expect(await screen.findByText('שלב בלי תיאור')).toBeInTheDocument();
     expect(screen.getByText(/קירור/)).toBeInTheDocument();
   });
@@ -284,6 +323,7 @@ describe('§14 the progress is remembered on the device', () => {
   it('comes back to the step you were on, with the ticks you made', async () => {
     const user = userEvent.setup();
     const first = show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
 
     // Tick step 1 — which advances to step 2 — then leave.
@@ -291,7 +331,9 @@ describe('§14 the progress is remembered on the device', () => {
     await screen.findByText('תפיחה ראשונה');
     first.unmount();
 
-    // Reopening is what a backgrounded app coming back really is.
+    // Reopening is what a backgrounded app coming back really is. The
+    // weighing was done before leaving, so it is not asked for again — which
+    // is restoring the preparation, not skipping a stage of it.
     show();
     expect(await screen.findByText('תפיחה ראשונה')).toBeInTheDocument();
     await waitFor(() =>
@@ -302,6 +344,7 @@ describe('§14 the progress is remembered on the device', () => {
   it('starts clean after "סיום ההכנה", because the next bake is a new one', async () => {
     const user = userEvent.setup();
     const first = show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
     await user.click(screen.getByRole('button', { name: 'סימון השלב כהושלם' }));
     await user.click(screen.getByRole('button', { name: 'שלב 3' }));
@@ -309,8 +352,13 @@ describe('§14 the progress is remembered on the device', () => {
     await screen.findByText('דף המתכון');
     first.unmount();
 
+    // A new preparation weighs again, and inherits no tick from the last one.
     show();
-    await screen.findByText('לשים 8 דקות');
+    expect(await screen.findByRole('heading', { name: 'הכנת חומרי גלם' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 2 חומרי גלם מוכנים'),
+    );
+    await startCooking();
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 3'),
     );
@@ -326,14 +374,345 @@ describe('§14 the progress is remembered on the device', () => {
     } as unknown as Recipe;
 
     const first = show();
+    await startCooking(user);
     await screen.findByText('לשים 8 דקות');
     await user.click(screen.getByRole('button', { name: 'סימון השלב כהושלם' }));
     first.unmount();
 
+    // Another recipe starts at its own weighing, with nothing ticked.
     show(CAKE);
+    expect(await screen.findByRole('heading', { name: 'הכנת חומרי גלם' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 2 חומרי גלם מוכנים'),
+    );
+    await startCooking();
     await screen.findByText('לערבב');
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 1'),
     );
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// §14 Mise en place.
+//
+// The stage that has to be true for the rest of Cook Mode to mean anything:
+// everything weighed, on the bench, before the first step exists. What is
+// checked here is the RULE, not the decoration — where the quantities come
+// from, that they follow the scale, that a tick survives being put down, and
+// above all that there is no way from this screen to the steps except through
+// a complete list.
+describe('§14 Mise en place — the stage that cannot be skipped', () => {
+  /** The list from the request, with quantities the engine will print as-is. */
+  const CAKE = {
+    id: 'cake',
+    name: 'עוגת חמאה',
+    category: 'עוגות',
+    ingredients: [
+      { id: 'a1', name: 'קמח', qty: 500, unit: 'g', flour: true },
+      { id: 'a2', name: 'חמאה', qty: 220, unit: 'g' },
+      { id: 'a3', name: 'ביצים', qty: 180, unit: 'g' },
+      { id: 'a4', name: 'סוכר', qty: 150, unit: 'g' },
+      { id: 'a5', name: 'אבקת אפייה', qty: 12, unit: 'g' },
+    ],
+    steps: [
+      { id: 'k1', text: 'להקציף חמאה וסוכר', minutes: 6, kind: 'active' },
+      { id: 'k2', text: 'לאפות', minutes: 45, temp: 170, kind: 'bake' },
+    ],
+  } as unknown as Recipe;
+
+  it('opens on the weighing list and not on the first step', async () => {
+    show(CAKE);
+    expect(
+      await screen.findByRole('heading', { name: 'הכנת חומרי גלם' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('הכינו ושקלו את כל חומרי הגלם לפני שמתחילים בהכנה.'),
+    ).toBeInTheDocument();
+    // The steps are not merely hidden behind a disabled control: they are not
+    // on the page.
+    expect(screen.queryByText('להקציף חמאה וסוכר')).not.toBeInTheDocument();
+  });
+
+  it('lists this recipe’s own ingredients, one line each', async () => {
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    for (const name of ['קמח', 'חמאה', 'ביצים', 'סוכר', 'אבקת אפייה']) {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+    expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 5 חומרי גלם מוכנים');
+  });
+
+  it('prints the quantities the engine computed, in the engine’s own words', async () => {
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    // `formatGrams` is what produces these — 500 → "500 גר'", and 1000 would
+    // become "1 ק\"ג". Nothing in the Mise en place list formats a number.
+    expect(screen.getByText("500 גר'")).toBeInTheDocument();
+    expect(screen.getByText("220 גר'")).toBeInTheDocument();
+    expect(screen.getByText("12 גר'")).toBeInTheDocument();
+  });
+
+  it('follows the scale the link carries, and says which scale it is', async () => {
+    // The recipe weighs 1,062 g; asking for 2,124 g is ×2 — computed by the
+    // engine's own `scaleFactor`, not by this screen and not by this test.
+    show(CAKE, '?mode=weight&v=2124');
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    expect(screen.getByText('1 ק"ג')).toBeInTheDocument(); // 500 → 1000
+    expect(screen.getByText("440 גר'")).toBeInTheDocument(); // 220 → 440
+    expect(screen.getByText("24 גר'")).toBeInTheDocument(); // 12 → 24
+    expect(screen.getByText(/לפי משקל סופי/)).toBeInTheDocument();
+    expect(screen.getByText(/×2\.00/)).toBeInTheDocument();
+  });
+
+  it('does not carry ticks across a change of scale — 500 g weighed is not 1 kg weighed', async () => {
+    const user = userEvent.setup();
+    const first = show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    for (const box of screen.getAllByRole('checkbox')) await user.click(box);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('5 מתוך 5'),
+    );
+    first.unmount();
+
+    show(CAKE, '?mode=weight&v=2124');
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    // Nothing ticked, the new quantities on screen, and the gate shut.
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 5'),
+    );
+    expect(screen.getByText('1 ק"ג')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' }),
+    ).toBeDisabled();
+  });
+
+  it('remembers a tick, and remembers taking it back', async () => {
+    const user = userEvent.setup();
+    const first = show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    const boxes = screen.getAllByRole('checkbox');
+    await user.click(boxes[0]!);
+    await user.click(boxes[1]!);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('2 מתוך 5'),
+    );
+    first.unmount();
+
+    // Put the phone down, pick it up: the same two lines are still ticked.
+    const second = show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('2 מתוך 5'),
+    );
+    expect(screen.getAllByRole('checkbox')[0]).toBeChecked();
+    expect(screen.getAllByRole('checkbox')[2]).not.toBeChecked();
+
+    // Un-tick one, leave again, and the un-tick is what comes back.
+    await user.click(screen.getAllByRole('checkbox')[0]!);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('1 מתוך 5'),
+    );
+    second.unmount();
+
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('1 מתוך 5'),
+    );
+    expect(screen.getAllByRole('checkbox')[0]).not.toBeChecked();
+  });
+
+  it('keeps the button disabled while even one line is missing', async () => {
+    const user = userEvent.setup();
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    const boxes = screen.getAllByRole('checkbox');
+    for (const box of boxes.slice(0, 4)) await user.click(box);
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('4 מתוך 5'),
+    );
+    expect(
+      screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' }),
+    ).toBeDisabled();
+    expect(screen.queryByText('להקציף חמאה וסוכר')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mise en place הושלם/)).not.toBeInTheDocument();
+  });
+
+  it('offers nothing that gets past it — no skip, no "start anyway", no other way in', async () => {
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+
+    for (const word of [/דלג/, /בכל זאת/, /ללא הכנ/, /התחל ללא/, /לשלבים/]) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+    // The only controls are the five ticks, the gate, and the way out of Cook
+    // Mode — which goes to the recipe, not to the steps.
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName('הכול מוכן — מתחילים בהכנה');
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/recipe/cake');
+  });
+
+  it('opens the gate at 100%, and the press lands on step 1', async () => {
+    const user = userEvent.setup();
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    for (const box of screen.getAllByRole('checkbox')) await user.click(box);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Mise en place הושלם/)).toBeInTheDocument(),
+    );
+    const gate = screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' });
+    expect(gate).toBeEnabled();
+
+    await user.click(gate);
+    // The existing first step of the existing Cook Mode, unchanged.
+    expect(await screen.findByText('להקציף חמאה וסוכר')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'סימון השלב כהושלם' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'הכנת חומרי גלם' })).not.toBeInTheDocument();
+  });
+
+  it('takes the gate back the moment a tick is undone', async () => {
+    const user = userEvent.setup();
+    show(CAKE);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    const boxes = screen.getAllByRole('checkbox');
+    for (const box of boxes) await user.click(box);
+    expect(
+      screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' }),
+    ).toBeEnabled();
+
+    await user.click(boxes[2]!);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('4 מתוך 5'),
+    );
+    expect(
+      screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' }),
+    ).toBeDisabled();
+    expect(screen.queryByText(/Mise en place הושלם/)).not.toBeInTheDocument();
+  });
+
+  it('treats a base recipe as one thing to prepare, and does not unpack it', async () => {
+    const CREAM = {
+      id: 'cream',
+      name: 'קרם פטיסייר',
+      category: 'קרמים',
+      isSub: true,
+      ingredients: [
+        { id: 'c1', name: 'חלב', qty: 500, unit: 'g', liquid: true },
+        { id: 'c2', name: 'חלמונים', qty: 90, unit: 'g' },
+        { id: 'c3', name: 'סוכר לקרם', qty: 110, unit: 'g' },
+      ],
+      steps: [{ id: 'cs1', text: 'לבשל', minutes: 8 }],
+    } as unknown as Recipe;
+    const TART = {
+      id: 'tart',
+      name: 'טארט',
+      category: 'טארטים',
+      ingredients: [
+        { id: 't1', name: 'בצק שקדים', qty: 300, unit: 'g' },
+        { id: 't2', name: 'קרם פטיסייר', qty: 500, unit: 'g', subId: 'cream' },
+      ],
+      steps: [{ id: 'ts1', text: 'להרכיב', minutes: 10 }],
+    } as unknown as Recipe;
+
+    render(
+      <MemoryRouter initialEntries={['/recipe/tart/cook']}>
+        <AppDataProvider repository={fakeRepository({
+          prefs: { ...defaultPrefs('pro'), done: true },
+          recipes: [TART, CREAM],
+        })}
+        >
+          <Routes>
+            <Route path="/recipe/:recipeId/cook" element={<CookScreen />} />
+            <Route path="/recipe/:recipeId" element={<p>דף המתכון</p>} />
+          </Routes>
+        </AppDataProvider>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    // Two lines, as the recipe is written: the base recipe is ONE of them.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(screen.getByText('קרם פטיסייר')).toBeInTheDocument();
+    expect(screen.getByText("500 גר'")).toBeInTheDocument();
+    // And its own ingredients are the base recipe's business, not this list's.
+    expect(screen.queryByText('חלב')).not.toBeInTheDocument();
+    expect(screen.queryByText('חלמונים')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 2');
+  });
+
+  it('is not opened by stored step progress — a reload is not a way past it', async () => {
+    // A record from a session that never weighed anything: steps marked, no
+    // Mise en place. Reading it back must not put the steps on the screen.
+    await writeCookProgress({
+      recipeId: 'cake',
+      done: { 0: true },
+      step: 1,
+      updatedAt: Date.now(),
+    });
+
+    show(CAKE);
+    expect(
+      await screen.findByRole('heading', { name: 'הכנת חומרי גלם' }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 5'),
+    );
+    expect(screen.queryByText('להקציף חמאה וסוכר')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' }),
+    ).toBeDisabled();
+  });
+
+  it('is not opened by a stored "started" whose ticks belong to another scale', async () => {
+    await writeCookProgress({
+      recipeId: 'cake',
+      done: {},
+      step: 0,
+      updatedAt: Date.now(),
+      mise: { a1: true, a2: true, a3: true, a4: true, a5: true },
+      miseScale: '1.000000',
+      started: true,
+    });
+
+    show(CAKE, '?mode=weight&v=2124');
+    expect(
+      await screen.findByRole('heading', { name: 'הכנת חומרי גלם' }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('0 מתוך 5'),
+    );
+  });
+
+  it('is right-to-left, like every other screen in the app', async () => {
+    show(CAKE);
+    const list = await screen.findByLabelText('הכנת חומרי גלם');
+    expect(list.closest('div[dir="rtl"]')).not.toBeNull();
+  });
+
+  it('says so when there is nothing to weigh, instead of being a dead end', async () => {
+    const NOTHING = {
+      id: 'nothing',
+      name: 'טמפרור שוקולד',
+      category: 'שוקולד',
+      ingredients: [],
+      steps: [{ id: 'n1', text: 'להמיס ל־45°', minutes: 5 }],
+    } as unknown as Recipe;
+
+    const user = userEvent.setup();
+    show(NOTHING);
+    await screen.findByRole('heading', { name: 'הכנת חומרי גלם' });
+    expect(screen.getByText(/לא נרשמו חומרי גלם/)).toBeInTheDocument();
+    const gate = screen.getByRole('button', { name: 'הכול מוכן — מתחילים בהכנה' });
+    expect(gate).toBeEnabled();
+    await user.click(gate);
+    expect(await screen.findByText('להמיס ל־45°')).toBeInTheDocument();
   });
 });

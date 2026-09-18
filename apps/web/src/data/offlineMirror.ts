@@ -3,8 +3,9 @@
 // Holds only what has to survive a dead zone in the kitchen:
 //   • measurement preferences and calibrations — every conversion needs them
 //   • the active recipe — so the recipe page and Cook Mode keep working
-//   • Cook Mode progress — step marks and timers, which the prototype lost on
-//     every reload (a real annoyance mid-bake)
+//   • Cook Mode progress — the Mise en place ticks, step marks and the step you
+//     were on, which the prototype lost on every reload (a real annoyance
+//     mid-bake, and worse when it is the weighing that is lost)
 //
 // It is a CACHE, never the source of truth. Nothing here is authoritative and
 // nothing here is synced upward; writes go to the repository.
@@ -99,6 +100,26 @@ export interface CookProgress {
   done: Record<number, boolean>;
   step: number;
   updatedAt: number;
+  /*
+    §14 Mise en place. Three OPTIONAL fields on the record that already
+    existed, rather than a second store: this is the same fact as the step
+    marks — how far this preparation has got on this device — and it belongs in
+    the same row, cleared by the same "סיום ההכנה" and by the same
+    `clearMirror()` on sign-out. A record written before these existed reads
+    back with them undefined, which is "nothing was weighed yet".
+  */
+  /** tick key → weighed and on the bench. Keys come from `features/cook/mise.ts`. */
+  mise?: Record<string, boolean>;
+  /**
+   * The scale those ticks were taken at.
+   *
+   * A tick says "500 grams of this is ready", so it is only true at the factor
+   * it was made at. Stored beside the ticks so a run at another scale does not
+   * inherit them; `restoreMise` is what compares them.
+   */
+  miseScale?: string;
+  /** the person pressed "הכול מוכן — מתחילים בהכנה" for this preparation */
+  started?: boolean;
 }
 
 export const readCookProgress = (recipeId: string): Promise<CookProgress | null> =>

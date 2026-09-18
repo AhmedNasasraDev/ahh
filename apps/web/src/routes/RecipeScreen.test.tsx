@@ -693,4 +693,31 @@ describe('§2 the way to the label and the order sheet', () => {
       '/recipe/brioche/order',
     );
   });
+
+  /*
+    §14 Cook Mode is the third screen that needs the scale, and the one where
+    being wrong is worst: the order sheet is read at a desk, Mise en place is
+    weighed. The link carries the same three parameters, built by the same
+    `scaleQuery`, so what is weighed is what was asked for.
+  */
+  it('carries the same scale into "מצב הכנה", because that is what gets weighed', async () => {
+    const user = userEvent.setup();
+    renderRecipe('brioche');
+    await screen.findByRole('heading', { name: 'בריוש נאנטר' });
+
+    expect(screen.getByRole('link', { name: 'מצב הכנה' })).toHaveAttribute(
+      'href',
+      '/recipe/brioche/cook',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'יחידות' }));
+    await user.type(screen.getByLabelText('מספר יחידות'), '36');
+
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'מצב הכנה' })).toHaveAttribute(
+        'href',
+        '/recipe/brioche/cook?mode=units&v=36',
+      ),
+    );
+  });
 });
