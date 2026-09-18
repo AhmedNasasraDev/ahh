@@ -25,15 +25,27 @@ import { fileURLToPath } from 'node:url';
 const PW = process.env['PW'] ?? '/opt/node22/lib/node_modules/playwright/index.js';
 const { chromium } = (await import(PW)).default ?? (await import(PW));
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DIST = path.join(HERE, '..', 'dist');
+/* Both default to the local build, and both can be pointed at the files the
+   artifact service actually serves (downloaded with `Artifact action:"read"`),
+   so this can check the LIVE page and not only the one on disk:
+     PAGE=<dir>/index.html DIST=<dir> node artifact/scripts/<this>.mjs */
+const DIST = process.env['DIST'] ?? path.join(HERE, '..', 'dist');
 const OUT = path.join(HERE, '..', '..', '.e2e-shots', 'audit');
 fs.mkdirSync(OUT, { recursive: true });
 const CHROME = process.env['CHROME'] ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-const PAGE = fs.readFileSync(path.join(HERE, '..', 'app-page.html'), 'utf8');
-/* The platform's own skeleton, as its documentation describes it: charset and
-   viewport meta, a small reset, and :root padded by the safe-area insets. */
-const WRAPPED = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui;background:#fafaf9}img{max-width:100%}[hidden]{display:none!important}</style></head><body>${PAGE}</body></html>`;
+const PAGE = fs.readFileSync(
+  process.env['PAGE'] ?? path.join(HERE, '..', 'app-page.html'),
+  'utf8',
+);
+/* The platform's OWN skeleton, copied verbatim from the published page
+   (`Artifact action:"read"` with `path:"index.html"` returns the page as the
+   service stores it, wrapper included). It is quoted rather than approximated
+   because two of its declarations decide layout here: the safe-area padding on
+   `:root`, and `box-sizing: border-box`. */
+const HEAD =
+  '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>';
+const WRAPPED = `${HEAD}${PAGE}</body></html>`;
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url ?? '/').split('?')[0].split('#')[0]);
