@@ -311,7 +311,25 @@ try {
 
   const layout = await page.evaluate(() => {
     const chat = document.querySelector('section[aria-label="צ׳אט הקבוצה"]');
-    const scroller = chat.querySelector('div[class*="scroll"]');
+    /*
+      THE SCROLLER IS THE SCREEN'S, NOT THE CHAT'S
+
+      This used to read `div[class*="scroll"]` inside the chat — the message
+      list's own bounded frame. That frame is gone: the group screen is now
+      ONE scroller (the shell's `.content`), the group header scrolls away,
+      and the tabs and the composer are `position: sticky`. So the honest
+      measure of "the conversation scrolls" is the screen's scroller, and
+      what has to be proven alongside it is that the two sticky bars stay
+      put while it moves.
+    */
+    const scroller = document.querySelector('main[class*="content"]');
+    const tabs = document.querySelector('div[role="tablist"]');
+    const composer = chat.querySelector('div[class*="composer"]');
+    const box = (el) => {
+      if (el === null) return null;
+      const r = el.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom) };
+    };
     const rows = [...chat.querySelectorAll('article')];
     const last3 = rows.slice(-3);
     const wide = rows.filter((r) => r.getBoundingClientRect().width > window.innerWidth + 1);
@@ -324,6 +342,11 @@ try {
       scrollable: scroller.scrollHeight > scroller.clientHeight + 4,
       atBottom:
         Math.abs(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop) < 40,
+      // The newest message, and the bar it must not hide behind.
+      lastRow: box(rows.at(-1) ?? null),
+      tabs: box(tabs),
+      composer: box(composer),
+      viewport: window.innerHeight,
       overflowing: wide.length,
       consecutiveMine: last3.every((r) => /mine/.test(r.className)),
       total: rows.length,
@@ -332,8 +355,34 @@ try {
   check('the chat is right-to-left', layout.dir === 'rtl', layout.dir);
   check('a long message does not widen the screen', layout.overflowing === 0 && layout.pageScroll === 0);
   check('three messages in a row from one person are all drawn as his', layout.consecutiveMine === true);
-  check('the conversation scrolls inside its own frame', layout.scrollable === true);
-  check('and the newest message is in view', layout.atBottom === true, `${layout.total} messages`);
+  check(
+    "the conversation scrolls in the screen's own scroller",
+    layout.scrollable === true,
+  );
+  /*
+    "In view" now means two things, because the composer is sticky: the
+    scroller is at its end AND the newest message is not underneath the bar.
+    The second half is the defect this caught when the sticky layout landed —
+    the last message sat 699-818 behind a composer starting at 709 — which
+    `.bottomAnchor { scroll-margin-block-end }` fixes.
+  */
+  check(
+    'and the newest message is in view, clear of the composer',
+    layout.atBottom === true &&
+      layout.lastRow !== null &&
+      layout.composer !== null &&
+      layout.lastRow.bottom <= layout.composer.top,
+    `${layout.total} messages, last ${layout.lastRow?.top}-${layout.lastRow?.bottom}, composer from ${layout.composer?.top}`,
+  );
+  check(
+    'the tabs and the composer stay pinned while it scrolls',
+    layout.tabs !== null &&
+      layout.tabs.top >= 0 &&
+      layout.tabs.top < 120 &&
+      layout.composer !== null &&
+      layout.composer.bottom <= layout.viewport + 2,
+    `tabs ${layout.tabs?.top}-${layout.tabs?.bottom}, composer ${layout.composer?.top}-${layout.composer?.bottom} of ${layout.viewport}`,
+  );
   /*
     THE PAGE ITSELF MUST NOT SCROLL — MEASURED ON THE BODY, NOT ON <html>
 
@@ -342,9 +391,10 @@ try {
     fold. `documentElement.scrollHeight` is the wrong proxy for that —
     Chromium counts overflow from descendants of an internally scrolling
     container in it, so a screen whose content area legitimately scrolls
-    (the group chat: a 58dvh message list plus a composer) reports 56px of
-    "page scroll" while the body is exactly the viewport and nothing ever
-    moves. Measured: body 860 of 860, `scrollTop` 0, tab bar 815-860.
+    (the group screen: a header that scrolls away, sticky tabs, a long
+    conversation) reports "page scroll" while the body is exactly the
+    viewport and nothing ever moves. Measured: body 860 of 860, `scrollTop`
+    0, tab bar 815-860.
 
     So: the body is not taller than the viewport, and the document is never
     actually scrolled.

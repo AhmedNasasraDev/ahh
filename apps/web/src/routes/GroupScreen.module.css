@@ -3,22 +3,7 @@
   gap: 14px;
 }
 
-/*
-  The chat tab only. `block-size: 100%` against the shell's content area, which
-  is a flex item of a frame with a definite height — so this box is exactly as
-  tall as the space available, and `min-block-size: 0` lets the message list
-  inside it shrink instead of pushing the composer out of view.
 
-  Declared after `.page` on purpose: both are single classes of equal
-  specificity, so source order is what makes `display: flex` win over the grid
-  above when both are applied.
-*/
-.pageChat {
-  display: flex;
-  flex-direction: column;
-  block-size: 100%;
-  min-block-size: 0;
-}
 
 .head {
   display: grid;
@@ -99,9 +84,26 @@
   color: var(--c-red);
 }
 
+/*
+  Sticky, on both tabs.
+
+  The scroller is the shell's content area, so `top: 0` is the top of the
+  screen's visible box: the group's title and note scroll away and the way
+  between "שיעורים" and "צ׳אט" stays where it was. An opaque background and
+  the padding are what stop the messages from showing through as they pass
+  behind it, and `z-index` puts it above them.
+
+  On the lessons tab this is the same improvement for the same reason — the
+  chat is one tap away from the bottom of a long course list.
+*/
 .tabs {
   display: flex;
   gap: 8px;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  padding-block: 8px;
+  background: var(--c-app-bg);
 }
 
 .tab {

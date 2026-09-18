@@ -235,31 +235,38 @@ try {
         }
 
         /*
-          THE CHAT'S COMPOSER MUST BE ON SCREEN (finding F27)
+          THE CHAT'S TWO EDGES MUST STAY ON SCREEN (finding F27)
 
-          The control the screen exists for used to sit below the fold on a
-          phone: the group header, the tabs, a message list sized as a fraction
-          of the viewport and the composer added up to more than the frame, so
-          the content area scrolled and the send button was off screen. The
-          three numbers that say it is fixed: the send button's bottom is
-          inside the viewport, the shell's content area does not scroll at all
-          on this screen, and the message list is the thing that does.
+          The control the screen exists for used to sit below the fold. The
+          shape now is one scroller with both edges pinned — the tabs sticky at
+          the top, the composer sticky at the bottom, the group header free to
+          scroll away — so what is measured is that BOTH are inside the
+          viewport, and that the newest message is not hidden behind the
+          composer. Checked here as the chat opens and again after scrolling up
+          through the history, because sticky is exactly the thing that can be
+          right in one scroll position and wrong in another.
         */
-        const content = document.querySelector('main[class*="content"]');
         const send = [...document.querySelectorAll('button')].find(
           (b) => (b.textContent || '').trim() === 'שליחה',
         );
-        const list = document.querySelector('section[aria-label="צ׳אט הקבוצה"] div[class*="scroll"]');
+        const tabs = document.querySelector('[class*="tabs"]');
+        const rows = [...document.querySelectorAll('section[aria-label="צ׳אט הקבוצה"] article')];
+        const last = rows.at(-1);
+        const inView = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return r.top >= -1 && r.bottom <= doc.clientHeight + 1;
+        };
 
         return {
           composer: send
-            ? {
-                bottom: Math.round(send.getBoundingClientRect().bottom),
-                inView: send.getBoundingClientRect().bottom <= doc.clientHeight + 1,
-              }
+            ? { bottom: Math.round(send.getBoundingClientRect().bottom), inView: inView(send) }
             : null,
-          contentScroll: content ? content.scrollHeight - content.clientHeight : null,
-          listScrolls: list ? list.scrollHeight > list.clientHeight : null,
+          tabsInView: inView(tabs),
+          newestClear:
+            last && send
+              ? last.getBoundingClientRect().bottom <= send.getBoundingClientRect().top + 1
+              : null,
           badgeCovers: [...new Set(covered)],
           overflowX: doc.scrollWidth - doc.clientWidth,
           wide: [...new Set(wide)].slice(0, 4),
@@ -290,10 +297,46 @@ try {
           m.composer.inView,
           `send bottom ${m.composer.bottom} of ${m.viewportH}`,
         );
+        check(`${tag}: so are the tabs`, m.tabsInView === true);
         check(
-          `${tag}: and the screen around it does not scroll`,
-          m.contentScroll === 0,
-          `content scrolls ${m.contentScroll}px`,
+          `${tag}: and the newest message is not behind the composer`,
+          m.newestClear === true,
+        );
+
+        /*
+          Now scroll back up through the history — the position where a sticky
+          edge stops being sticky if anything about the containing block is
+          wrong — and ask the same two questions again.
+        */
+        await page.evaluate(() => {
+          const c = document.querySelector('main[class*="content"]');
+          if (c) c.scrollTop = 0;
+        });
+        await page.waitForTimeout(350);
+        const up = await page.evaluate(() => {
+          const doc = document.documentElement;
+          const send = [...document.querySelectorAll('button')].find(
+            (b) => (b.textContent || '').trim() === 'שליחה',
+          );
+          const tabs = document.querySelector('[class*="tabs"]');
+          const head = document.querySelector('header[class*="head"]');
+          const inView = (el) => {
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return r.top >= -1 && r.bottom <= doc.clientHeight + 1;
+          };
+          return {
+            composer: inView(send),
+            tabs: inView(tabs),
+            headTop: head ? Math.round(head.getBoundingClientRect().top) : null,
+          };
+        });
+        check(`${tag}: the composer is still on screen at the top of the history`, up.composer === true);
+        check(`${tag}: and so are the tabs`, up.tabs === true);
+        check(
+          `${tag}: the group header is what scrolls — and it is there at the top`,
+          up.headTop !== null && up.headTop >= -1,
+          `header top ${up.headTop}`,
         );
       }
       if (m.tabBottom !== null) {

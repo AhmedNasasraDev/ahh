@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GroupScreen } from './GroupScreen.js';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fakeRepository, renderRoute } from '../test/render.js';
 import type { FakeGroupOptions, FakeGroupSeed } from '../test/fakeGroups.js';
 import type { GroupRole } from '../lib/database.types.js';
@@ -284,30 +287,48 @@ describe('the chat tab', () => {
   });
 
   /*
-    F27: the composer used to sit below the fold on a phone, because the screen
-    was a document that scrolled and the message list was sized as a fraction of
-    the viewport. On the chat tab the screen is now a bounded column — the list
-    takes what is left and the composer keeps its place.
+    F27, AND THE SHAPE THAT REPLACED ITS FIRST FIX
 
-    jsdom has no layout, so what is asserted here is the contract this
-    component owns: WHICH layout it asks for, per tab. The measurement is in
-    artifact/scripts/responsive.mjs, which checks the send button is inside the
-    viewport and that nothing around it scrolls, at five widths.
+    The composer used to sit below the fold on a phone: the screen scrolled as
+    a document and the message list was bounded by a fraction of the VIEWPORT,
+    so the sum was taller than the frame. The first fix made the chat tab a
+    column exactly as tall as the frame — the composer was safe, and a 184px
+    group header ate a third of the conversation. The shape now is one scroller
+    with both edges pinned: the header scrolls away, the tabs stick to the top
+    and the composer sticks to the bottom.
+
+    jsdom has no layout, so this asserts the three CSS rules that shape holds —
+    the same way `styles/tokens.test.ts` pins the design tokens. What it cannot
+    do is measure; that is `artifact/scripts/responsive.mjs`, which checks in a
+    real browser at five widths that the composer and the tabs are inside the
+    viewport both when the chat opens and after scrolling up through the
+    history, and that the newest message is not behind the composer.
   */
-  it('asks for a bounded column on the chat tab and document flow on the lessons tab', async () => {
-    const { container } = render_({ groups: [seed('member')] });
-    await screen.findByRole('tab', { name: 'צ׳אט' });
+  it('pins the tabs and the composer to the edges of one scroller (F27)', () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const groupCss = readFileSync(path.join(here, 'GroupScreen.module.css'), 'utf8');
+    const chatCss = readFileSync(
+      path.join(here, '..', 'features', 'groups', 'GroupChat.module.css'),
+      'utf8',
+    );
 
-    const page = () => container.querySelector('div[class*="page"]');
-    const onChat = () => /pageChat/.test(page()?.className ?? '');
+    // The tabs stay at the top of the scroller, opaque so the messages do not
+    // show through them.
+    expect(groupCss).toMatch(/\.tabs\s*\{[^}]*position:\s*sticky/s);
+    expect(groupCss).toMatch(/\.tabs\s*\{[^}]*inset-block-start:\s*0/s);
+    expect(groupCss).toMatch(/\.tabs\s*\{[^}]*background:\s*var\(--c-app-bg\)/s);
 
-    expect(onChat()).toBe(false);
-    await userEvent.click(screen.getByRole('tab', { name: 'צ׳אט' }));
-    await screen.findByLabelText('הודעה חדשה');
-    expect(onChat()).toBe(true);
+    // The composer stays at the bottom of it.
+    expect(chatCss).toMatch(/\.composer\s*\{[^}]*position:\s*sticky/s);
+    expect(chatCss).toMatch(/\.composer\s*\{[^}]*inset-block-end:\s*0/s);
 
-    await userEvent.click(screen.getByRole('tab', { name: 'שיעורים' }));
-    expect(onChat()).toBe(false);
+    // And the history is not a scroller of its own any more — that is what put
+    // the composer below the fold in the first place.
+    expect(chatCss).not.toMatch(/\.scroll\s*\{[^}]*max-height/s);
+    expect(chatCss).not.toMatch(/\.scroll\s*\{[^}]*overflow-y/s);
+
+    // The auto-scroll leaves the newest message clear of the sticky bar.
+    expect(chatCss).toMatch(/\.bottomAnchor\s*\{[^}]*scroll-margin-block-end/s);
   });
 
   it('carries the unread count on the tab', async () => {

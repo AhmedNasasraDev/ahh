@@ -427,7 +427,9 @@ export function GroupChat({ groupId, role, members, avatarUrls }: GroupChatProps
                 })}
               </div>
             ))}
-            <div ref={bottom} />
+            {/* Where the auto-scroll comes to rest; `.bottomAnchor` keeps the
+                newest message clear of the sticky composer. */}
+            <div ref={bottom} className={styles.bottomAnchor} />
           </>
         )}
       </div>

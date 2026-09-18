@@ -1,39 +1,46 @@
 /*
-  A column: the history takes whatever height is left and the composer keeps
-  its own. `flex: 1` and `min-block-size: 0` are about the PARENT — GroupScreen
-  gives the chat tab a box exactly as tall as the frame allows — and are inert
-  if this component is ever rendered somewhere unbounded.
+  A column, and NOT a scroller of its own: the screen around it is the one
+  scroller (see GroupScreen's `.page`), the history flows at its natural
+  height, and the composer below it sticks to the bottom of the view.
 */
 .chat {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  flex: 1;
-  min-block-size: 0;
 }
 
 /*
-  A bounded, scrolling history with the composer below it.
+  The history. It does NOT scroll on its own.
 
-  It used to be bounded by `max-height: 58dvh` — a fraction of the VIEWPORT,
-  which knows nothing about how much room the group header and the tabs above
-  it have already taken. The sum overflowed the frame and the composer went
-  below the fold, which is the one element that must never be out of reach
-  (that was the point of using `dvh` over `vh` in the first place; the unit was
-  right and the reference frame was wrong). Now the parent column bounds it:
-  this takes the height that is left, and it is the only thing that scrolls.
-
-  `min-block-size: 0` because a flex item's default minimum is its content —
-  without it the list refuses to shrink and pushes the composer out again.
+  Two earlier versions are worth remembering. It was bounded by
+  `max-height: 58dvh` — a fraction of the VIEWPORT, which knows nothing about
+  the header above it, so the sum overflowed the frame and the composer went
+  below the fold. Then it was `flex: 1` inside a column exactly as tall as the
+  frame: the composer was safe, and a 184px group header ate a third of the
+  conversation. Now the screen scrolls as one document with the tabs and the
+  composer stuck to its two edges, so the list needs no height rule at all —
+  it is as tall as the messages in it.
 */
 .scroll {
   display: grid;
   gap: 10px;
   align-content: start;
-  flex: 1;
-  min-block-size: 0;
-  overflow-y: auto;
   padding: 4px;
+}
+
+/*
+  The anchor the auto-scroll aims at, and the only reason it has a class.
+
+  The composer is sticky at the bottom, so aligning the anchor with the bottom
+  EDGE of the scroller leaves the newest message behind the bar — measured: the
+  last bubble ended at 818 with the composer starting at 709. A scroll margin
+  is the right tool because it changes only where a scroll comes to rest, not
+  the layout: no empty band at the end of the conversation, which is what
+  bottom padding on the list would have left. Generous on purpose — the
+  composer grows by a line when a reply is being quoted.
+*/
+.bottomAnchor {
+  scroll-margin-block-end: 150px;
 }
 
 .state,
@@ -234,10 +241,18 @@
   gap: 6px;
 }
 
-/* Never shrinks, never scrolls out of reach: this is the control the screen
-   exists for. */
+/*
+  Never out of reach: this is the control the screen exists for, so it sticks
+  to the bottom of the scroller and the history passes behind it.
+
+  `--c-paper` was already its background, which is what makes that work — a
+  transparent bar would show the messages through it. The bottom margin is the
+  gap the sticky edge would otherwise eat.
+*/
 .composer {
-  flex: none;
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 1;
   display: grid;
   gap: 8px;
   padding: 10px;
